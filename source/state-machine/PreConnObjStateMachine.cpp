@@ -1,18 +1,18 @@
 
 // Copyright 2023 Two Six Technologies
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-// 
+//
 
 #include "PreConnObjStateMachine.h"
 
@@ -32,34 +32,36 @@ namespace Raceboat {
 //-----------------------------------------------------------------------------------------------
 
 void PreConnObjContext::updatePreConnObjStateMachineStart(
-    RaceHandle contextHandle, RaceHandle recvHandle, const ConnectionID &_recvConnId,
-    const ChannelId &_recvChannel, const ChannelId &_sendChannel, const std::string &_sendRole,
+    RaceHandle contextHandle, RaceHandle recvHandle,
+    const ConnectionID &_recvConnId, const ChannelId &_recvChannel,
+    const ChannelId &_sendChannel, const std::string &_sendRole,
     const std::string &_sendLinkAddress, const std::string &_packageId,
     std::vector<std::vector<uint8_t>> recvMessages) {
-    this->parentHandle = contextHandle;
-    this->recvConnSMHandle = recvHandle;
-    this->recvConnId = _recvConnId;
-    this->sendChannel = _sendChannel;
-    this->sendRole = _sendRole;                // TODO:
-    this->sendLinkAddress = _sendLinkAddress;  // TODO:
-    this->recvChannel = _recvChannel;
-    this->packageId = _packageId;
-    this->recvQueue = recvMessages;
+  this->parentHandle = contextHandle;
+  this->recvConnSMHandle = recvHandle;
+  this->recvConnId = _recvConnId;
+  this->sendChannel = _sendChannel;
+  this->sendRole = _sendRole;               // TODO:
+  this->sendLinkAddress = _sendLinkAddress; // TODO:
+  this->recvChannel = _recvChannel;
+  this->packageId = _packageId;
+  this->recvQueue = recvMessages;
 }
 
-void PreConnObjContext::updateReceiveEncPkg(ConnectionID /* connId */,
-                                            std::shared_ptr<std::vector<uint8_t>> data) {
-    this->recvQueue.push_back(*data);
+void PreConnObjContext::updateReceiveEncPkg(
+    ConnectionID /* connId */, std::shared_ptr<std::vector<uint8_t>> data) {
+  this->recvQueue.push_back(*data);
 }
 
-void PreConnObjContext::updateConnStateMachineConnected(RaceHandle /* contextHandle */,
-                                                        ConnectionID connId,
-                                                        std::string /* linkAddress */) {
-    this->sendConnId = connId;
+void PreConnObjContext::updateConnStateMachineConnected(
+    RaceHandle /* contextHandle */, ConnectionID connId,
+    std::string /* linkAddress */) {
+  this->sendConnId = connId;
 }
 
-void PreConnObjContext::updateListenAccept(std::function<void(ApiStatus, RaceHandle)> cb) {
-    this->acceptCb = cb;
+void PreConnObjContext::updateListenAccept(
+    std::function<void(ApiStatus, RaceHandle)> cb) {
+  this->acceptCb = cb;
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -67,101 +69,100 @@ void PreConnObjContext::updateListenAccept(std::function<void(ApiStatus, RaceHan
 //-----------------------------------------------------------------------------------------------
 
 struct StatePreConnObjInitial : public PreConnObjState {
-    explicit StatePreConnObjInitial(StateType id = STATE_PRE_CONN_OBJ_INITIAL) :
-        PreConnObjState(id, "STATE_PRE_CONN_OBJ_INITIAL") {}
-    virtual EventResult enter(Context &context) {
-        TRACE_METHOD();
-        auto &ctx = getContext(context);
+  explicit StatePreConnObjInitial(StateType id = STATE_PRE_CONN_OBJ_INITIAL)
+      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_INITIAL") {}
+  virtual EventResult enter(Context &context) {
+    TRACE_METHOD();
+    auto &ctx = getContext(context);
 
-        ctx.manager.registerPackageId(ctx, ctx.recvConnId, ctx.packageId);
-        ctx.manager.registerHandle(ctx, ctx.parentHandle);
+    ctx.manager.registerPackageId(ctx, ctx.recvConnId, ctx.packageId);
+    ctx.manager.registerHandle(ctx, ctx.parentHandle);
 
-        return EventResult::SUCCESS;
-    }
+    return EventResult::SUCCESS;
+  }
 };
 
 struct StatePreConnObjAccepted : public PreConnObjState {
-    explicit StatePreConnObjAccepted(StateType id = STATE_PRE_CONN_OBJ_ACCEPTED) :
-        PreConnObjState(id, "STATE_PRE_CONN_OBJ_ACCEPTED") {}
-    virtual EventResult enter(Context &context) {
-        TRACE_METHOD();
-        auto &ctx = getContext(context);
+  explicit StatePreConnObjAccepted(StateType id = STATE_PRE_CONN_OBJ_ACCEPTED)
+      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_ACCEPTED") {}
+  virtual EventResult enter(Context &context) {
+    TRACE_METHOD();
+    auto &ctx = getContext(context);
 
-        ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
-            ctx.handle, ctx.sendChannel, ctx.sendRole, ctx.sendLinkAddress, true);
+    ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
+        ctx.handle, ctx.sendChannel, ctx.sendRole, ctx.sendLinkAddress, true);
 
-        if (ctx.sendConnSMHandle == NULL_RACE_HANDLE) {
-            helper::logError(logPrefix + " starting connection state machine failed");
-            return EventResult::NOT_SUPPORTED;
-        }
-
-        ctx.manager.registerHandle(ctx, ctx.sendConnSMHandle);
-        ctx.pendingEvents.push(EVENT_ALWAYS);
-
-        return EventResult::SUCCESS;
+    if (ctx.sendConnSMHandle == NULL_RACE_HANDLE) {
+      helper::logError(logPrefix + " starting connection state machine failed");
+      return EventResult::NOT_SUPPORTED;
     }
+
+    ctx.manager.registerHandle(ctx, ctx.sendConnSMHandle);
+    ctx.pendingEvents.push(EVENT_ALWAYS);
+
+    return EventResult::SUCCESS;
+  }
 };
 
 struct StatePreConnObjOpening : public PreConnObjState {
-    explicit StatePreConnObjOpening(StateType id = STATE_PRE_CONN_OBJ_OPENING) :
-        PreConnObjState(id, "STATE_PRE_CONN_OBJ_OPENING") {}
-    virtual EventResult enter(Context & /* context */) {
-        TRACE_METHOD();
-        return EventResult::SUCCESS;
-    }
+  explicit StatePreConnObjOpening(StateType id = STATE_PRE_CONN_OBJ_OPENING)
+      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_OPENING") {}
+  virtual EventResult enter(Context & /* context */) {
+    TRACE_METHOD();
+    return EventResult::SUCCESS;
+  }
 };
 
 struct StatePreConnObjOpen : public PreConnObjState {
-    explicit StatePreConnObjOpen(StateType id = STATE_PRE_CONN_OBJ_FINISHED) :
-        PreConnObjState(id, "STATE_PRE_CONN_OBJ_FINISHED") {}
-    virtual EventResult enter(Context &context) {
-        TRACE_METHOD();
-        auto &ctx = getContext(context);
+  explicit StatePreConnObjOpen(StateType id = STATE_PRE_CONN_OBJ_FINISHED)
+      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_FINISHED") {}
+  virtual EventResult enter(Context &context) {
+    TRACE_METHOD();
+    auto &ctx = getContext(context);
 
-        RaceHandle connObjectApiHandle = ctx.manager.getCore().generateHandle();
-        RaceHandle connObjectHandle = ctx.manager.startConnObjectStateMachine(
-            ctx.handle, ctx.recvConnSMHandle, ctx.recvConnId, ctx.sendConnSMHandle, ctx.sendConnId,
-            ctx.sendChannel, ctx.recvChannel, ctx.packageId, {std::move(ctx.recvQueue)},
-            connObjectApiHandle);
-        ctx.recvQueue.clear();
-        if (connObjectHandle == NULL_RACE_HANDLE) {
-            helper::logError(logPrefix + " starting connection object state machine failed");
-            return EventResult::NOT_SUPPORTED;
-        }
-
-        ctx.manager.unregisterHandle(ctx, ctx.sendConnSMHandle);
-        bool success = ctx.manager.detachConnSM(ctx.handle, ctx.sendConnSMHandle);
-        if (!success) {
-            helper::logError(logPrefix + "detachConnSM failed");
-            return EventResult::NOT_SUPPORTED;
-        }
-
-        ctx.acceptCb(ApiStatus::OK, connObjectApiHandle);
-        ctx.acceptCb = {};
-
-        ctx.manager.stateMachineFinished(ctx);
-        return EventResult::SUCCESS;
+    RaceHandle connObjectApiHandle = ctx.manager.getCore().generateHandle();
+    RaceHandle connObjectHandle = ctx.manager.startConnObjectStateMachine(
+        ctx.handle, ctx.recvConnSMHandle, ctx.recvConnId, ctx.sendConnSMHandle,
+        ctx.sendConnId, ctx.sendChannel, ctx.recvChannel, ctx.packageId,
+        {std::move(ctx.recvQueue)}, connObjectApiHandle);
+    ctx.recvQueue.clear();
+    if (connObjectHandle == NULL_RACE_HANDLE) {
+      helper::logError(logPrefix +
+                       " starting connection object state machine failed");
+      return EventResult::NOT_SUPPORTED;
     }
-    virtual bool finalState() {
-        return true;
+
+    ctx.manager.unregisterHandle(ctx, ctx.sendConnSMHandle);
+    bool success = ctx.manager.detachConnSM(ctx.handle, ctx.sendConnSMHandle);
+    if (!success) {
+      helper::logError(logPrefix + "detachConnSM failed");
+      return EventResult::NOT_SUPPORTED;
     }
+
+    ctx.acceptCb(ApiStatus::OK, connObjectApiHandle);
+    ctx.acceptCb = {};
+
+    ctx.manager.stateMachineFinished(ctx);
+    return EventResult::SUCCESS;
+  }
+  virtual bool finalState() { return true; }
 };
 
 struct StatePreConnObjFailed : public PreConnObjState {
-    explicit StatePreConnObjFailed(StateType id = STATE_PRE_CONN_OBJ_FAILED) :
-        PreConnObjState(id, "STATE_PRE_CONN_OBJ_FAILED") {}
-    virtual EventResult enter(Context &context) {
-        TRACE_METHOD();
-        auto &ctx = getContext(context);
+  explicit StatePreConnObjFailed(StateType id = STATE_PRE_CONN_OBJ_FAILED)
+      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_FAILED") {}
+  virtual EventResult enter(Context &context) {
+    TRACE_METHOD();
+    auto &ctx = getContext(context);
 
-        if (ctx.acceptCb) {
-            ctx.acceptCb(ApiStatus::INTERNAL_ERROR, {});
-            ctx.acceptCb = {};
-        }
-
-        ctx.manager.stateMachineFailed(ctx);
-        return EventResult::SUCCESS;
+    if (ctx.acceptCb) {
+      ctx.acceptCb(ApiStatus::INTERNAL_ERROR, {});
+      ctx.acceptCb = {};
     }
+
+    ctx.manager.stateMachineFailed(ctx);
+    return EventResult::SUCCESS;
+  }
 };
 
 //-----------------------------------------------------------------------------------------------
@@ -169,24 +170,24 @@ struct StatePreConnObjFailed : public PreConnObjState {
 //-----------------------------------------------------------------------------------------------
 
 PreConnObjStateEngine::PreConnObjStateEngine() {
-    addInitialState<StatePreConnObjInitial>(STATE_PRE_CONN_OBJ_INITIAL);
-    addState<StatePreConnObjAccepted>(STATE_PRE_CONN_OBJ_ACCEPTED);
-    addState<StatePreConnObjOpening>(STATE_PRE_CONN_OBJ_OPENING);
-    addState<StatePreConnObjOpen>(STATE_PRE_CONN_OBJ_FINISHED);
-    addFailedState<StatePreConnObjFailed>(STATE_PRE_CONN_OBJ_FAILED);
+  addInitialState<StatePreConnObjInitial>(STATE_PRE_CONN_OBJ_INITIAL);
+  addState<StatePreConnObjAccepted>(STATE_PRE_CONN_OBJ_ACCEPTED);
+  addState<StatePreConnObjOpening>(STATE_PRE_CONN_OBJ_OPENING);
+  addState<StatePreConnObjOpen>(STATE_PRE_CONN_OBJ_FINISHED);
+  addFailedState<StatePreConnObjFailed>(STATE_PRE_CONN_OBJ_FAILED);
 
-    // clang-format off
+  // clang-format off
     // initial -> opening -> open
     declareStateTransition(STATE_PRE_CONN_OBJ_INITIAL,   EVENT_RECEIVE_PACKAGE,              STATE_PRE_CONN_OBJ_INITIAL);
     declareStateTransition(STATE_PRE_CONN_OBJ_INITIAL,   EVENT_LISTEN_ACCEPTED,              STATE_PRE_CONN_OBJ_ACCEPTED);
     declareStateTransition(STATE_PRE_CONN_OBJ_ACCEPTED,  EVENT_ALWAYS,                       STATE_PRE_CONN_OBJ_OPENING);
     declareStateTransition(STATE_PRE_CONN_OBJ_OPENING,   EVENT_RECEIVE_PACKAGE,              STATE_PRE_CONN_OBJ_OPENING);
     declareStateTransition(STATE_PRE_CONN_OBJ_OPENING,   EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_PRE_CONN_OBJ_FINISHED);
-    // clang-format on
+  // clang-format on
 }
 
 std::string PreConnObjStateEngine::eventToString(EventType event) {
-    return Raceboat::eventToString(event);
+  return Raceboat::eventToString(event);
 }
 
-}  // namespace Raceboat
+} // namespace Raceboat

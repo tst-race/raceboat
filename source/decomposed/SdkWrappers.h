@@ -27,68 +27,80 @@ class ComponentManager;
 
 class ComponentSdkBaseWrapper : public virtual IComponentSdkBase {
 public:
-    ComponentSdkBaseWrapper(ComponentManager &manager, const std::string &id);
+  ComponentSdkBaseWrapper(ComponentManager &manager, const std::string &id);
 
-    virtual std::string getActivePersona() override;
+  virtual std::string getActivePersona() override;
 
-    virtual ChannelResponse requestPluginUserInput(const std::string &key,
-                                                   const std::string &prompt, bool cache) override;
-    virtual ChannelResponse requestCommonUserInput(const std::string &key) override;
+  virtual ChannelResponse requestPluginUserInput(const std::string &key,
+                                                 const std::string &prompt,
+                                                 bool cache) override;
+  virtual ChannelResponse
+  requestCommonUserInput(const std::string &key) override;
 
-    virtual ChannelResponse updateState(ComponentState state) override;
+  virtual ChannelResponse updateState(ComponentState state) override;
 
-    virtual std::string toString() const;
+  virtual std::string toString() const;
 
-    virtual ChannelResponse makeDir(const std::string &directoryPath) override;
-    virtual ChannelResponse removeDir(const std::string &directoryPath) override;
-    virtual std::vector<std::string> listDir(const std::string &directoryPath) override;
-    virtual std::vector<std::uint8_t> readFile(const std::string &filepath) override;
-    virtual ChannelResponse appendFile(const std::string &filepath,
-                                       const std::vector<std::uint8_t> &data) override;
-    virtual ChannelResponse writeFile(const std::string &filepath,
-                                      const std::vector<std::uint8_t> &data) override;
+  virtual ChannelResponse makeDir(const std::string &directoryPath) override;
+  virtual ChannelResponse removeDir(const std::string &directoryPath) override;
+  virtual std::vector<std::string>
+  listDir(const std::string &directoryPath) override;
+  virtual std::vector<std::uint8_t>
+  readFile(const std::string &filepath) override;
+  virtual ChannelResponse
+  appendFile(const std::string &filepath,
+             const std::vector<std::uint8_t> &data) override;
+  virtual ChannelResponse
+  writeFile(const std::string &filepath,
+            const std::vector<std::uint8_t> &data) override;
 
 protected:
-    ComponentManager &manager;
-    std::string id;
+  ComponentManager &manager;
+  std::string id;
 };
 
-std::ostream &operator<<(std::ostream &out, const ComponentSdkBaseWrapper &wrapper);
+std::ostream &operator<<(std::ostream &out,
+                         const ComponentSdkBaseWrapper &wrapper);
 
-class TransportSdkWrapper : public ComponentSdkBaseWrapper, public ITransportSdk {
+class TransportSdkWrapper : public ComponentSdkBaseWrapper,
+                            public ITransportSdk {
 public:
-    TransportSdkWrapper(ComponentManager &sdk, const std::string &id);
+  TransportSdkWrapper(ComponentManager &sdk, const std::string &id);
 
-    virtual ChannelProperties getChannelProperties() override;
+  virtual ChannelProperties getChannelProperties() override;
 
-    virtual ChannelResponse onLinkStatusChanged(RaceHandle handle, const LinkID &linkId,
-                                                LinkStatus status,
-                                                const LinkParameters &params) override;
+  virtual ChannelResponse
+  onLinkStatusChanged(RaceHandle handle, const LinkID &linkId,
+                      LinkStatus status, const LinkParameters &params) override;
 
-    virtual ChannelResponse onPackageStatusChanged(RaceHandle handle,
-                                                   PackageStatus status) override;
+  virtual ChannelResponse onPackageStatusChanged(RaceHandle handle,
+                                                 PackageStatus status) override;
 
-    virtual ChannelResponse onEvent(const Event &event) override;
+  virtual ChannelResponse onEvent(const Event &event) override;
 
-    virtual ChannelResponse onReceive(const LinkID &linkId, const EncodingParameters &params,
-                                      const std::vector<uint8_t> &bytes) override;
+  virtual ChannelResponse onReceive(const LinkID &linkId,
+                                    const EncodingParameters &params,
+                                    const std::vector<uint8_t> &bytes) override;
 };
 
-class UserModelSdkWrapper : public ComponentSdkBaseWrapper, public IUserModelSdk {
+class UserModelSdkWrapper : public ComponentSdkBaseWrapper,
+                            public IUserModelSdk {
 public:
-    UserModelSdkWrapper(ComponentManager &sdk, const std::string &id);
+  UserModelSdkWrapper(ComponentManager &sdk, const std::string &id);
 
-    virtual ChannelResponse onTimelineUpdated() override;
+  virtual ChannelResponse onTimelineUpdated() override;
 };
 
 class EncodingSdkWrapper : public ComponentSdkBaseWrapper, public IEncodingSdk {
 public:
-    EncodingSdkWrapper(ComponentManager &sdk, const std::string &id);
+  EncodingSdkWrapper(ComponentManager &sdk, const std::string &id);
 
-    virtual ChannelResponse onBytesEncoded(RaceHandle handle, const std::vector<uint8_t> &bytes,
-                                           EncodingStatus status) override;
-    virtual ChannelResponse onBytesDecoded(RaceHandle handle, const std::vector<uint8_t> &bytes,
-                                           EncodingStatus status) override;
+  virtual ChannelResponse onBytesEncoded(RaceHandle handle,
+                                         const std::vector<uint8_t> &bytes,
+                                         EncodingStatus status) override;
+  virtual ChannelResponse onBytesDecoded(RaceHandle handle,
+                                         const std::vector<uint8_t> &bytes,
+                                         EncodingStatus status) override;
 };
 
-}  // namespace Raceboat
+} // namespace Raceboat

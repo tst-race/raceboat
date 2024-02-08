@@ -25,32 +25,32 @@
 namespace Raceboat {
 
 bool mimeTypeMatches(const std::string &mimeType, const std::string &pattern) {
-    std::string logPrefix = "mimeTypeMatches: ";
-    std::string_view mimeTypeView = mimeType;
-    std::string_view patternView = pattern;
+  std::string logPrefix = "mimeTypeMatches: ";
+  std::string_view mimeTypeView = mimeType;
+  std::string_view patternView = pattern;
 
-    try {
-        size_t mimeTypeEnd = mimeTypeView.find('/');
-        size_t mimeSubTypeEnd = mimeTypeView.find(';');
-        size_t patternTypeEnd = patternView.find('/');
-        size_t patternSubTypeEnd = patternView.find(';');
-        std::string_view mimeTypeType = mimeTypeView.substr(0, mimeTypeEnd);
-        std::string_view mimeTypeSubType =
-            mimeTypeView.substr(mimeTypeEnd + 1, mimeSubTypeEnd - mimeTypeEnd - 1);
-        std::string_view patternType = patternView.substr(0, patternTypeEnd);
-        std::string_view patternSubType =
-            patternView.substr(patternTypeEnd + 1, patternSubTypeEnd - patternTypeEnd - 1);
+  try {
+    size_t mimeTypeEnd = mimeTypeView.find('/');
+    size_t mimeSubTypeEnd = mimeTypeView.find(';');
+    size_t patternTypeEnd = patternView.find('/');
+    size_t patternSubTypeEnd = patternView.find(';');
+    std::string_view mimeTypeType = mimeTypeView.substr(0, mimeTypeEnd);
+    std::string_view mimeTypeSubType =
+        mimeTypeView.substr(mimeTypeEnd + 1, mimeSubTypeEnd - mimeTypeEnd - 1);
+    std::string_view patternType = patternView.substr(0, patternTypeEnd);
+    std::string_view patternSubType = patternView.substr(
+        patternTypeEnd + 1, patternSubTypeEnd - patternTypeEnd - 1);
 
-        if ((patternType == "*" || patternType == mimeTypeType) &&
-            (patternSubType == "*" || patternSubType == mimeTypeSubType)) {
-            return true;
-        }
-
-        return false;
-    } catch (std::out_of_range &e) {
-        helper::logError(logPrefix + "Invalid mime type");
-        return false;
+    if ((patternType == "*" || patternType == mimeTypeType) &&
+        (patternSubType == "*" || patternSubType == mimeTypeSubType)) {
+      return true;
     }
+
+    return false;
+  } catch (std::out_of_range &e) {
+    helper::logError(logPrefix + "Invalid mime type");
+    return false;
+  }
 }
 
-}  // namespace Raceboat
+} // namespace Raceboat

@@ -26,39 +26,46 @@
 
 class ITransportComponent : public IComponentBase {
 public:
-    virtual ~ITransportComponent() = default;
+  virtual ~ITransportComponent() = default;
 
-    virtual TransportProperties getTransportProperties() = 0;
-    virtual LinkProperties getLinkProperties(const LinkID &linkId) = 0;
+  virtual TransportProperties getTransportProperties() = 0;
+  virtual LinkProperties getLinkProperties(const LinkID &linkId) = 0;
 
-    // Link management
-    virtual ComponentStatus createLink(RaceHandle handle, const LinkID &linkId) = 0;
-    virtual ComponentStatus loadLinkAddress(RaceHandle handle, const LinkID &linkId,
-                                            const std::string &linkAddress) = 0;
-    virtual ComponentStatus loadLinkAddresses(RaceHandle handle, const LinkID &linkId,
-                                              const std::vector<std::string> &linkAddress) = 0;
-    virtual ComponentStatus createLinkFromAddress(RaceHandle handle, const LinkID &linkId,
-                                                  const std::string &linkAddress) = 0;
-    virtual ComponentStatus destroyLink(RaceHandle handle, const LinkID &linkId) = 0;
+  // Link management
+  virtual ComponentStatus createLink(RaceHandle handle,
+                                     const LinkID &linkId) = 0;
+  virtual ComponentStatus loadLinkAddress(RaceHandle handle,
+                                          const LinkID &linkId,
+                                          const std::string &linkAddress) = 0;
+  virtual ComponentStatus
+  loadLinkAddresses(RaceHandle handle, const LinkID &linkId,
+                    const std::vector<std::string> &linkAddress) = 0;
+  virtual ComponentStatus
+  createLinkFromAddress(RaceHandle handle, const LinkID &linkId,
+                        const std::string &linkAddress) = 0;
+  virtual ComponentStatus destroyLink(RaceHandle handle,
+                                      const LinkID &linkId) = 0;
 
-    // Message handling
-    // Get params necessary for properly encoding content for this action
-    virtual std::vector<EncodingParameters> getActionParams(const Action &action) = 0;
+  // Message handling
+  // Get params necessary for properly encoding content for this action
+  virtual std::vector<EncodingParameters>
+  getActionParams(const Action &action) = 0;
 
-    // Enqueue this content for use by this action
-    virtual ComponentStatus enqueueContent(const EncodingParameters &params, const Action &action,
-                                           const std::vector<uint8_t> &content) = 0;
+  // Enqueue this content for use by this action
+  virtual ComponentStatus
+  enqueueContent(const EncodingParameters &params, const Action &action,
+                 const std::vector<uint8_t> &content) = 0;
 
-    virtual ComponentStatus dequeueContent(const Action &action) = 0;
+  virtual ComponentStatus dequeueContent(const Action &action) = 0;
 
-    // Actually execute this action
-    virtual ComponentStatus doAction(const std::vector<RaceHandle> &handles,
-                                     const Action &action) = 0;
+  // Actually execute this action
+  virtual ComponentStatus doAction(const std::vector<RaceHandle> &handles,
+                                   const Action &action) = 0;
 };
 
-extern "C" EXPORT ITransportComponent *createTransport(const std::string &name, ITransportSdk *sdk,
-                                                       const std::string &roleName,
-                                                       const PluginConfig &pluginConfig);
+extern "C" EXPORT ITransportComponent *
+createTransport(const std::string &name, ITransportSdk *sdk,
+                const std::string &roleName, const PluginConfig &pluginConfig);
 extern "C" EXPORT void destroyTransport(ITransportComponent *component);
 
 #endif

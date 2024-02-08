@@ -26,20 +26,23 @@
 
 class ITransportSdk : public virtual IComponentSdkBase {
 public:
-    virtual ~ITransportSdk() = default;
+  virtual ~ITransportSdk() = default;
 
-    virtual ChannelProperties getChannelProperties() = 0;
+  virtual ChannelProperties getChannelProperties() = 0;
 
-    virtual ChannelResponse onLinkStatusChanged(RaceHandle handle, const LinkID &linkId,
-                                                LinkStatus status,
-                                                const LinkParameters &params) = 0;
+  virtual ChannelResponse onLinkStatusChanged(RaceHandle handle,
+                                              const LinkID &linkId,
+                                              LinkStatus status,
+                                              const LinkParameters &params) = 0;
 
-    virtual ChannelResponse onPackageStatusChanged(RaceHandle handle, PackageStatus status) = 0;
+  virtual ChannelResponse onPackageStatusChanged(RaceHandle handle,
+                                                 PackageStatus status) = 0;
 
-    virtual ChannelResponse onEvent(const Event &event) = 0;
+  virtual ChannelResponse onEvent(const Event &event) = 0;
 
-    virtual ChannelResponse onReceive(const LinkID &linkId, const EncodingParameters &params,
-                                      const std::vector<uint8_t> &bytes) = 0;
+  virtual ChannelResponse onReceive(const LinkID &linkId,
+                                    const EncodingParameters &params,
+                                    const std::vector<uint8_t> &bytes) = 0;
 };
 
 #endif

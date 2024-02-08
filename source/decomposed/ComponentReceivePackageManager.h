@@ -32,47 +32,49 @@ class ComponentManagerInternal;
 
 class ComponentReceivePackageManager {
 public:
-    explicit ComponentReceivePackageManager(ComponentManagerInternal &manager);
-    virtual ~ComponentReceivePackageManager(){};
+  explicit ComponentReceivePackageManager(ComponentManagerInternal &manager);
+  virtual ~ComponentReceivePackageManager(){};
 
-    virtual CMTypes::CmInternalStatus onReceive(CMTypes::ComponentWrapperHandle postId,
-                                                const LinkID &linkId,
-                                                const EncodingParameters &params,
-                                                std::vector<uint8_t> &&bytes);
+  virtual CMTypes::CmInternalStatus
+  onReceive(CMTypes::ComponentWrapperHandle postId, const LinkID &linkId,
+            const EncodingParameters &params, std::vector<uint8_t> &&bytes);
 
-    virtual CMTypes::CmInternalStatus onBytesDecoded(CMTypes::ComponentWrapperHandle postId,
-                                                     CMTypes::DecodingHandle handle,
-                                                     std::vector<uint8_t> &&bytes,
-                                                     EncodingStatus status);
+  virtual CMTypes::CmInternalStatus
+  onBytesDecoded(CMTypes::ComponentWrapperHandle postId,
+                 CMTypes::DecodingHandle handle, std::vector<uint8_t> &&bytes,
+                 EncodingStatus status);
 
-    void teardown();
-    void setup();
-
-protected:
-    CMTypes::CmInternalStatus receiveSingle(std::vector<uint8_t> &&bytes,
-                                            std::vector<std::string> &&connVec);
-    CMTypes::CmInternalStatus receiveBatch(std::vector<uint8_t> &&bytes,
-                                           std::vector<std::string> &&connVec);
-    CMTypes::CmInternalStatus receiveFragmentSingleProducer(CMTypes::Link *link,
-                                                            std::vector<uint8_t> &&bytes,
-                                                            std::vector<std::string> &&connVec);
-    CMTypes::CmInternalStatus receiveFragmentMultipleProducer(CMTypes::Link *link,
-                                                              std::vector<uint8_t> &&bytes,
-                                                              std::vector<std::string> &&connVec);
-    CMTypes::CmInternalStatus receiveFragmentProducer(const std::string &producer, size_t offset,
-                                                      CMTypes::Link *link,
-                                                      std::vector<uint8_t> &&bytes,
-                                                      std::vector<std::string> &&connVec);
-
-    std::vector<uint8_t> readFragment(const std::vector<uint8_t> &buffer, size_t &offset);
-
-    friend std::ostream &operator<<(std::ostream &out,
-                                    const ComponentReceivePackageManager &manager);
+  void teardown();
+  void setup();
 
 protected:
-    ComponentManagerInternal &manager;
-    uint64_t nextDecodingHandle{0};
+  CMTypes::CmInternalStatus receiveSingle(std::vector<uint8_t> &&bytes,
+                                          std::vector<std::string> &&connVec);
+  CMTypes::CmInternalStatus receiveBatch(std::vector<uint8_t> &&bytes,
+                                         std::vector<std::string> &&connVec);
+  CMTypes::CmInternalStatus
+  receiveFragmentSingleProducer(CMTypes::Link *link,
+                                std::vector<uint8_t> &&bytes,
+                                std::vector<std::string> &&connVec);
+  CMTypes::CmInternalStatus
+  receiveFragmentMultipleProducer(CMTypes::Link *link,
+                                  std::vector<uint8_t> &&bytes,
+                                  std::vector<std::string> &&connVec);
+  CMTypes::CmInternalStatus
+  receiveFragmentProducer(const std::string &producer, size_t offset,
+                          CMTypes::Link *link, std::vector<uint8_t> &&bytes,
+                          std::vector<std::string> &&connVec);
 
-    std::unordered_map<CMTypes::DecodingHandle, LinkID> pendingDecodings;
+  std::vector<uint8_t> readFragment(const std::vector<uint8_t> &buffer,
+                                    size_t &offset);
+
+  friend std::ostream &
+  operator<<(std::ostream &out, const ComponentReceivePackageManager &manager);
+
+protected:
+  ComponentManagerInternal &manager;
+  uint64_t nextDecodingHandle{0};
+
+  std::unordered_map<CMTypes::DecodingHandle, LinkID> pendingDecodings;
 };
-}  // namespace Raceboat
+} // namespace Raceboat

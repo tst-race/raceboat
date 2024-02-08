@@ -15,9 +15,9 @@
 // limitations under the License.
 //
 
+#include "decomposed/ComponentLifetimeManager.h"
 #include "../common/LogExpect.h"
 #include "../common/MockComponentManagerInternal.h"
-#include "decomposed/ComponentLifetimeManager.h"
 // #include "../../common/helpers.h"
 #include "../common/race_printers.h"
 #include "gmock/gmock.h"
@@ -29,52 +29,52 @@ using ::testing::Return;
 
 class ComponentLifetimeManagerTestFixture : public ::testing::Test {
 public:
-    ComponentLifetimeManagerTestFixture() :
-        test_info(testing::UnitTest::GetInstance()->current_test_info()),
+  ComponentLifetimeManagerTestFixture()
+      : test_info(testing::UnitTest::GetInstance()->current_test_info()),
         logger(test_info->test_suite_name(), test_info->name()),
         composition("id", "transport", "usermodel", {"encoding"}),
-        mockComponentManager(logger),
-        transportPlugin("transport", logger),
+        mockComponentManager(logger), transportPlugin("transport", logger),
         usermodelPlugin("usermodel", logger),
         encodingPlugin("encoding", logger),
-        lifetimeManager(mockComponentManager, composition, transportPlugin, usermodelPlugin,
-                        {{"encoding", &encodingPlugin}}) {}
+        lifetimeManager(mockComponentManager, composition, transportPlugin,
+                        usermodelPlugin, {{"encoding", &encodingPlugin}}) {}
 
-    virtual void TearDown() override {
-        logger.check();
-        lifetimeManager.teardown();
-    }
+  virtual void TearDown() override {
+    logger.check();
+    lifetimeManager.teardown();
+  }
 
 public:
-    const testing::TestInfo *test_info;
-    LogExpect logger;
-    Composition composition;
-    MockComponentManagerInternal mockComponentManager;
-    MockComponentPlugin transportPlugin;
-    MockComponentPlugin usermodelPlugin;
-    MockComponentPlugin encodingPlugin;
-    ComponentLifetimeManager lifetimeManager;
+  const testing::TestInfo *test_info;
+  LogExpect logger;
+  Composition composition;
+  MockComponentManagerInternal mockComponentManager;
+  MockComponentPlugin transportPlugin;
+  MockComponentPlugin usermodelPlugin;
+  MockComponentPlugin encodingPlugin;
+  ComponentLifetimeManager lifetimeManager;
 };
 
 TEST_F(ComponentLifetimeManagerTestFixture, test_activate_channel) {
-    lifetimeManager.state = CMTypes::State::UNACTIVATED;
-    LOG_EXPECT(this->logger, __func__, lifetimeManager);
-    lifetimeManager.activateChannel({0}, {1}, "id", "role");
-    LOG_EXPECT(this->logger, __func__, lifetimeManager);
+  lifetimeManager.state = CMTypes::State::UNACTIVATED;
+  LOG_EXPECT(this->logger, __func__, lifetimeManager);
+  lifetimeManager.activateChannel({0}, {1}, "id", "role");
+  LOG_EXPECT(this->logger, __func__, lifetimeManager);
 }
 
-TEST_F(ComponentLifetimeManagerTestFixture, test_activate_channel_with_callbacks) {
-    lifetimeManager.state = CMTypes::State::UNACTIVATED;
-    EXPECT_CALL(mockComponentManager, setup()).WillOnce([this]() {
-        LOG_EXPECT(this->logger, "mockComponentManager::setup", lifetimeManager);
-        lifetimeManager.setup();
-    });
+TEST_F(ComponentLifetimeManagerTestFixture,
+       test_activate_channel_with_callbacks) {
+  lifetimeManager.state = CMTypes::State::UNACTIVATED;
+  EXPECT_CALL(mockComponentManager, setup()).WillOnce([this]() {
+    LOG_EXPECT(this->logger, "mockComponentManager::setup", lifetimeManager);
+    lifetimeManager.setup();
+  });
 
-    LOG_EXPECT(this->logger, __func__, lifetimeManager);
-    lifetimeManager.activateChannel({0}, {1}, "id", "role");
-    LOG_EXPECT(this->logger, __func__, lifetimeManager);
-    lifetimeManager.updateState({1}, "encoding", COMPONENT_STATE_STARTED);
-    lifetimeManager.updateState({2}, "usermodel", COMPONENT_STATE_STARTED);
-    lifetimeManager.updateState({3}, "transport", COMPONENT_STATE_STARTED);
-    LOG_EXPECT(this->logger, __func__, lifetimeManager);
+  LOG_EXPECT(this->logger, __func__, lifetimeManager);
+  lifetimeManager.activateChannel({0}, {1}, "id", "role");
+  LOG_EXPECT(this->logger, __func__, lifetimeManager);
+  lifetimeManager.updateState({1}, "encoding", COMPONENT_STATE_STARTED);
+  lifetimeManager.updateState({2}, "usermodel", COMPONENT_STATE_STARTED);
+  lifetimeManager.updateState({3}, "transport", COMPONENT_STATE_STARTED);
+  LOG_EXPECT(this->logger, __func__, lifetimeManager);
 }

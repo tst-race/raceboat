@@ -32,65 +32,67 @@ class ComponentManagerInternal;
 
 class ComponentActionManager {
 public:
-    explicit ComponentActionManager(ComponentManagerInternal &manager);
+  explicit ComponentActionManager(ComponentManagerInternal &manager);
 
-    CMTypes::CmInternalStatus onTimelineUpdated(CMTypes::ComponentWrapperHandle postId);
+  CMTypes::CmInternalStatus
+  onTimelineUpdated(CMTypes::ComponentWrapperHandle postId);
 
-    CMTypes::CmInternalStatus onSendPackage(double now, const ConnectionID &connId,
-                                            const EncPkg &pkg);
+  CMTypes::CmInternalStatus
+  onSendPackage(double now, const ConnectionID &connId, const EncPkg &pkg);
 
-    CMTypes::CmInternalStatus onLinkStatusChanged(CMTypes::ComponentWrapperHandle postId,
-                                                  CMTypes::LinkSdkHandle handle,
-                                                  const LinkID &linkId, LinkStatus status,
-                                                  const LinkParameters &params);
+  CMTypes::CmInternalStatus
+  onLinkStatusChanged(CMTypes::ComponentWrapperHandle postId,
+                      CMTypes::LinkSdkHandle handle, const LinkID &linkId,
+                      LinkStatus status, const LinkParameters &params);
 
-    void teardown();
-    void setup();
+  void teardown();
+  void setup();
 
-    double getMaxEncodingTime();
-    void joinActionThread();
+  double getMaxEncodingTime();
+  void joinActionThread();
 
 protected:
-    void fetchTimeline();
-    void updateTimeline(ActionTimeline &usermodelActions, Timestamp start);
+  void fetchTimeline();
+  void updateTimeline(ActionTimeline &usermodelActions, Timestamp start);
 
-    std::unique_ptr<CMTypes::ActionInfo> createActionInfo(Action &&action);
-    void insertActions(ActionTimeline &usermodelActions);
-    void updateGlobalTimeline(ActionTimeline &usermodelActions, Timestamp start);
-    void updateLinkTimelines();
-    void removeDeletedActions();
-    void updateActionTimestamp();
-    void updateEncodeTimestamp();
+  std::unique_ptr<CMTypes::ActionInfo> createActionInfo(Action &&action);
+  void insertActions(ActionTimeline &usermodelActions);
+  void updateGlobalTimeline(ActionTimeline &usermodelActions, Timestamp start);
+  void updateLinkTimelines();
+  void removeDeletedActions();
+  void updateActionTimestamp();
+  void updateEncodeTimestamp();
 
-    void runActionThread();
-    bool actionThreadLogic(Timestamp now);
-    void doAction();
-    void encodeActions(Timestamp now);
+  void runActionThread();
+  bool actionThreadLogic(Timestamp now);
+  void doAction();
+  void encodeActions(Timestamp now);
 
-    virtual double currentTime();
+  virtual double currentTime();
 
 public:
-    double maxEncodingTime = 0;
-    double timelineLength = 600;
-    double timelineFetchPeriod = 300;
+  double maxEncodingTime = 0;
+  double timelineLength = 600;
+  double timelineFetchPeriod = 300;
 
-    Timestamp nextFetchTime;
-    Timestamp nextActionTime;
-    Timestamp nextEncodeTime;
+  Timestamp nextFetchTime;
+  Timestamp nextActionTime;
+  Timestamp nextEncodeTime;
 
-    Timestamp lastEncodeTime;
+  Timestamp lastEncodeTime;
 
-    // unique_ptr is used to keep the address the same, even if the item in the deque is moved.
-    std::deque<std::unique_ptr<CMTypes::ActionInfo>> actions;
+  // unique_ptr is used to keep the address the same, even if the item in the
+  // deque is moved.
+  std::deque<std::unique_ptr<CMTypes::ActionInfo>> actions;
 
-    // thread responsible for updating action queue and notifying the transport
-    std::thread actionThread;
-    std::condition_variable_any actionThreadSignaler;
+  // thread responsible for updating action queue and notifying the transport
+  std::thread actionThread;
+  std::condition_variable_any actionThreadSignaler;
 
 protected:
-    ComponentManagerInternal &manager;
+  ComponentManagerInternal &manager;
 };
 
 std::ostream &operator<<(std::ostream &out, const ComponentActionManager &cam);
 
-}  // namespace Raceboat
+} // namespace Raceboat

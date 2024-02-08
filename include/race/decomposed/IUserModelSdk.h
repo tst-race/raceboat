@@ -22,9 +22,9 @@
 
 class IUserModelSdk : public virtual IComponentSdkBase {
 public:
-    virtual ~IUserModelSdk() = default;
+  virtual ~IUserModelSdk() = default;
 
-    virtual ChannelResponse onTimelineUpdated() = 0;
+  virtual ChannelResponse onTimelineUpdated() = 0;
 };
 
 #endif

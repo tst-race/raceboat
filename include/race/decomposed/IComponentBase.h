@@ -22,10 +22,10 @@
 
 class IComponentBase {
 public:
-    virtual ~IComponentBase() = default;
+  virtual ~IComponentBase() = default;
 
-    virtual ComponentStatus onUserInputReceived(RaceHandle handle, bool answered,
-                                                const std::string &response) = 0;
+  virtual ComponentStatus onUserInputReceived(RaceHandle handle, bool answered,
+                                              const std::string &response) = 0;
 };
 
 #endif

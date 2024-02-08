@@ -32,41 +32,42 @@ class ComponentManagerInternal;
 
 class ComponentLinkManager {
 public:
-    explicit ComponentLinkManager(ComponentManagerInternal &manager);
-    CMTypes::CmInternalStatus destroyLink(CMTypes::ComponentWrapperHandle postId,
-                                          CMTypes::LinkSdkHandle handle, const LinkID &linkId);
+  explicit ComponentLinkManager(ComponentManagerInternal &manager);
+  CMTypes::CmInternalStatus destroyLink(CMTypes::ComponentWrapperHandle postId,
+                                        CMTypes::LinkSdkHandle handle,
+                                        const LinkID &linkId);
 
-    CMTypes::CmInternalStatus createLink(CMTypes::ComponentWrapperHandle postId,
-                                         CMTypes::LinkSdkHandle handle,
-                                         const std::string &channelGid);
+  CMTypes::CmInternalStatus createLink(CMTypes::ComponentWrapperHandle postId,
+                                       CMTypes::LinkSdkHandle handle,
+                                       const std::string &channelGid);
 
-    CMTypes::CmInternalStatus loadLinkAddress(CMTypes::ComponentWrapperHandle postId,
-                                              CMTypes::LinkSdkHandle handle,
-                                              const std::string &channelGid,
-                                              const std::string &linkAddress);
+  CMTypes::CmInternalStatus
+  loadLinkAddress(CMTypes::ComponentWrapperHandle postId,
+                  CMTypes::LinkSdkHandle handle, const std::string &channelGid,
+                  const std::string &linkAddress);
 
-    CMTypes::CmInternalStatus loadLinkAddresses(CMTypes::ComponentWrapperHandle postId,
-                                                CMTypes::LinkSdkHandle handle,
-                                                const std::string &channelGid,
-                                                const std::vector<std::string> &linkAddresses);
+  CMTypes::CmInternalStatus
+  loadLinkAddresses(CMTypes::ComponentWrapperHandle postId,
+                    CMTypes::LinkSdkHandle handle,
+                    const std::string &channelGid,
+                    const std::vector<std::string> &linkAddresses);
 
-    CMTypes::CmInternalStatus createLinkFromAddress(CMTypes::ComponentWrapperHandle postId,
-                                                    CMTypes::LinkSdkHandle handle,
-                                                    const std::string &channelGid,
-                                                    const std::string &linkAddress);
+  CMTypes::CmInternalStatus createLinkFromAddress(
+      CMTypes::ComponentWrapperHandle postId, CMTypes::LinkSdkHandle handle,
+      const std::string &channelGid, const std::string &linkAddress);
 
-    CMTypes::CmInternalStatus onLinkStatusChanged(CMTypes::ComponentWrapperHandle postId,
-                                                  CMTypes::LinkSdkHandle handle,
-                                                  const LinkID &linkId, LinkStatus status,
-                                                  const LinkParameters &params);
+  CMTypes::CmInternalStatus
+  onLinkStatusChanged(CMTypes::ComponentWrapperHandle postId,
+                      CMTypes::LinkSdkHandle handle, const LinkID &linkId,
+                      LinkStatus status, const LinkParameters &params);
 
-    void teardown();
-    void setup();
+  void teardown();
+  void setup();
 
 public:
-    std::unordered_map<LinkID, std::unique_ptr<CMTypes::Link>> links;
+  std::unordered_map<LinkID, std::unique_ptr<CMTypes::Link>> links;
 
 protected:
-    ComponentManagerInternal &manager;
+  ComponentManagerInternal &manager;
 };
-}  // namespace Raceboat
+} // namespace Raceboat

@@ -26,28 +26,30 @@
 
 class IEncodingComponent : public IComponentBase {
 public:
-    virtual ~IEncodingComponent() = default;
+  virtual ~IEncodingComponent() = default;
 
-    // Global encoding properties. e.g. max encoding time
-    virtual EncodingProperties getEncodingProperties() = 0;
+  // Global encoding properties. e.g. max encoding time
+  virtual EncodingProperties getEncodingProperties() = 0;
 
-    // Parameter specific properties, e.g. how many bytes I can stuff into an image encoded
-    // with these params
-    virtual SpecificEncodingProperties getEncodingPropertiesForParameters(
-        const EncodingParameters &params) = 0;
+  // Parameter specific properties, e.g. how many bytes I can stuff into an
+  // image encoded with these params
+  virtual SpecificEncodingProperties
+  getEncodingPropertiesForParameters(const EncodingParameters &params) = 0;
 
-    // Actually encode these bytes into content - bytes should always be small enough to fit due to
-    // Channel's use of the above API
-    virtual ComponentStatus encodeBytes(RaceHandle handle, const EncodingParameters &params,
-                                        const std::vector<uint8_t> &bytes) = 0;
+  // Actually encode these bytes into content - bytes should always be small
+  // enough to fit due to Channel's use of the above API
+  virtual ComponentStatus encodeBytes(RaceHandle handle,
+                                      const EncodingParameters &params,
+                                      const std::vector<uint8_t> &bytes) = 0;
 
-    virtual ComponentStatus decodeBytes(RaceHandle handle, const EncodingParameters &params,
-                                        const std::vector<uint8_t> &bytes) = 0;
+  virtual ComponentStatus decodeBytes(RaceHandle handle,
+                                      const EncodingParameters &params,
+                                      const std::vector<uint8_t> &bytes) = 0;
 };
 
-extern "C" EXPORT IEncodingComponent *createEncoding(const std::string &name, IEncodingSdk *sdk,
-                                                     const std::string &roleName,
-                                                     const PluginConfig &pluginConfig);
+extern "C" EXPORT IEncodingComponent *
+createEncoding(const std::string &name, IEncodingSdk *sdk,
+               const std::string &roleName, const PluginConfig &pluginConfig);
 extern "C" EXPORT void destroyEncoding(IEncodingComponent *component);
 
 #endif

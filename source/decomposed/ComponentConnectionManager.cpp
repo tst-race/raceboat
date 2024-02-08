@@ -23,47 +23,50 @@ namespace Raceboat {
 
 using namespace CMTypes;
 
-ComponentConnectionManager::ComponentConnectionManager(ComponentManagerInternal &manager) :
-    manager(manager) {}
+ComponentConnectionManager::ComponentConnectionManager(
+    ComponentManagerInternal &manager)
+    : manager(manager) {}
 
 CMTypes::CmInternalStatus ComponentConnectionManager::openConnection(
-    ComponentWrapperHandle /* postId */, ConnectionSdkHandle handle, LinkType /* linkType */,
-    const LinkID &linkId, const std::string & /* linkHints */, int32_t /* sendTimeout */) {
-    auto connId = manager.sdk.generateConnectionId(linkId);
-    auto connection = std::make_unique<CMTypes::Connection>(connId, linkId);
-    auto link = manager.getLink(linkId);
-    connections[connId] = std::move(connection);
-    link->connections.insert(connId);
-    manager.sdk.onConnectionStatusChanged(handle.handle, connId, CONNECTION_OPEN, link->props,
-                                          RACE_BLOCKING);
-    return OK;
+    ComponentWrapperHandle /* postId */, ConnectionSdkHandle handle,
+    LinkType /* linkType */, const LinkID &linkId,
+    const std::string & /* linkHints */, int32_t /* sendTimeout */) {
+  auto connId = manager.sdk.generateConnectionId(linkId);
+  auto connection = std::make_unique<CMTypes::Connection>(connId, linkId);
+  auto link = manager.getLink(linkId);
+  connections[connId] = std::move(connection);
+  link->connections.insert(connId);
+  manager.sdk.onConnectionStatusChanged(handle.handle, connId, CONNECTION_OPEN,
+                                        link->props, RACE_BLOCKING);
+  return OK;
 }
 
-CMTypes::CmInternalStatus ComponentConnectionManager::closeConnection(
-    ComponentWrapperHandle /* postId */, ConnectionSdkHandle handle, const ConnectionID &connId) {
-    std::string logPrefix = "ComponentConnectionManager::closeConnection: ";
-    auto it = connections.find(connId);
-    if (it != connections.end()) {
-        auto connection = it->second.get();
-        auto link = manager.getLink(connection->linkId);
-        link->connections.erase(connection->connId);
-        manager.sdk.onConnectionStatusChanged(handle.handle, connId, CONNECTION_CLOSED, link->props,
-                                              RACE_BLOCKING);
-        connections.erase(it);
-    } else {
-        helper::logError(logPrefix + "Request to close non-existent connection: " + connId);
-        return ERROR;
-    }
-    return OK;
+CMTypes::CmInternalStatus
+ComponentConnectionManager::closeConnection(ComponentWrapperHandle /* postId */,
+                                            ConnectionSdkHandle handle,
+                                            const ConnectionID &connId) {
+  std::string logPrefix = "ComponentConnectionManager::closeConnection: ";
+  auto it = connections.find(connId);
+  if (it != connections.end()) {
+    auto connection = it->second.get();
+    auto link = manager.getLink(connection->linkId);
+    link->connections.erase(connection->connId);
+    manager.sdk.onConnectionStatusChanged(
+        handle.handle, connId, CONNECTION_CLOSED, link->props, RACE_BLOCKING);
+    connections.erase(it);
+  } else {
+    helper::logError(logPrefix +
+                     "Request to close non-existent connection: " + connId);
+    return ERROR;
+  }
+  return OK;
 }
 
 void ComponentConnectionManager::teardown() {
-    TRACE_METHOD();
-    // TODO: tell sdk these are closed
-    connections.clear();
+  TRACE_METHOD();
+  // TODO: tell sdk these are closed
+  connections.clear();
 }
 
-void ComponentConnectionManager::setup() {
-    TRACE_METHOD();
-}
-}  // namespace Raceboat
+void ComponentConnectionManager::setup() { TRACE_METHOD(); }
+} // namespace Raceboat

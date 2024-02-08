@@ -32,23 +32,26 @@ class ComponentManagerInternal;
 
 class ComponentConnectionManager {
 public:
-    explicit ComponentConnectionManager(ComponentManagerInternal &manager);
-    CMTypes::CmInternalStatus openConnection(CMTypes::ComponentWrapperHandle postId,
-                                             CMTypes::ConnectionSdkHandle handle, LinkType linkType,
-                                             const LinkID &linkId, const std::string &linkHints,
-                                             int32_t sendTimeout);
+  explicit ComponentConnectionManager(ComponentManagerInternal &manager);
+  CMTypes::CmInternalStatus
+  openConnection(CMTypes::ComponentWrapperHandle postId,
+                 CMTypes::ConnectionSdkHandle handle, LinkType linkType,
+                 const LinkID &linkId, const std::string &linkHints,
+                 int32_t sendTimeout);
 
-    CMTypes::CmInternalStatus closeConnection(CMTypes::ComponentWrapperHandle postId,
-                                              CMTypes::ConnectionSdkHandle handle,
-                                              const ConnectionID &connectionId);
+  CMTypes::CmInternalStatus
+  closeConnection(CMTypes::ComponentWrapperHandle postId,
+                  CMTypes::ConnectionSdkHandle handle,
+                  const ConnectionID &connectionId);
 
-    void teardown();
-    void setup();
+  void teardown();
+  void setup();
 
 public:
-    std::unordered_map<ConnectionID, std::unique_ptr<CMTypes::Connection>> connections;
+  std::unordered_map<ConnectionID, std::unique_ptr<CMTypes::Connection>>
+      connections;
 
 protected:
-    ComponentManagerInternal &manager;
+  ComponentManagerInternal &manager;
 };
-}  // namespace Raceboat
+} // namespace Raceboat

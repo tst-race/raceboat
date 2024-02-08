@@ -25,33 +25,37 @@
 
 class IUserModelComponent : public IComponentBase {
 public:
-    virtual ~IUserModelComponent() = default;
+  virtual ~IUserModelComponent() = default;
 
-    virtual UserModelProperties getUserModelProperties() = 0;
+  virtual UserModelProperties getUserModelProperties() = 0;
 
-    // Inform the User Model of a new link and any pertinent characteristics (e.g. multicast vs.
-    // unicast)
-    virtual ComponentStatus addLink(const LinkID &link, const LinkParameters &params) = 0;
+  // Inform the User Model of a new link and any pertinent characteristics (e.g.
+  // multicast vs. unicast)
+  virtual ComponentStatus addLink(const LinkID &link,
+                                  const LinkParameters &params) = 0;
 
-    virtual ComponentStatus removeLink(const LinkID &link) = 0;
+  virtual ComponentStatus removeLink(const LinkID &link) = 0;
 
-    // Return a list of (timestamp, action) tuples corresponding to all the actions to perform
-    // between start and end in time
-    virtual ActionTimeline getTimeline(Timestamp start, Timestamp end) = 0;
+  // Return a list of (timestamp, action) tuples corresponding to all the
+  // actions to perform between start and end in time
+  virtual ActionTimeline getTimeline(Timestamp start, Timestamp end) = 0;
 
-    // Inform the User Model about an external event the transport believes could be relevant to it
-    virtual ComponentStatus onTransportEvent(const Event &event) = 0;
+  // Inform the User Model about an external event the transport believes could
+  // be relevant to it
+  virtual ComponentStatus onTransportEvent(const Event &event) = 0;
 
-    // Inform the User Model sendPackage being called
-    // If a returned action contains a timestamp of 0, it is encoded for and executed immediately
-    virtual ActionTimeline onSendPackage(const LinkID & /* linkId */, int /* bytes */) {
-        return {};
-    };
+  // Inform the User Model sendPackage being called
+  // If a returned action contains a timestamp of 0, it is encoded for and
+  // executed immediately
+  virtual ActionTimeline onSendPackage(const LinkID & /* linkId */,
+                                       int /* bytes */) {
+    return {};
+  };
 };
 
-extern "C" EXPORT IUserModelComponent *createUserModel(const std::string &name, IUserModelSdk *sdk,
-                                                       const std::string &roleName,
-                                                       const PluginConfig &pluginConfig);
+extern "C" EXPORT IUserModelComponent *
+createUserModel(const std::string &name, IUserModelSdk *sdk,
+                const std::string &roleName, const PluginConfig &pluginConfig);
 extern "C" EXPORT void destroyUserModel(IUserModelComponent *component);
 
 #endif

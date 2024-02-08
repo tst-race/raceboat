@@ -23,17 +23,19 @@
 #include "IComponentSdkBase.h"
 
 enum EncodingStatus {
-    ENCODE_OK,
-    ENCODE_FAILED,
+  ENCODE_OK,
+  ENCODE_FAILED,
 };
 
 class IEncodingSdk : public virtual IComponentSdkBase {
 public:
-    virtual ~IEncodingSdk() = default;
-    virtual ChannelResponse onBytesEncoded(RaceHandle handle, const std::vector<uint8_t> &bytes,
-                                           EncodingStatus status) = 0;
-    virtual ChannelResponse onBytesDecoded(RaceHandle handle, const std::vector<uint8_t> &bytes,
-                                           EncodingStatus status) = 0;
+  virtual ~IEncodingSdk() = default;
+  virtual ChannelResponse onBytesEncoded(RaceHandle handle,
+                                         const std::vector<uint8_t> &bytes,
+                                         EncodingStatus status) = 0;
+  virtual ChannelResponse onBytesDecoded(RaceHandle handle,
+                                         const std::vector<uint8_t> &bytes,
+                                         EncodingStatus status) = 0;
 };
 
 #endif

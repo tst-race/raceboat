@@ -29,57 +29,63 @@ class ComponentManagerInternal;
 
 class ComponentLifetimeManager {
 public:
-    ComponentLifetimeManager(
-        ComponentManagerInternal &manager, const Composition &composition,
-        IComponentPlugin &transportPlugin, IComponentPlugin &usermodelPlugin,
-        const std::unordered_map<std::string, IComponentPlugin *> &encodingPlugins);
-    ~ComponentLifetimeManager();
+  ComponentLifetimeManager(
+      ComponentManagerInternal &manager, const Composition &composition,
+      IComponentPlugin &transportPlugin, IComponentPlugin &usermodelPlugin,
+      const std::unordered_map<std::string, IComponentPlugin *>
+          &encodingPlugins);
+  ~ComponentLifetimeManager();
 
-    CMTypes::CmInternalStatus init(CMTypes::ComponentWrapperHandle postId,
-                                   const PluginConfig &pluginConfig);
-    CMTypes::CmInternalStatus shutdown(CMTypes::ComponentWrapperHandle postId);
-    CMTypes::CmInternalStatus deactivateChannel(CMTypes::ComponentWrapperHandle postId,
-                                                CMTypes::ChannelSdkHandle handle,
-                                                const std::string &channelGid);
-    CMTypes::CmInternalStatus activateChannel(CMTypes::ComponentWrapperHandle postId,
-                                              CMTypes::ChannelSdkHandle handle,
-                                              const std::string &channelGid,
-                                              const std::string &roleName);
-    CMTypes::CmInternalStatus updateState(CMTypes::ComponentWrapperHandle postId,
-                                          const std::string &componentId, ComponentState state);
+  CMTypes::CmInternalStatus init(CMTypes::ComponentWrapperHandle postId,
+                                 const PluginConfig &pluginConfig);
+  CMTypes::CmInternalStatus shutdown(CMTypes::ComponentWrapperHandle postId);
+  CMTypes::CmInternalStatus
+  deactivateChannel(CMTypes::ComponentWrapperHandle postId,
+                    CMTypes::ChannelSdkHandle handle,
+                    const std::string &channelGid);
+  CMTypes::CmInternalStatus
+  activateChannel(CMTypes::ComponentWrapperHandle postId,
+                  CMTypes::ChannelSdkHandle handle,
+                  const std::string &channelGid, const std::string &roleName);
+  CMTypes::CmInternalStatus updateState(CMTypes::ComponentWrapperHandle postId,
+                                        const std::string &componentId,
+                                        ComponentState state);
 
-    EncodingComponentWrapper *encodingComponentFromEncodingParams(const EncodingParameters &params);
+  EncodingComponentWrapper *
+  encodingComponentFromEncodingParams(const EncodingParameters &params);
 
-    void fail(CMTypes::ComponentWrapperHandle postId);
-    void teardown();
-    void setup();
+  void fail(CMTypes::ComponentWrapperHandle postId);
+  void teardown();
+  void setup();
 
 protected:
-    void checkActivated();
+  void checkActivated();
 
 public:
-    CMTypes::State state;
+  CMTypes::State state;
 
-    ComponentManagerInternal &manager;
-    Composition composition;
+  ComponentManagerInternal &manager;
+  Composition composition;
 
-    IComponentPlugin &transportPlugin;
-    IComponentPlugin &usermodelPlugin;
-    std::unordered_map<std::string, IComponentPlugin *> encodingPlugins;
+  IComponentPlugin &transportPlugin;
+  IComponentPlugin &usermodelPlugin;
+  std::unordered_map<std::string, IComponentPlugin *> encodingPlugins;
 
-    std::map<std::string, ComponentState> componentStates;
-    CMTypes::ChannelSdkHandle activateHandle;
+  std::map<std::string, ComponentState> componentStates;
+  CMTypes::ChannelSdkHandle activateHandle;
 
-    std::unordered_map<std::string, EncodingComponentWrapper> encodings;
-    std::optional<TransportComponentWrapper> transport;
-    std::optional<UserModelComponentWrapper> usermodel;
-    std::vector<std::unique_ptr<ComponentSdkBaseWrapper>> wrappers;
+  std::unordered_map<std::string, EncodingComponentWrapper> encodings;
+  std::optional<TransportComponentWrapper> transport;
+  std::optional<UserModelComponentWrapper> usermodel;
+  std::vector<std::unique_ptr<ComponentSdkBaseWrapper>> wrappers;
 
-    std::vector<std::pair<EncodingType, EncodingComponentWrapper *>> encodingsByType;
+  std::vector<std::pair<EncodingType, EncodingComponentWrapper *>>
+      encodingsByType;
 
-    std::map<std::string, ComponentBaseWrapper *> idComponentMap;
+  std::map<std::string, ComponentBaseWrapper *> idComponentMap;
 };
 
-std::ostream &operator<<(std::ostream &out, const ComponentLifetimeManager &manager);
+std::ostream &operator<<(std::ostream &out,
+                         const ComponentLifetimeManager &manager);
 
-}  // namespace Raceboat
+} // namespace Raceboat
