@@ -1,0 +1,411 @@
+
+// Copyright 2023 Two Six Technologies
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+
+#include "race/Race.h"
+
+#include <atomic>
+#include <future>
+
+#include "Core.h"
+#include "helper.h"
+
+namespace Raceboat {
+
+std::string recvOptionsToString(const ReceiveOptions &recvOptions) {
+  std::stringstream ss;
+
+  ss << "RecvOptions {";
+  ss << "recv_channel: '" << recvOptions.recv_channel << "', ";
+  ss << "send_channel: '" << recvOptions.send_channel << "', ";
+  ss << "alt_channel: '" << recvOptions.alt_channel << "', ";
+  ss << "send_role: '" << recvOptions.send_role << "', ";
+  ss << "recv_role: '" << recvOptions.recv_role << "', ";
+  ss << "timeout_ms: '" << recvOptions.timeout_ms << "'}";
+  return ss.str();
+}
+
+std::string sendOptionsToString(const SendOptions &sendOptions) {
+  std::stringstream ss;
+
+  ss << "SendOptions {";
+  ss << "recv_channel: '" << sendOptions.recv_channel << "', ";
+  ss << "send_channel: '" << sendOptions.send_channel << "', ";
+  ss << "alt_channel: '" << sendOptions.alt_channel << "', ";
+  ss << "send_address: '" << sendOptions.send_address << "', ";
+  ss << "send_role: '" << sendOptions.send_role << "', ";
+  ss << "recv_role: '" << sendOptions.recv_role << "', ";
+  ss << "timeout_ms: '" << sendOptions.timeout_ms << "'}";
+  return ss.str();
+}
+
+ConnectionObject::ConnectionObject(std::shared_ptr<Core> core, OpHandle handle)
+    : core(core), handle(handle) {}
+ConnectionObject::ConnectionObject(const ConnectionObject &that) {
+  core = that.core;
+  handle = that.handle;
+}
+
+std::pair<ApiStatus, std::vector<uint8_t>> ConnectionObject::read() {
+  std::promise<std::pair<ApiStatus, std::vector<uint8_t>>> promise;
+  auto future = promise.get_future();
+
+  if (core == nullptr) {
+    return {ApiStatus::INVALID, {}};
+  }
+
+  // Taking promise by reference is fine because we block waiting for the
+  // return. If this function gets changed to timeout, this should be changed as
+  // well.
+  auto response = core->getApiManager().read(
+      handle, [&promise](ApiStatus status, std::vector<uint8_t> bytes) {
+        promise.set_value({status, std::move(bytes)});
+      });
+  if (response.status != SDK_OK) {
+    return {ApiStatus::INVALID_ARGUMENT, {}};
+  }
+
+  return future.get();
+}
+
+std::pair<ApiStatus, std::string> ConnectionObject::read_str() {
+  auto [status, bytes] = read();
+  std::string str{bytes.begin(), bytes.end()};
+  return {status, str};
+}
+
+ApiStatus ConnectionObject::write(std::vector<uint8_t> bytes) {
+  std::promise<ApiStatus> promise;
+  auto future = promise.get_future();
+
+  if (core == nullptr) {
+    return ApiStatus::INVALID;
+  }
+
+  // Taking promise by reference is fine because we block waiting for the
+  // return. If this function gets changed to timeout, this should be changed as
+  // well.
+  auto response = core->getApiManager().write(
+      handle, std::move(bytes),
+      [&promise](ApiStatus status) { promise.set_value(status); });
+  if (response.status != SDK_OK) {
+    return ApiStatus::INVALID_ARGUMENT;
+  }
+
+  return future.get();
+}
+
+ApiStatus ConnectionObject::write_str(const std::string &message) {
+  std::vector<uint8_t> bytes{message.begin(), message.end()};
+  return write(bytes);
+}
+
+ApiStatus ConnectionObject::close() {
+  std::promise<ApiStatus> promise;
+  auto future = promise.get_future();
+  if (core == nullptr) {
+    return ApiStatus::INVALID_ARGUMENT;
+  }
+
+  auto response = core->getApiManager().close(
+      handle, [&promise](ApiStatus status) { promise.set_value(status); });
+  if (response.status != SDK_OK) {
+    return ApiStatus::INTERNAL_ERROR;
+  }
+
+  return future.get();
+}
+
+ReceiveObject::ReceiveObject() : handle(0) {}
+ReceiveObject::ReceiveObject(std::shared_ptr<Core> core, OpHandle handle)
+    : core(core), handle(handle) {}
+
+std::pair<ApiStatus, std::vector<uint8_t>> ReceiveObject::receive() {
+  std::promise<std::pair<ApiStatus, std::vector<uint8_t>>> promise;
+  auto future = promise.get_future();
+
+  if (core == nullptr) {
+    return {ApiStatus::INVALID, {}};
+  }
+
+  // Taking promise by reference is fine because we block waiting for the
+  // return. If this function gets changed to timeout, this should be changed as
+  // well.
+  auto response = core->getApiManager().receive(
+      handle, [&promise](ApiStatus status, std::vector<uint8_t> bytes) {
+        promise.set_value({status, std::move(bytes)});
+      });
+  if (response.status != SDK_OK) {
+    return {ApiStatus::INVALID_ARGUMENT, {}};
+  }
+
+  return future.get();
+}
+
+std::pair<ApiStatus, std::string> ReceiveObject::receive_str() {
+  auto [status, bytes] = receive();
+  std::string str{bytes.begin(), bytes.end()};
+  return {status, str};
+}
+
+ApiStatus ReceiveObject::close() {
+  std::promise<ApiStatus> promise;
+  auto future = promise.get_future();
+  if (core == nullptr) {
+    return ApiStatus::INVALID_ARGUMENT;
+  }
+
+  auto response = core->getApiManager().close(
+      handle, [&promise](ApiStatus status) { promise.set_value(status); });
+  if (response.status != SDK_OK) {
+    return ApiStatus::INTERNAL_ERROR;
+  }
+
+  return future.get();
+}
+
+RespondObject::RespondObject(std::shared_ptr<Core> core,
+                             SendOptions sendOptions)
+    : core(core), sendOptions(sendOptions) {}
+
+//  respond to the package received by the receive call
+ApiStatus RespondObject::respond(std::vector<uint8_t> data) {
+  TRACE_METHOD();
+  std::promise<ApiStatus> promise;
+  auto future = promise.get_future();
+  core->getApiManager().send(sendOptions, data, [&promise](ApiStatus status) {
+    promise.set_value(status);
+  });
+  return future.get();
+}
+
+ApiStatus RespondObject::respond_str(std::string response) {
+  std::vector<uint8_t> bytes{response.begin(), response.end()};
+  return respond(bytes);
+}
+
+ReceiveRespondObject::ReceiveRespondObject(std::shared_ptr<Core> core,
+                                           OpHandle handle,
+                                           ReceiveOptions options)
+    : core(core), handle(handle), recvOptions(options) {}
+
+//  blocks until a package is received. This object may be reused after
+//  responding.
+std::tuple<ApiStatus, std::vector<uint8_t>, RespondObject>
+ReceiveRespondObject::receive() {
+  std::promise<std::tuple<ApiStatus, std::vector<uint8_t>, LinkAddress>>
+      promise;
+  auto future = promise.get_future();
+
+  if (core == nullptr) {
+    return {ApiStatus::INVALID, {}, RespondObject{nullptr, {}}};
+  }
+
+  // Taking promise by reference is fine because we block waiting for the
+  // return. If this function gets changed to timeout, this should be changed as
+  // well.
+  auto response = core->getApiManager().receiveRespond(
+      handle, [&promise](ApiStatus status, std::vector<uint8_t> bytes,
+                         LinkAddress respondAddress) {
+        promise.set_value({status, std::move(bytes), respondAddress});
+      });
+  if (response.status != SDK_OK) {
+    return {ApiStatus::INVALID_ARGUMENT, {}, RespondObject{nullptr, {}}};
+  }
+
+  auto [status, data, respondAddress] = future.get();
+  if (status != ApiStatus::OK) {
+    return {status, data, {nullptr, {}}};
+  }
+
+  SendOptions sendOptions;
+  sendOptions.send_channel = recvOptions.send_channel;
+  sendOptions.send_role = recvOptions.send_role;
+  sendOptions.send_address = respondAddress;
+  RespondObject responder(core, sendOptions);
+  return {status, data, responder};
+}
+
+std::tuple<ApiStatus, std::string, RespondObject>
+ReceiveRespondObject::receive_str() {
+  auto [status, bytes, reply_object] = receive();
+  std::string str{bytes.begin(), bytes.end()};
+  return {status, str, reply_object};
+}
+
+ApiStatus ReceiveRespondObject::close() {
+  std::promise<ApiStatus> promise;
+  auto future = promise.get_future();
+  if (core == nullptr) {
+    return ApiStatus::INVALID_ARGUMENT;
+  }
+
+  auto response = core->getApiManager().close(
+      handle, [&promise](ApiStatus status) { promise.set_value(status); });
+  if (response.status != SDK_OK) {
+    return ApiStatus::INTERNAL_ERROR;
+  }
+
+  return future.get();
+}
+
+AcceptObject::AcceptObject(std::shared_ptr<Core> core, OpHandle handle)
+    : core(core), handle(handle) {}
+
+std::pair<ApiStatus, ConnectionObject> AcceptObject::accept() {
+  std::promise<std::pair<ApiStatus, RaceHandle>> promise;
+  auto future = promise.get_future();
+  if (core == nullptr) {
+    return {ApiStatus::INVALID_ARGUMENT, {nullptr, NULL_RACE_HANDLE}};
+  }
+
+  auto response = core->getApiManager().accept(
+      handle, [&promise](ApiStatus status, RaceHandle _handle) {
+        promise.set_value({status, _handle});
+      });
+  if (response.status != SDK_OK) {
+    return {ApiStatus::INTERNAL_ERROR, {nullptr, NULL_RACE_HANDLE}};
+  }
+
+  auto [status, connHandle] = future.get();
+  ConnectionObject connection(core, connHandle);
+  return {status, connection};
+}
+
+void ChannelParamStore::setChannelParam(std::string key, std::string value) {
+  params[key] = value;
+}
+
+Race::Race(std::string race_dir, ChannelParamStore params)
+    : core(std::make_shared<Core>(race_dir, params)) {}
+Race::Race(std::shared_ptr<Core> core) : core(core) {}
+
+Race::~Race() {}
+
+std::tuple<ApiStatus, LinkAddress, ReceiveObject>
+Race::receive(ReceiveOptions options) {
+  TRACE_METHOD();
+  std::promise<std::tuple<ApiStatus, LinkAddress, RaceHandle>> promise;
+  auto future = promise.get_future();
+
+  // Taking promise by reference is fine because we block waiting for the
+  // return. If this function gets changed to timeout, this should be changed as
+  // well.
+  core->getApiManager().getReceiveObject(
+      options,
+      [&promise](ApiStatus status, LinkAddress addr, RaceHandle handle) {
+        promise.set_value({status, addr, handle});
+      });
+
+  auto [status, linkAddr, handle] = future.get();
+  ReceiveObject receiver(core, handle);
+  return {status, linkAddr, receiver};
+}
+
+std::tuple<ApiStatus, LinkAddress, ReceiveRespondObject>
+Race::receive_respond(ReceiveOptions options) {
+  std::promise<std::tuple<ApiStatus, LinkAddress, RaceHandle>> promise;
+  auto future = promise.get_future();
+
+  core->getApiManager().getReceiveObject(
+      options,
+      [&promise](ApiStatus status, LinkAddress addr, RaceHandle handle) {
+        promise.set_value({status, addr, handle});
+      });
+
+  auto [status, linkAddr, handle] = future.get();
+  ReceiveRespondObject receiver(core, handle, options);
+  return {status, linkAddr, receiver};
+}
+
+std::tuple<ApiStatus, LinkAddress, AcceptObject>
+Race::listen(ReceiveOptions options) {
+  TRACE_METHOD();
+  std::promise<std::tuple<ApiStatus, LinkAddress, RaceHandle>> promise;
+  auto future = promise.get_future();
+
+  core->getApiManager().listen(
+      options,
+      [&promise](ApiStatus status, LinkAddress addr, RaceHandle handle) {
+        promise.set_value({status, addr, handle});
+      });
+
+  auto [status, addr, handle] = future.get();
+  AcceptObject receiver(core, handle);
+  return {status, addr, receiver};
+}
+
+ApiStatus Race::send(SendOptions options, std::vector<uint8_t> data) {
+  TRACE_METHOD();
+  std::promise<ApiStatus> promise;
+  auto future = promise.get_future();
+  core->getApiManager().send(options, data, [&promise](ApiStatus status) {
+    promise.set_value(status);
+  });
+  return future.get();
+}
+
+ApiStatus Race::send_str(SendOptions options, std::string message) {
+  TRACE_METHOD();
+  std::vector<uint8_t> bytes{message.begin(), message.end()};
+  return send(options, bytes);
+}
+
+std::pair<ApiStatus, std::vector<uint8_t>>
+Race::send_receive(SendOptions options, std::vector<uint8_t> data) {
+  TRACE_METHOD();
+  std::promise<std::pair<ApiStatus, std::vector<uint8_t>>> promise;
+  auto future = promise.get_future();
+  core->getApiManager().sendReceive(
+      options, data,
+      [&promise](ApiStatus status, std::vector<uint8_t> response) {
+        promise.set_value({status, response});
+      });
+  return future.get();
+}
+
+std::pair<ApiStatus, std::string> Race::send_receive_str(SendOptions options,
+                                                         std::string message) {
+  TRACE_METHOD();
+  std::vector<uint8_t> bytes{message.begin(), message.end()};
+  auto [status, message_bytes] = send_receive(options, bytes);
+  std::string str{message_bytes.begin(), message_bytes.end()};
+  return {status, str};
+}
+
+std::pair<ApiStatus, ConnectionObject> Race::dial(SendOptions options,
+                                                  std::vector<uint8_t> bytes) {
+  TRACE_METHOD();
+  std::promise<std::tuple<ApiStatus, RaceHandle>> promise;
+  auto future = promise.get_future();
+
+  core->getApiManager().dial(options, bytes,
+                             [&promise](ApiStatus status, RaceHandle handle) {
+                               promise.set_value({status, handle});
+                             });
+
+  auto [status, handle] = future.get();
+  ConnectionObject receiver(core, handle);
+  return {status, receiver};
+}
+
+std::pair<ApiStatus, ConnectionObject> Race::dial_str(SendOptions options,
+                                                      std::string message) {
+  TRACE_METHOD();
+  std::vector<uint8_t> bytes{message.begin(), message.end()};
+  return dial(options, bytes);
+}
+
+} // namespace Raceboat

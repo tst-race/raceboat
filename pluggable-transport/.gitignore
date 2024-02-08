@@ -1,0 +1,70 @@
+##############################
+## CMake
+##############################
+build/
+cmake
+
+##############################
+## IntelliJ
+##############################
+out/
+.idea/
+.idea_modules/
+*.iml
+*.ipr
+*.iws
+
+##############################
+## Eclipse
+##############################
+.settings/
+bin/
+tmp/
+.metadata
+.classpath
+.project
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.loadpath
+.factorypath
+
+##############################
+## NetBeans
+##############################
+nbproject/private/
+build/
+nbbuild/
+dist/
+nbdist/
+nbactions.xml
+nb-configuration.xml
+
+##############################
+## Visual Studio Code
+##############################
+.vscode/
+
+##############################
+## OS X
+##############################
+.DS_Store
+
+##############################
+## Gitlab
+##############################
+.gitlab_artifacts
+*~
+
+##############################
+## Race Artifacts
+##############################
+racesdk/
+plugin/
+##############################
+## golang files generated during build and test
+##############################
+go.mod
+initialized.txt
