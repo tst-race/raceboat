@@ -152,6 +152,7 @@ std::shared_ptr<ITransportComponent> PythonComponentPlugin::createTransport(
     const PluginConfig &pluginConfig) {
   TRACE_METHOD(path, name);
   initPython("", pythonModulePath, pythonShimsPath);
+  pluginConfig.pluginDirectory = fs::path(path).string();
   return std::shared_ptr<ITransportComponent>(
       static_cast<ITransportComponent *>(createPythonComponentPlugin(
           FUNC_CREATE_TRANSPORT, path, pythonModule, SDK_TYPE_TRANSPORT,
@@ -164,6 +165,7 @@ std::shared_ptr<IUserModelComponent> PythonComponentPlugin::createUserModel(
     const PluginConfig &pluginConfig) {
   TRACE_METHOD(path, name);
   initPython("", pythonModulePath, pythonShimsPath);
+  pluginConfig.pluginDirectory = fs::path(path).string();
   return std::shared_ptr<IUserModelComponent>(
       static_cast<IUserModelComponent *>(createPythonComponentPlugin(
           FUNC_CREATE_USER_MODEL, path, pythonModule, SDK_TYPE_USER_MODEL,
@@ -176,6 +178,7 @@ std::shared_ptr<IEncodingComponent> PythonComponentPlugin::createEncoding(
     const PluginConfig &pluginConfig) {
   TRACE_METHOD(path, name);
   initPython("", pythonModulePath, pythonShimsPath);
+  pluginConfig.pluginDirectory = fs::path(path).string();
   return std::shared_ptr<IEncodingComponent>(
       static_cast<IEncodingComponent *>(createPythonComponentPlugin(
           FUNC_CREATE_ENCODING, path, pythonModule, SDK_TYPE_ENCODING,
