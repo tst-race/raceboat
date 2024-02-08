@@ -34,7 +34,7 @@ namespace RaceLib {
 
 using json = nlohmann::json;
 
-static const std::string pluginNameForLogging = "RaceCommLib";
+static const std::string pluginNameForLogging = "Raceboat";
 
 void helper::logDebug(const std::string &message, const std::string &stackTrace) {
     RaceLog::logDebug(pluginNameForLogging, message, stackTrace);

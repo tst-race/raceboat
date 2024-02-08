@@ -91,7 +91,7 @@ std::string get_thread_name();
  **/
 std::string stringVectorToString(const std::vector<std::string> &vec);
 
-#define TRACE_FUNCTION(...) TRACE_FUNCTION_BASE(RaceCommLib, ##__VA_ARGS__)
-#define TRACE_METHOD(...) TRACE_METHOD_BASE(RaceCommLib, ##__VA_ARGS__)
+#define TRACE_FUNCTION(...) TRACE_FUNCTION_BASE(Raceboat, ##__VA_ARGS__)
+#define TRACE_METHOD(...) TRACE_METHOD_BASE(Raceboat, ##__VA_ARGS__)
 
 }  // namespace RaceLib
