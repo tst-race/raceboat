@@ -10,7 +10,7 @@
 #include "race/common/RaceHandle.h"
 #include "race/Race.h"
 #include "race/common/RaceLog.h"
-using namespace RaceLib;
+using namespace Raceboat;
 %}
 
 // SWIG wraps these %include'ed files, %templates, etc
@@ -21,9 +21,9 @@ using namespace RaceLib;
 
 
 %template(ByteVector) std::vector<uint8_t>;
-%template(StatusConnectionPair) std::pair<RaceLib::ApiStatus, RaceLib::ConnectionObject>;
-%template(StatusStringPair) std::pair<RaceLib::ApiStatus, std::string>;
-%template(StatusSwigConnectionPair) std::pair<RaceLib::ApiStatus, RaceLib::SwigConnectionObject>;
+%template(StatusConnectionPair) std::pair<Raceboat::ApiStatus, Raceboat::ConnectionObject>;
+%template(StatusStringPair) std::pair<Raceboat::ApiStatus, std::string>;
+%template(StatusSwigConnectionPair) std::pair<Raceboat::ApiStatus, Raceboat::SwigConnectionObject>;
 
 %include "race/common/ChannelId.h"
 %include "race/common/RaceHandle.h"
@@ -32,7 +32,7 @@ using namespace RaceLib;
 
 %inline %{
 // mitigate circular deps that prohibit including Race.h as well as duplicate wrapper defs for Race
-namespace RaceLib {
+namespace Raceboat {
 struct ReadResult {
     ApiStatus status;
     std::vector<uint8_t> result;
@@ -88,7 +88,7 @@ struct RaceSwig: public Race {
         return { pair.first, pair.second };
     }
 };
-}  // namespace RaceLib
+}  // namespace Raceboat
 %}
 
 %template(SwigConnVector) std::vector<SwigConnectionObject>; // go doesn't support generic containers

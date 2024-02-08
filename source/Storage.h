@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-namespace RaceLib {
+namespace Raceboat {
 
 /**
  * @brief Storage class designed for encryption algorithms
@@ -67,4 +67,4 @@ protected:
     virtual bool appendCiphertext(const std::filesystem::path &existingEncryptedFile,
                                   const std::vector<std::uint8_t> &plaintext) const;
 };
-}  // namespace RaceLib
+}  // namespace Raceboat

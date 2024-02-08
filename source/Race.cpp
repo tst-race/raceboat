@@ -22,7 +22,7 @@
 #include "Core.h"
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 std::string recvOptionsToString(const ReceiveOptions &recvOptions) {
     std::stringstream ss;
@@ -384,4 +384,4 @@ std::pair<ApiStatus, ConnectionObject> Race::dial_str(SendOptions options, std::
     return dial(options, bytes);
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

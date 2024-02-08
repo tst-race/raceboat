@@ -19,7 +19,7 @@
 
 #include "ComponentManager.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 std::ostream &operator<<(std::ostream &out, const ComponentBaseWrapper &wrapper) {
     return out << wrapper.toString();
@@ -331,4 +331,4 @@ void EncodingComponentWrapper::decodeBytes(CMTypes::DecodingHandle handle,
     TRACE_METHOD(handle, params, bytes.size());
     post(logPrefix, &IEncodingComponent::decodeBytes, handle.handle, params, bytes);
 }
-}  // namespace RaceLib
+}  // namespace Raceboat

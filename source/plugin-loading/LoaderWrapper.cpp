@@ -16,7 +16,7 @@
 
 #include "LoaderWrapper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 LoaderWrapper::LoaderWrapper(PluginContainer &container, Core &, const fs::path &path) :
     PluginWrapper(container), dl(path) {
@@ -89,4 +89,4 @@ std::string LoaderWrapper::versionToString(const RaceVersionInfo &version) {
     return versionString.str();
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

@@ -20,7 +20,7 @@
 
 #include "ApiContext.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class PreConnObjContext : public ApiContext {
 public:
@@ -68,4 +68,4 @@ public:
 
 using PreConnObjState = BaseApiState<PreConnObjContext>;
 
-}  // namespace RaceLib
+}  // namespace Raceboat

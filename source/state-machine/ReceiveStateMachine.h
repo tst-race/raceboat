@@ -18,7 +18,7 @@
 
 #include "ApiContext.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ApiRecvContext : public ApiContext {
 public:
@@ -53,4 +53,4 @@ public:
 
 using RecvState = BaseApiState<ApiRecvContext>;
 
-}  // namespace RaceLib
+}  // namespace Raceboat

@@ -20,7 +20,7 @@
 
 #include "race/Race.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class UserInput {
 public:
@@ -33,4 +33,4 @@ private:
     const std::unordered_map<std::string, std::string> params;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

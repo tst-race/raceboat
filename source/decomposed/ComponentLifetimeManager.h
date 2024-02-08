@@ -23,7 +23,7 @@
 #include "SdkWrappers.h"
 #include "plugin-loading/IComponentPlugin.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ComponentManagerInternal;
 
@@ -82,4 +82,4 @@ public:
 
 std::ostream &operator<<(std::ostream &out, const ComponentLifetimeManager &manager);
 
-}  // namespace RaceLib
+}  // namespace Raceboat

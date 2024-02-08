@@ -19,7 +19,7 @@
 #include "gmock/gmock.h"
 #include "api-managers/ChannelManager.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class MockChannelManager : public ChannelManager {
 public:

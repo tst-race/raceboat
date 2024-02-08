@@ -19,7 +19,7 @@
 // #include "RaceExceptions.h"
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 bool PluginDef::is_decomposed_plugin() const {
     return !is_unified_plugin();
@@ -52,4 +52,4 @@ void from_json(const nlohmann::json &pluginJson, PluginDef &pluginDef) {
     }
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

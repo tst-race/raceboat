@@ -18,7 +18,7 @@
 
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 FileSystem::FileSystem(const fs::path &pluginsPath, std::unique_ptr<Storage> _storage) :
     pluginsInstallPath(pluginsPath) {
@@ -210,4 +210,4 @@ bool FileSystem::createDirectories(const fs::path &absPath) {
     return true;
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

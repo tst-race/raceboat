@@ -23,7 +23,7 @@
 
 #include "swigpyrun.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 /**
  * @brief Initialize the python interpreter. Loads the python interpreter from the location
@@ -59,6 +59,6 @@ void savePythonThread();
  */
 void destroyPythonPlugin(void **obj, const std::string &pluginType);
 
-}  // namespace RaceLib
+}  // namespace Raceboat
 
 #endif

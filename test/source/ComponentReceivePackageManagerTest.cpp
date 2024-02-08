@@ -20,7 +20,7 @@
 #include "decomposed/ComponentReceivePackageManager.h"
 #include "gtest/gtest.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 using namespace CMTypes;
 
 class TestableComponentReceivePackageManager : public ComponentReceivePackageManager {

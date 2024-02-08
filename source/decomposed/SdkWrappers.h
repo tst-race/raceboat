@@ -21,7 +21,7 @@
 #include "race/decomposed/ITransportComponent.h"
 #include "race/decomposed/IUserModelComponent.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ComponentManager;
 
@@ -91,4 +91,4 @@ public:
                                            EncodingStatus status) override;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

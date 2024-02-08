@@ -21,7 +21,7 @@
 #include "gmock/gmock.h"
 #include "race_printers.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class MockSdkWrapper : public SdkWrapper {
 public:
@@ -72,4 +72,4 @@ public:
                 (override));
     MOCK_METHOD(SdkResponse, unblockQueue, (ConnectionID connId), (override));
 };
-}  // namespace RaceLib
+}  // namespace Raceboat

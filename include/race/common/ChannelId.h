@@ -18,6 +18,6 @@
 
 #include <string>
 
-namespace RaceLib {
+namespace Raceboat {
 using ChannelId = std::string;
 }

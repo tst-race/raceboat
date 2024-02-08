@@ -24,7 +24,7 @@
 #include "race/Race.h"
 #include "race/common/RaceLog.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 
 enum class Mode : int {
     INVALID,

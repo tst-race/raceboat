@@ -24,7 +24,7 @@
 #include "common/ChannelId.h"
 #include "common/RaceHandle.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class Core;
 class Race;
@@ -309,4 +309,4 @@ public:
      */
     std::pair<ApiStatus, ConnectionObject> dial_str(SendOptions options, std::string message);
 };
-}  // namespace RaceLib
+}  // namespace Raceboat

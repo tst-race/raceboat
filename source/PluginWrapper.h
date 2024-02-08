@@ -23,7 +23,7 @@
 #include "SdkWrapper.h"
 #include "race/unified/IRacePluginComms.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 static const int32_t WAIT_FOREVER = 0;
 
@@ -191,4 +191,4 @@ protected:
     std::atomic<uint64_t> nextPostId = 0;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

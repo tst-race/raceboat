@@ -20,7 +20,7 @@
 #include "race/common/EncPkg.h"
 #include "gmock/gmock.h"
 
-namespace RaceLib {
+namespace Raceboat {
 class MockPluginWrapper : public PluginWrapper {
 public:
     MockPluginWrapper(PluginContainer &container) : PluginWrapper(container) {}
@@ -85,4 +85,4 @@ public:
                 (override));
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

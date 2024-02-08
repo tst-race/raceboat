@@ -24,7 +24,7 @@
 #include "helper.h"
 #include "plugin-loading/IComponentPlugin.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 using ::testing::_;
 using ::testing::Return;
 

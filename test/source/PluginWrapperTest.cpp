@@ -24,7 +24,7 @@ using ::testing::Invoke;
 using ::testing::Return;
 using ::testing::Unused;
 
-using namespace RaceLib;
+using namespace Raceboat;
 using namespace std::chrono_literals;
 
 TEST(PluginWrapperTest, test_constructor) {

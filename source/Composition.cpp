@@ -21,7 +21,7 @@
 
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 Composition::Composition(const std::string &id, const std::string &transport,
                          const std::string &usermodel, const std::vector<std::string> &encodings) :
@@ -56,4 +56,4 @@ void from_json(const nlohmann::json &j, Composition &composition) {
     composition.encodings = j.at("encodings").get<std::vector<std::string>>();
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

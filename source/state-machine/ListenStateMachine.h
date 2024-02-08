@@ -18,7 +18,7 @@
 
 #include "ApiContext.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ApiListenContext : public ApiContext {
 public:
@@ -56,4 +56,4 @@ public:
 
 using ListenState = BaseApiState<ApiListenContext>;
 
-}  // namespace RaceLib
+}  // namespace Raceboat

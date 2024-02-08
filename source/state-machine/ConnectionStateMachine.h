@@ -20,7 +20,7 @@
 
 #include "ApiContext.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ApiConnContext : public ApiContext {
 public:
@@ -67,4 +67,4 @@ public:
 
 using ConnState = BaseApiState<ApiConnContext>;
 
-}  // namespace RaceLib
+}  // namespace Raceboat

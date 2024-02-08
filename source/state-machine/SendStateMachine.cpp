@@ -25,7 +25,7 @@
 #include "api-managers/ApiManager.h"
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 //-----------------------------------------------------------------------------------------------
 // Context
@@ -180,7 +180,7 @@ SendStateEngine::SendStateEngine() {
 }
 
 std::string SendStateEngine::eventToString(EventType event) {
-    return RaceLib::eventToString(event);
+    return Raceboat::eventToString(event);
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

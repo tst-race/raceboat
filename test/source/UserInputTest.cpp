@@ -18,7 +18,7 @@
 #include "Race.h"
 #include "gtest/gtest.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 
 TEST(UserInputTest, test) {
     std::string actualStartPort = "26262";

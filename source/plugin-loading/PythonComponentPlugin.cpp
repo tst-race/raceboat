@@ -20,7 +20,7 @@
 #include "PythonHelper.h"
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 static void *createPythonComponentPlugin(const std::string &createFunction,
                                          const std::string &pythonPath,
@@ -187,6 +187,6 @@ std::string PythonComponentPlugin::get_path() {
     return path;
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat
 
 #endif

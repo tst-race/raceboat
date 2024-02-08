@@ -18,7 +18,7 @@
 #include "PythonHelper.h"
 
 #include "helper.h"
-namespace RaceLib {
+namespace Raceboat {
 
 bool initPython(std::string pythonHome, std::string pluginPath, std::string shimsPath) {
     TRACE_FUNCTION(pythonHome, pluginPath, shimsPath);
@@ -112,5 +112,5 @@ void destroyPythonPlugin(void **obj, const std::string &pluginType) {
 
     PyGILState_Release(gstate);
 }
-}  // namespace RaceLib
+}  // namespace Raceboat
 #endif

@@ -24,7 +24,7 @@
 #include "race/decomposed/ITransportComponent.h"
 #include "race/decomposed/IUserModelComponent.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ComponentManager;
 
@@ -146,4 +146,4 @@ public:
                              const std::vector<uint8_t> &bytes);
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

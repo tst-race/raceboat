@@ -29,7 +29,7 @@
 #include "helper.h"
 #include "race/common/RacePluginExports.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class CompositeWrapper : public PluginWrapper {
 public:
@@ -40,4 +40,4 @@ public:
     virtual ~CompositeWrapper() override;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

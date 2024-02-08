@@ -19,7 +19,7 @@
 
 #include "ComponentManager.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 ComponentSdkBaseWrapper::ComponentSdkBaseWrapper(ComponentManager &manager, const std::string &id) :
     manager(manager), id(id) {}
@@ -126,4 +126,4 @@ ChannelResponse EncodingSdkWrapper::onBytesDecoded(RaceHandle handle,
     return manager.onBytesDecoded(handle, bytes, status);
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

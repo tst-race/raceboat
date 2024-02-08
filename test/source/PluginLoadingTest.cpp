@@ -39,7 +39,7 @@
 #define DECOMPOSED_TRANSPORT "Unknown"
 #endif
 
-using namespace RaceLib;
+using namespace Raceboat;
 using testing::_;
 using testing::Return;
 

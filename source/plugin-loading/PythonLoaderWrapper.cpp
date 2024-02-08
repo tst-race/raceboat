@@ -29,7 +29,7 @@
 #include "PythonHelper.h"
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 /**
  * @brief Create a Python plugin.
@@ -145,5 +145,5 @@ PythonLoaderWrapper::~PythonLoaderWrapper() {
     this->mPlugin.reset();
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat
 #endif

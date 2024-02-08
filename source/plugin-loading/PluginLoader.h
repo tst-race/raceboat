@@ -20,7 +20,7 @@
 #include "PluginContainer.h"
 #include "race/common/ChannelId.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class Core;
 
@@ -31,4 +31,4 @@ public:
     static std::unique_ptr<IPluginLoader> construct(Core &core);
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

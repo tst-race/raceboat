@@ -20,7 +20,7 @@
 #include "../common/mocks/MockRacePlugin.h"
 #include "base64.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 using namespace testing;
 using testing::_;
 

@@ -23,7 +23,7 @@
 #include "base64.h"
 #include "race/common/EncPkg.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 //-----------------------------------------------------------------------------------------------
 // Context
@@ -274,7 +274,7 @@ ConnectionObjectStateEngine::ConnectionObjectStateEngine() {
 }
 
 std::string ConnectionObjectStateEngine::eventToString(EventType event) {
-    return RaceLib::eventToString(event);
+    return Raceboat::eventToString(event);
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

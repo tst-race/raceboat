@@ -39,7 +39,7 @@
 
 using json = nlohmann::json;
 
-namespace RaceLib {
+namespace Raceboat {
 
 /**
  * @brief Load a plugin using the provided definition.
@@ -123,7 +123,7 @@ public:
     LoadableUnifiedPlugin(PluginDef pluginDef) : pluginDef(pluginDef) {}
     virtual ~LoadableUnifiedPlugin() {}
     virtual std::unique_ptr<PluginContainer> loadPlugin(Core &core) override {
-        return RaceLib::loadPlugin(pluginDef, core);
+        return Raceboat::loadPlugin(pluginDef, core);
     }
     virtual std::vector<ChannelId> channelIdsForPlugin() override {
         return pluginDef.channels;
@@ -260,4 +260,4 @@ std::unique_ptr<IPluginLoader> IPluginLoader::construct(Core &core) {
     return std::make_unique<PluginLoader>(core);
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

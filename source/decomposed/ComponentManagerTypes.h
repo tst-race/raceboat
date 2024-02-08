@@ -29,7 +29,7 @@
 #include "race/common/LinkProperties.h"  // ConnectionID, LinkID
 #include "race/decomposed/ComponentTypes.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 namespace CMTypes {
 enum CmInternalStatus { OK, ERROR, FATAL };
@@ -279,12 +279,12 @@ struct Connection {
 std::ostream &operator<<(std::ostream &out, const Connection &conn);
 
 }  // namespace CMTypes
-}  // namespace RaceLib
+}  // namespace Raceboat
 
 namespace std {
 template <int N>
-struct hash<RaceLib::CMTypes::HandleStruct<N>> {
-    std::size_t operator()(const RaceLib::CMTypes::HandleStruct<N> &handleStruct) const {
+struct hash<Raceboat::CMTypes::HandleStruct<N>> {
+    std::size_t operator()(const Raceboat::CMTypes::HandleStruct<N> &handleStruct) const {
         return std::hash<RaceHandle>{}(handleStruct.handle);
     }
 };

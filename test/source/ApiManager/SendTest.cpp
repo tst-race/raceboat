@@ -19,7 +19,7 @@
 #include "../common/MockCore.h"
 #include "../common/mocks/MockRacePlugin.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 using namespace testing;
 using testing::_;
 

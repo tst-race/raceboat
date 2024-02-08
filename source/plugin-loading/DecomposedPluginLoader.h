@@ -26,7 +26,7 @@
 #include "PythonComponentPlugin.h"
 #include "race/common/RaceEnums.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class Core;
 class PluginWrapper;
@@ -48,4 +48,4 @@ public:
     std::unordered_map<std::string, IComponentPlugin *> encodings;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

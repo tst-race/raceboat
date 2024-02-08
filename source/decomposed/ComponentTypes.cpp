@@ -18,7 +18,7 @@
 
 #include <sstream>
 
-// using namespace RaceLib;
+// using namespace Raceboat;
 
 std::string actionToString(const Action &action) {
     return "Action{ id:" + std::to_string(action.actionId) +

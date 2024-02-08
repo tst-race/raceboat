@@ -19,7 +19,7 @@
 
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 using namespace CMTypes;
 
@@ -947,4 +947,4 @@ std::ostream &operator<<(std::ostream &out, const ComponentManager &manager) {
     return out << manager.toString();
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

@@ -26,7 +26,7 @@
 
 #include "ComponentManager.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 using namespace CMTypes;
 
@@ -455,4 +455,4 @@ std::ostream &operator<<(std::ostream &out, const ComponentActionManager &cam) {
                << ", lastEncodeTime: " << cam.lastEncodeTime
                << ", actions: " << printActions(cam.actions) << "}";
 }
-}  // namespace RaceLib
+}  // namespace Raceboat

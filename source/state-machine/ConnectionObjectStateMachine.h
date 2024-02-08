@@ -21,7 +21,7 @@
 
 #include "ApiContext.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ConnectionObjectContext : public ApiContext {
 public:
@@ -85,4 +85,4 @@ public:
 
 using ConnectionObjectState = BaseApiState<ConnectionObjectContext>;
 
-}  // namespace RaceLib
+}  // namespace Raceboat

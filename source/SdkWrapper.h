@@ -19,7 +19,7 @@
 #include "PluginContainer.h"
 #include "race/unified/IRaceSdkComms.h"
 
-namespace RaceLib {
+namespace Raceboat {
 class Core;
 
 /**
@@ -82,4 +82,4 @@ protected:
     PluginContainer &container;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

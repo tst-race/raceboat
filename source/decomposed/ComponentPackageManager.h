@@ -27,7 +27,7 @@
 #include "plugin-loading/ComponentPlugin.h"
 #include "race/common/PluginResponse.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ComponentManagerInternal;
 
@@ -90,4 +90,4 @@ protected:
     // gets called.
     std::unordered_map<CMTypes::PackageFragmentHandle, CMTypes::PackageFragmentInfo *> fragments;
 };
-}  // namespace RaceLib
+}  // namespace Raceboat

@@ -19,7 +19,7 @@
 
 #include <stdexcept>
 
-namespace RaceLib {
+namespace Raceboat {
 
 constexpr char b64_encode_table[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -134,4 +134,4 @@ std::vector<uint8_t> base64::decode(const std::string &b64) {
     return data;
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

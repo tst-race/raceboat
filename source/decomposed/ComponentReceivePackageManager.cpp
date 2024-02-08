@@ -19,7 +19,7 @@
 
 #include "ComponentManager.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 using namespace CMTypes;
 
@@ -238,4 +238,4 @@ std::ostream &operator<<(std::ostream &out, const ComponentReceivePackageManager
                << "nextDecodingHandle:" << manager.nextDecodingHandle
                << ", pendingDecodings: " << manager.pendingDecodings << "}";
 }
-}  // namespace RaceLib
+}  // namespace Raceboat

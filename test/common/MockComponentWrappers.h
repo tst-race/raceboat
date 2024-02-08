@@ -25,10 +25,10 @@
 #include "helper.h"
 #include "race_printers.h"
 
-class MockTransportComponentWrapper : public RaceLib::TransportComponentWrapper {
+class MockTransportComponentWrapper : public Raceboat::TransportComponentWrapper {
 public:
     MockTransportComponentWrapper(LogExpect &logger) :
-        RaceLib::TransportComponentWrapper("", "", nullptr, nullptr), logger(logger) {
+        Raceboat::TransportComponentWrapper("", "", nullptr, nullptr), logger(logger) {
         using ::testing::_;
         ON_CALL(*this, getTransportProperties()).WillByDefault([this]() {
             LOG_EXPECT(this->logger, "getTransportProperties");
@@ -39,27 +39,27 @@ public:
             return LinkProperties{};
         });
         ON_CALL(*this, createLink(_, _))
-            .WillByDefault([this](RaceLib::CMTypes::LinkSdkHandle handle, const LinkID &linkId) {
+            .WillByDefault([this](Raceboat::CMTypes::LinkSdkHandle handle, const LinkID &linkId) {
                 LOG_EXPECT(this->logger, "createLink", handle, linkId);
             });
         ON_CALL(*this, loadLinkAddress(_, _, _))
-            .WillByDefault([this](RaceLib::CMTypes::LinkSdkHandle handle, const LinkID &linkId,
+            .WillByDefault([this](Raceboat::CMTypes::LinkSdkHandle handle, const LinkID &linkId,
                                   const std::string &linkAddress) {
                 LOG_EXPECT(this->logger, "loadLinkAddress", handle, linkId, linkAddress);
             });
         ON_CALL(*this, loadLinkAddresses(_, _, _))
-            .WillByDefault([this](RaceLib::CMTypes::LinkSdkHandle handle, const LinkID &linkId,
+            .WillByDefault([this](Raceboat::CMTypes::LinkSdkHandle handle, const LinkID &linkId,
                                   const std::vector<std::string> &linkAddress) {
                 nlohmann::json linkAddressesJson = linkAddress;
                 LOG_EXPECT(this->logger, "loadLinkAddresses", handle, linkId, linkAddressesJson);
             });
         ON_CALL(*this, createLinkFromAddress(_, _, _))
-            .WillByDefault([this](RaceLib::CMTypes::LinkSdkHandle handle, const LinkID &linkId,
+            .WillByDefault([this](Raceboat::CMTypes::LinkSdkHandle handle, const LinkID &linkId,
                                   const std::string &linkAddress) {
                 LOG_EXPECT(this->logger, "createLinkFromAddress", handle, linkId, linkAddress);
             });
         ON_CALL(*this, destroyLink(_, _))
-            .WillByDefault([this](RaceLib::CMTypes::LinkSdkHandle handle, const LinkID &linkId) {
+            .WillByDefault([this](Raceboat::CMTypes::LinkSdkHandle handle, const LinkID &linkId) {
                 LOG_EXPECT(this->logger, "destroyLink", handle, linkId);
             });
         ON_CALL(*this, getActionParams(_)).WillByDefault([this](const Action &action) {
@@ -75,7 +75,7 @@ public:
             LOG_EXPECT(this->logger, "dequeueContent", action);
         });
         ON_CALL(*this, doAction(_, _))
-            .WillByDefault([this](const std::vector<RaceLib::CMTypes::PackageFragmentHandle> &handles,
+            .WillByDefault([this](const std::vector<Raceboat::CMTypes::PackageFragmentHandle> &handles,
                                   const Action &action) {
                 std::vector<RaceHandle> raceHandles(handles.size());
                 std::transform(handles.begin(), handles.end(), raceHandles.begin(),
@@ -89,21 +89,21 @@ public:
 
     MOCK_METHOD(LinkProperties, getLinkProperties, (const LinkID &linkId), (override));
 
-    MOCK_METHOD(void, createLink, (RaceLib::CMTypes::LinkSdkHandle handle, const LinkID &linkId),
+    MOCK_METHOD(void, createLink, (Raceboat::CMTypes::LinkSdkHandle handle, const LinkID &linkId),
                 (override));
     MOCK_METHOD(void, loadLinkAddress,
-                (RaceLib::CMTypes::LinkSdkHandle handle, const LinkID &linkId,
+                (Raceboat::CMTypes::LinkSdkHandle handle, const LinkID &linkId,
                  const std::string &linkAddress),
                 (override));
     MOCK_METHOD(void, loadLinkAddresses,
-                (RaceLib::CMTypes::LinkSdkHandle handle, const LinkID &linkId,
+                (Raceboat::CMTypes::LinkSdkHandle handle, const LinkID &linkId,
                  const std::vector<std::string> &linkAddress),
                 (override));
     MOCK_METHOD(void, createLinkFromAddress,
-                (RaceLib::CMTypes::LinkSdkHandle handle, const LinkID &linkId,
+                (Raceboat::CMTypes::LinkSdkHandle handle, const LinkID &linkId,
                  const std::string &linkAddress),
                 (override));
-    MOCK_METHOD(void, destroyLink, (RaceLib::CMTypes::LinkSdkHandle handle, const LinkID &linkId),
+    MOCK_METHOD(void, destroyLink, (Raceboat::CMTypes::LinkSdkHandle handle, const LinkID &linkId),
                 (override));
 
     MOCK_METHOD(std::vector<EncodingParameters>, getActionParams, (const Action &action),
@@ -117,17 +117,17 @@ public:
     MOCK_METHOD(void, dequeueContent, (const Action &action), (override));
 
     MOCK_METHOD(void, doAction,
-                (const std::vector<RaceLib::CMTypes::PackageFragmentHandle> &handles, const Action &action),
+                (const std::vector<Raceboat::CMTypes::PackageFragmentHandle> &handles, const Action &action),
                 (override));
 
 public:
     LogExpect &logger;
 };
 
-class MockUserModelComponentWrapper : public RaceLib::UserModelComponentWrapper {
+class MockUserModelComponentWrapper : public Raceboat::UserModelComponentWrapper {
 public:
     MockUserModelComponentWrapper(LogExpect &logger) :
-        RaceLib::UserModelComponentWrapper("", "", nullptr, nullptr), logger(logger) {
+        Raceboat::UserModelComponentWrapper("", "", nullptr, nullptr), logger(logger) {
         using ::testing::_;
         ON_CALL(*this, getUserModelProperties()).WillByDefault([this]() {
             LOG_EXPECT(this->logger, "getUserModelProperties");
@@ -169,10 +169,10 @@ public:
     LogExpect &logger;
 };
 
-class MockEncodingComponentWrapper : public RaceLib::EncodingComponentWrapper {
+class MockEncodingComponentWrapper : public Raceboat::EncodingComponentWrapper {
 public:
     MockEncodingComponentWrapper(LogExpect &logger) :
-        RaceLib::EncodingComponentWrapper("", "", nullptr, nullptr), logger(logger) {
+        Raceboat::EncodingComponentWrapper("", "", nullptr, nullptr), logger(logger) {
         using ::testing::_;
         ON_CALL(*this, getEncodingProperties()).WillByDefault([this]() {
             LOG_EXPECT(this->logger, "getEncodingProperties");
@@ -184,12 +184,12 @@ public:
                 return SpecificEncodingProperties({1000});
             });
         ON_CALL(*this, encodeBytes(_, _, _))
-            .WillByDefault([this](RaceLib::CMTypes::EncodingHandle handle, const EncodingParameters &params,
+            .WillByDefault([this](Raceboat::CMTypes::EncodingHandle handle, const EncodingParameters &params,
                                   const std::vector<uint8_t> &bytes) {
                 LOG_EXPECT(this->logger, "encodeBytes", handle, params, bytes.size());
             });
         ON_CALL(*this, decodeBytes(_, _, _))
-            .WillByDefault([this](RaceLib::CMTypes::DecodingHandle handle, const EncodingParameters &params,
+            .WillByDefault([this](Raceboat::CMTypes::DecodingHandle handle, const EncodingParameters &params,
                                   const std::vector<uint8_t> &bytes) {
                 LOG_EXPECT(this->logger, "decodeBytes", handle, params, bytes.size());
             });
@@ -201,12 +201,12 @@ public:
                 (const EncodingParameters &params), (override));
 
     MOCK_METHOD(void, encodeBytes,
-                (RaceLib::CMTypes::EncodingHandle handle, const EncodingParameters &params,
+                (Raceboat::CMTypes::EncodingHandle handle, const EncodingParameters &params,
                  const std::vector<uint8_t> &bytes),
                 (override));
 
     MOCK_METHOD(void, decodeBytes,
-                (RaceLib::CMTypes::DecodingHandle handle, const EncodingParameters &params,
+                (Raceboat::CMTypes::DecodingHandle handle, const EncodingParameters &params,
                  const std::vector<uint8_t> &bytes),
                 (override));
 

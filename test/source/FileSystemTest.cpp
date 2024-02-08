@@ -24,7 +24,7 @@
 #define INPUT_FILE_DIR "Unknown"
 #endif
 
-using namespace RaceLib;
+using namespace Raceboat;
 using namespace testing;
 
 struct FileSystemTestable : public FileSystem {

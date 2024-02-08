@@ -73,7 +73,7 @@ public:
         ASSERT_FALSE(checked);
         fs::create_directories(output_file_path);
 
-        std::string threadName = RaceLib::helper::get_thread_name();
+        std::string threadName = Raceboat::helper::get_thread_name();
         if (threadName.empty()) {
             threadName = "default";
         }

@@ -25,7 +25,7 @@
 #include "race/decomposed/ITransportComponent.h"
 #include "race/decomposed/IUserModelComponent.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 struct ComponentPlugin : public IComponentPlugin {
 public:
@@ -76,4 +76,4 @@ private:
     using destroyEncodingImplType = void(IEncodingComponent *);
     destroyEncodingImplType *destroyEncodingImpl;
 };
-}  // namespace RaceLib
+}  // namespace Raceboat

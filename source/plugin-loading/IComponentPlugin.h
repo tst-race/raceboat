@@ -22,7 +22,7 @@
 #include "race/decomposed/ITransportComponent.h"
 #include "race/decomposed/IUserModelComponent.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 struct IComponentPlugin {
 public:
@@ -40,4 +40,4 @@ public:
     virtual std::string get_path() = 0;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

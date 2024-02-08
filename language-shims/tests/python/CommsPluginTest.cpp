@@ -35,7 +35,7 @@
 using ::testing::_;
 using ::testing::Return;
 
-using namespace RaceLib;
+using namespace Raceboat;
 
 class CommsPluginTest : public ::testing::Test {
 public:

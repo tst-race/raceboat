@@ -25,7 +25,7 @@
 #include "Storage.h"
 namespace fs = std::filesystem;
 
-namespace RaceLib {
+namespace Raceboat {
 /**
  * @brief manages plugin-specific directories for Storage item to write to
  **/
@@ -169,4 +169,4 @@ public:
      **/
     const fs::path pluginsInstallPath;
 };
-}  // namespace RaceLib
+}  // namespace Raceboat

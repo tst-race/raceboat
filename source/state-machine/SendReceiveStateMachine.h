@@ -18,7 +18,7 @@
 
 #include "ApiContext.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ApiSendReceiveContext : public ApiContext {
 public:
@@ -55,4 +55,4 @@ public:
 
 using SendReceiveState = BaseApiState<ApiSendReceiveContext>;
 
-}  // namespace RaceLib
+}  // namespace Raceboat

@@ -26,13 +26,13 @@
 #include "gmock/gmock.h"
 #include "race_printers.h"
 
-class MockComponentManagerInternal : public RaceLib::ComponentManagerInternal {
+class MockComponentManagerInternal : public Raceboat::ComponentManagerInternal {
 public:
     // This is cursed. I'm passing references sdk / componentPlugins to the base class, but they
     // aren't initialized until after the base class constructor is complete. This is why having an
     // interface that both the mock and the actual class implement makes more sense. Oh well.
     MockComponentManagerInternal(LogExpect &logger) :
-        RaceLib::ComponentManagerInternal(nullptr, mockSdkComms, {}, transportPlugin, usermodelPlugin, {}),
+        Raceboat::ComponentManagerInternal(nullptr, mockSdkComms, {}, transportPlugin, usermodelPlugin, {}),
         logger(logger),
         mockSdkComms(logger),
         transportPlugin("transport", logger),
@@ -55,7 +55,7 @@ public:
 
         ON_CALL(*this, getState()).WillByDefault([this]() {
             LOG_EXPECT(this->logger, "getState");
-            return RaceLib::CMTypes::State::INITIALIZING;
+            return Raceboat::CMTypes::State::INITIALIZING;
         });
         ON_CALL(*this, getCompositionId).WillByDefault([this]() {
             LOG_EXPECT(this->logger, "getCompositionId");
@@ -89,7 +89,7 @@ public:
 
         ON_CALL(*this, getLinks()).WillByDefault([this]() {
             LOG_EXPECT(this->logger, "getLinks");
-            return std::vector<RaceLib::CMTypes::Link *>{&mockLink, &mockLink2};
+            return std::vector<Raceboat::CMTypes::Link *>{&mockLink, &mockLink2};
         });
         ON_CALL(*this, getConnection(_)).WillByDefault([this](const ConnectionID &connId) {
             LOG_EXPECT(this->logger, "getConnection", connId);
@@ -99,158 +99,158 @@ public:
         ON_CALL(*this, updatedActions()).WillByDefault([this]() {
             LOG_EXPECT(this->logger, "updatedActions");
         });
-        ON_CALL(*this, encodeForAction(_)).WillByDefault([this](RaceLib::CMTypes::ActionInfo *info) {
+        ON_CALL(*this, encodeForAction(_)).WillByDefault([this](Raceboat::CMTypes::ActionInfo *info) {
             LOG_EXPECT(this->logger, "encodeForAction", *info)
         });
         ON_CALL(*this, getPackageHandlesForAction(_))
-            .WillByDefault([this](RaceLib::CMTypes::ActionInfo *info) {
+            .WillByDefault([this](Raceboat::CMTypes::ActionInfo *info) {
                 LOG_EXPECT(this->logger, "getPackageHandlesForAction", *info)
-                return std::vector<RaceLib::CMTypes::PackageFragmentHandle>{};
+                return std::vector<Raceboat::CMTypes::PackageFragmentHandle>{};
             });
 
-        ON_CALL(*this, actionDone(_)).WillByDefault([this](RaceLib::CMTypes::ActionInfo *info) {
+        ON_CALL(*this, actionDone(_)).WillByDefault([this](Raceboat::CMTypes::ActionInfo *info) {
             LOG_EXPECT(this->logger, "actionDone", *info)
         });
     }
 
     // Comms Plugin APIs
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, init,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, const PluginConfig &pluginConfig),
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, init,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, const PluginConfig &pluginConfig),
                 (override));
 
-    MOCK_METHOD(PluginResponse, shutdown, (RaceLib::CMTypes::ComponentWrapperHandle postId), (override));
+    MOCK_METHOD(PluginResponse, shutdown, (Raceboat::CMTypes::ComponentWrapperHandle postId), (override));
 
     MOCK_METHOD(PluginResponse, sendPackage,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::PackageSdkHandle handle,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::PackageSdkHandle handle,
                  const ConnectionID &connectionId, EncPkg &&pkg, double timeoutTimestamp,
                  uint64_t batchId),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, openConnection,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::ConnectionSdkHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, openConnection,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::ConnectionSdkHandle handle,
                  LinkType linkType, const LinkID &linkId, const std::string &linkHints,
                  int32_t sendTimeout),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, closeConnection,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::ConnectionSdkHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, closeConnection,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::ConnectionSdkHandle handle,
                  const ConnectionID &connectionId),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, destroyLink,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::LinkSdkHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, destroyLink,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::LinkSdkHandle handle,
                  const LinkID &linkId),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, createLink,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::LinkSdkHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, createLink,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::LinkSdkHandle handle,
                  const std::string &channelGid),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, loadLinkAddress,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::LinkSdkHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, loadLinkAddress,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::LinkSdkHandle handle,
                  const std::string &channelGid, const std::string &linkAddress),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, loadLinkAddresses,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::LinkSdkHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, loadLinkAddresses,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::LinkSdkHandle handle,
                  const std::string &channelGid, const std::vector<std::string> &linkAddresses),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, createLinkFromAddress,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::LinkSdkHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, createLinkFromAddress,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::LinkSdkHandle handle,
                  const std::string &channelGid, const std::string &linkAddress),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, deactivateChannel,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::ChannelSdkHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, deactivateChannel,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::ChannelSdkHandle handle,
                  const std::string &channelGid),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, activateChannel,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::ChannelSdkHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, activateChannel,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::ChannelSdkHandle handle,
                  const std::string &channelGid, const std::string &roleName),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, onUserInputReceived,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::UserSdkHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, onUserInputReceived,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::UserSdkHandle handle,
                  bool answered, const std::string &response),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, onUserAcknowledgementReceived,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::UserSdkHandle handle),
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, onUserAcknowledgementReceived,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::UserSdkHandle handle),
                 (override));
 
     // Common Apis
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, requestPluginUserInput,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, const std::string &componentId,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, requestPluginUserInput,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, const std::string &componentId,
                  const std::string &key, const std::string &prompt, bool cache),
                 (override));
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, requestCommonUserInput,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, const std::string &componentId,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, requestCommonUserInput,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, const std::string &componentId,
                  const std::string &key),
                 (override));
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, updateState,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, const std::string &componentId,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, updateState,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, const std::string &componentId,
                  ComponentState state),
                 (override));
 
     // IEncodingSdk APIs
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, onBytesEncoded,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::EncodingHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, onBytesEncoded,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::EncodingHandle handle,
                  std::vector<uint8_t> &&bytes, EncodingStatus status),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, onBytesDecoded,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::DecodingHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, onBytesDecoded,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::DecodingHandle handle,
                  std::vector<uint8_t> &&bytes, EncodingStatus status),
                 (override));
 
     // ITransportSdk APIs
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, onLinkStatusChanged,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::LinkSdkHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, onLinkStatusChanged,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::LinkSdkHandle handle,
                  const LinkID &linkId, LinkStatus status, const LinkParameters &params),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, onPackageStatusChanged,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, RaceLib::CMTypes::PackageFragmentHandle handle,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, onPackageStatusChanged,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, Raceboat::CMTypes::PackageFragmentHandle handle,
                  PackageStatus status),
                 (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, onEvent,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, const Event &event), (override));
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, onEvent,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, const Event &event), (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, onReceive,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId, const LinkID &linkId,
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, onReceive,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId, const LinkID &linkId,
                  const EncodingParameters &params, std::vector<uint8_t> &&bytes),
                 (override));
 
     // IUserModelSdk APIs
-    MOCK_METHOD(RaceLib::CMTypes::CmInternalStatus, onTimelineUpdated,
-                (RaceLib::CMTypes::ComponentWrapperHandle postId), (override));
+    MOCK_METHOD(Raceboat::CMTypes::CmInternalStatus, onTimelineUpdated,
+                (Raceboat::CMTypes::ComponentWrapperHandle postId), (override));
 
     // methods for sub-managers
     MOCK_METHOD(void, teardown, (), (override));
     MOCK_METHOD(void, setup, (), (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::State, getState, (), (override));
+    MOCK_METHOD(Raceboat::CMTypes::State, getState, (), (override));
     MOCK_METHOD(const std::string &, getCompositionId, (), (override));
 
-    MOCK_METHOD(RaceLib::EncodingComponentWrapper *, encodingComponentFromEncodingParams,
+    MOCK_METHOD(Raceboat::EncodingComponentWrapper *, encodingComponentFromEncodingParams,
                 (const EncodingParameters &params), (override));
-    MOCK_METHOD(RaceLib::TransportComponentWrapper *, getTransport, (), (override));
-    MOCK_METHOD(RaceLib::UserModelComponentWrapper *, getUserModel, (), (override));
+    MOCK_METHOD(Raceboat::TransportComponentWrapper *, getTransport, (), (override));
+    MOCK_METHOD(Raceboat::UserModelComponentWrapper *, getUserModel, (), (override));
 
-    MOCK_METHOD(RaceLib::CMTypes::Link *, getLink, (const LinkID &linkId), (override));
-    MOCK_METHOD(std::vector<RaceLib::CMTypes::Link *>, getLinks, (), (override));
-    MOCK_METHOD(RaceLib::CMTypes::Connection *, getConnection, (const ConnectionID &connId), (override));
+    MOCK_METHOD(Raceboat::CMTypes::Link *, getLink, (const LinkID &linkId), (override));
+    MOCK_METHOD(std::vector<Raceboat::CMTypes::Link *>, getLinks, (), (override));
+    MOCK_METHOD(Raceboat::CMTypes::Connection *, getConnection, (const ConnectionID &connId), (override));
 
     MOCK_METHOD(void, updatedActions, (), (override));
-    MOCK_METHOD(void, encodeForAction, (RaceLib::CMTypes::ActionInfo * info), (override));
-    MOCK_METHOD(std::vector<RaceLib::CMTypes::PackageFragmentHandle>, getPackageHandlesForAction,
-                (RaceLib::CMTypes::ActionInfo * info), (override));
+    MOCK_METHOD(void, encodeForAction, (Raceboat::CMTypes::ActionInfo * info), (override));
+    MOCK_METHOD(std::vector<Raceboat::CMTypes::PackageFragmentHandle>, getPackageHandlesForAction,
+                (Raceboat::CMTypes::ActionInfo * info), (override));
 
-    MOCK_METHOD(void, actionDone, (RaceLib::CMTypes::ActionInfo * info), (override));
+    MOCK_METHOD(void, actionDone, (Raceboat::CMTypes::ActionInfo * info), (override));
 
 public:
     LogExpect &logger;
@@ -260,8 +260,8 @@ public:
     MockEncodingComponentWrapper encoding;
     MockTransportComponentWrapper transport;
     MockUserModelComponentWrapper usermodel;
-    RaceLib::CMTypes::Connection mockConnection;
-    RaceLib::CMTypes::Link mockLink;
-    RaceLib::CMTypes::Link mockLink2;
+    Raceboat::CMTypes::Connection mockConnection;
+    Raceboat::CMTypes::Link mockLink;
+    Raceboat::CMTypes::Link mockLink2;
 };
 

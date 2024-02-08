@@ -18,7 +18,7 @@
 #include "../../source/state-machine/StateMachine.h"
 #include "gtest/gtest.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 using namespace testing;
 
 enum TestStates { FIRST_STATE = STATE_INIT, SECOND_STATE, THIRD_STATE, UNUSED_STATE };

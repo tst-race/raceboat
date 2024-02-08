@@ -25,7 +25,7 @@
 #include "PluginDef.h"
 #include "race/common/ChannelProperties.h"
 
-namespace RaceLib {
+namespace Raceboat {
 /**
  * @brief Reads plugin and channel information necessary for \p IPluginLoader
  * it requires at least one of the following files to exist: manifest.json, channel_properties.json
@@ -71,6 +71,6 @@ protected:
 void from_json(const nlohmann::json &j, Config::ChannelParameter &response);
 void from_json(const nlohmann::json &j, Config::PluginManifest &manifest);
 
-}  // namespace RaceLib
+}  // namespace Raceboat
 
 #endif  // __CONFIG_READER_H__

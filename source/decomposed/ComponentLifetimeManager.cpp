@@ -20,7 +20,7 @@
 #include "ComponentManager.h"
 #include "MimeTypes.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 using namespace CMTypes;
 
@@ -298,4 +298,4 @@ std::ostream &operator<<(std::ostream &out, const ComponentLifetimeManager &mana
                << ", componentStates: " << manager.componentStates
                << ", idComponentMap: " << manager.idComponentMap << "}";
 }
-}  // namespace RaceLib
+}  // namespace Raceboat

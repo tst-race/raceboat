@@ -19,9 +19,9 @@
 #include "Core.h"
 #include "api-managers/ApiManager.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 ApiContext::ApiContext(ApiManagerInternal &_manager, StateEngine &_engine) :
     manager(_manager), engine(_engine), handle(manager.getCore().generateHandle()) {}
 
-}  // namespace RaceLib
+}  // namespace Raceboat

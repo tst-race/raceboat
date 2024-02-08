@@ -21,7 +21,7 @@
 #include "PluginDef.h"
 #include "race/common/RaceEnums.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class Composition {
 public:
@@ -42,4 +42,4 @@ public:
 void to_json(nlohmann::json &j, const Composition &composition);
 void from_json(const nlohmann::json &j, Composition &composition);
 
-}  // namespace RaceLib
+}  // namespace Raceboat

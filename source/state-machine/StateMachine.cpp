@@ -20,7 +20,7 @@
 #include "States.h"
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 std::string EventResultString(const EventResult &result) {
     switch (result) {
@@ -340,4 +340,4 @@ bool StateEngine::validateStateMachine() {
     }
     return success;
 }
-}  // namespace RaceLib
+}  // namespace Raceboat

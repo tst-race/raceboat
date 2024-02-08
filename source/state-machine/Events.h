@@ -18,7 +18,7 @@
 
 #include "StateMachine.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 enum ApiManagerEvent : EventType {
     // EVENT_INVALID = 0,
@@ -51,4 +51,4 @@ enum ApiManagerEvent : EventType {
 
 std::string eventToString(EventType event);
 
-}  // namespace RaceLib
+}  // namespace Raceboat

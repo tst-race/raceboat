@@ -20,7 +20,7 @@
 #include "PluginWrapper.h"
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 SdkWrapper::SdkWrapper(PluginContainer &container, Core &core) : core(core), container(container) {}
 
@@ -224,4 +224,4 @@ LinkID SdkWrapper::generateLinkId(std::string channelGid) {
     return response;
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

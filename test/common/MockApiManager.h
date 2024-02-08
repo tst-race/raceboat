@@ -19,7 +19,7 @@
 #include "api-managers/ApiManager.h"
 #include "gmock/gmock.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class MockApiManager : public ApiManager {
 public:
@@ -45,4 +45,4 @@ public:
                 (uint64_t postId, OpHandle handle, std::function<void(ApiStatus, std::vector<uint8_t>)> callback), (override));
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

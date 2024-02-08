@@ -22,7 +22,7 @@
 #include "PluginContainer.h"
 #include "PluginWrapper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 /**
  * @brief Class for handling loading of a Python plugin. Will initialize the Python interpreter and
@@ -43,5 +43,5 @@ public:
     virtual ~PythonLoaderWrapper();
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat
 #endif

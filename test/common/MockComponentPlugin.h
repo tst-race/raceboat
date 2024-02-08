@@ -26,10 +26,10 @@
 #include "plugin-loading/ComponentPlugin.h"
 #include "race_printers.h"
 
-class MockComponentPlugin : public RaceLib::ComponentPlugin {
+class MockComponentPlugin : public Raceboat::ComponentPlugin {
 public:
     MockComponentPlugin(std::string id, LogExpect &logger) :
-        RaceLib::ComponentPlugin(""), id(id), logger(logger) {
+        Raceboat::ComponentPlugin(""), id(id), logger(logger) {
         using ::testing::_;
         ON_CALL(*this, createTransport(_, _, _, _))
             .WillByDefault([this](const std::string &name, ITransportSdk *sdk,

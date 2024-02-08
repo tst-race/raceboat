@@ -21,7 +21,7 @@
 
 #include "ComponentManager.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 using namespace CMTypes;
 
@@ -604,4 +604,4 @@ std::ostream &operator<<(std::ostream &out, const ComponentPackageManager &manag
                << "\n    nextEncodingHandle: " << manager.nextEncodingHandle
                << "\n    fragments: " << manager.fragments << "\n}";
 }
-}  // namespace RaceLib
+}  // namespace Raceboat

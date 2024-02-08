@@ -22,7 +22,7 @@
 
 #include <dlfcn.h>
 
-namespace RaceLib {
+namespace Raceboat {
 
 static_assert(std::is_same_v<DynamicLibrary::path_char, char>);
 static_assert(std::is_same_v<DynamicLibrary::path_string, std::string>);

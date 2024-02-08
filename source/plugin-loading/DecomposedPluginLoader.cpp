@@ -21,7 +21,7 @@
 #include "decomposed/ComponentManager.h"
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 DecomposedPluginLoader::DecomposedPluginLoader(FileSystem &fs) : fs(fs) {}
 
@@ -133,4 +133,4 @@ std::unique_ptr<PluginContainer> DecomposedPluginLoader::compose(Composition com
 
     return container;
 }
-}  // namespace RaceLib
+}  // namespace Raceboat

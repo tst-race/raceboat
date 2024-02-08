@@ -18,7 +18,7 @@
 #include "../../source/state-machine/UnidirectionalStateMachine.h"
 #include "gtest/gtest.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 using namespace testing;
 
 TEST(UnidirectionalStateMachine, DISABLED_sendEngine) {}

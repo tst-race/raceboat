@@ -38,7 +38,7 @@
 #include "plugin-loading/IComponentPlugin.h"
 #include "race/unified/IRacePluginComms.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ComponentManager;
 
@@ -331,4 +331,4 @@ protected:
 std::ostream &operator<<(std::ostream &out, const ComponentManager &manager);
 std::ostream &operator<<(std::ostream &out, const ComponentManagerInternal &manager);
 
-}  // namespace RaceLib
+}  // namespace Raceboat

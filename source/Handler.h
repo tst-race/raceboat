@@ -29,7 +29,7 @@
 
 #include "race/common/constants.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class Handler {
 public:
@@ -528,4 +528,4 @@ auto Handler::post(std::string queue_name, size_t postedWorkSize, int timeout, T
 std::string handlerPostStatusToString(Handler::PostStatus status);
 std::ostream &operator<<(std::ostream &out, Handler::PostStatus status);
 
-}  // namespace RaceLib
+}  // namespace Raceboat

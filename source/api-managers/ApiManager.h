@@ -55,7 +55,7 @@ class EncPkg;
 
 // The manager is responsible to forwarding events to the appropriate state machine and context
 
-namespace RaceLib {
+namespace Raceboat {
 
 static const int packageIdLen = 16;
 
@@ -269,4 +269,4 @@ protected:
     std::atomic<uint64_t> nextPostId = 1;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

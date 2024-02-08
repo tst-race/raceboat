@@ -21,7 +21,7 @@
 
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 Core::Core() : fs(""), userInput({}), apiManager(std::make_unique<ApiManager>(*this)) {}
 Core::Core(std::string pluginPath, ChannelParamStore params) :
@@ -173,4 +173,4 @@ RaceHandle Core::generateHandle() {
     handleCount.compare_exchange_strong(rollover, 1ull);
     return handleCount++;
 }
-}  // namespace RaceLib
+}  // namespace Raceboat

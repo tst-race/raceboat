@@ -18,7 +18,7 @@
 
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 // increment the iterator to the next value. If it has reached the end of the container, reset it to
 // the beginning
@@ -579,4 +579,4 @@ std::ostream &operator<<(std::ostream &out, Handler::PostStatus status) {
     return out << handlerPostStatusToString(status);
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

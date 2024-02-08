@@ -23,7 +23,7 @@
 #include "FileSystem.h"
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class DynamicLibrary {
 public:
@@ -141,4 +141,4 @@ inline T &DynamicLibrary::get(const char *name) const {
     return *reinterpret_cast<T *>(ptr);
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

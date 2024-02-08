@@ -21,9 +21,9 @@
 
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
-using namespace RaceLib;
+using namespace Raceboat;
 
 Storage::~Storage() {}
 
@@ -147,4 +147,4 @@ bool Storage::appendCiphertext(const std::filesystem::path &existingEncryptedFil
     return success;
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

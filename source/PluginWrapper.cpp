@@ -20,7 +20,7 @@
 
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 PluginWrapper::PluginWrapper(PluginContainer &container) :
     container(container), mThreadHandler(container.id + "-thread", 0, 0) {
@@ -477,4 +477,4 @@ SdkResponse PluginWrapper::makeResponse(const std::string &functionName, bool su
     return SdkResponse(status, queueUtilization, handle);
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

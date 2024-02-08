@@ -22,7 +22,7 @@
 
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 bool mimeTypeMatches(const std::string &mimeType, const std::string &pattern) {
     std::string logPrefix = "mimeTypeMatches: ";
@@ -53,4 +53,4 @@ bool mimeTypeMatches(const std::string &mimeType, const std::string &pattern) {
     }
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

@@ -21,7 +21,7 @@
 #include "helper.h"
 #include "plugin-loading/Config.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 std::string activateChannelStatusCodeToString(ActivateChannelStatusCode status) {
     switch (status) {
@@ -130,4 +130,4 @@ ActivateChannelStatusCode ChannelManager::activateChannel(RaceHandle handle, std
     }
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

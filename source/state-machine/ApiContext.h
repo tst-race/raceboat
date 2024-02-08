@@ -31,7 +31,7 @@
 #include "race/common/LinkStatus.h"
 #include "race/common/PackageStatus.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ApiManagerInternal;
 class PluginWrapper;
@@ -145,4 +145,4 @@ struct BaseApiState : public State {
     }
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

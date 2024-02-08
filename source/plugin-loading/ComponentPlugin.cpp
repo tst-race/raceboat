@@ -16,7 +16,7 @@
 
 #include "ComponentPlugin.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 ComponentPlugin::ComponentPlugin(const std::string &path) :
     path(path),
@@ -92,4 +92,4 @@ std::string ComponentPlugin::get_path() {
     return path;
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

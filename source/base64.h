@@ -20,9 +20,9 @@
 #include <string>
 #include <vector>
 
-namespace RaceLib {
+namespace Raceboat {
 namespace base64 {
 std::string encode(const std::vector<uint8_t> &data);
 std::vector<uint8_t> decode(const std::string &b64);
 }  // namespace base64
-}  // namespace RaceLib
+}  // namespace Raceboat

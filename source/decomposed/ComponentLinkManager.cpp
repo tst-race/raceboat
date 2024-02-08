@@ -19,7 +19,7 @@
 
 #include "ComponentManager.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 using namespace CMTypes;
 
@@ -115,4 +115,4 @@ void ComponentLinkManager::teardown() {
 void ComponentLinkManager::setup() {
     TRACE_METHOD();
 }
-}  // namespace RaceLib
+}  // namespace Raceboat

@@ -46,7 +46,7 @@
 //   StateEngine as opposed to tasking each State implementation with creating instances of states
 //   resulting from events
 
-namespace RaceLib {
+namespace Raceboat {
 
 enum struct EventResult {
     NOT_SUPPORTED,  // state does not handle event
@@ -236,4 +236,4 @@ private:
     StateType initStateId;
     StateType failedStateId;
 };
-}  //  namespace RaceLib
+}  //  namespace Raceboat

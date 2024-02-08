@@ -17,7 +17,7 @@
 
 #include "ComponentManagerTypes.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 namespace CMTypes {
 
@@ -227,4 +227,4 @@ std::ostream &operator<<(std::ostream &out, const Connection &conn) {
 }
 
 }  // namespace CMTypes
-}  // namespace RaceLib
+}  // namespace Raceboat

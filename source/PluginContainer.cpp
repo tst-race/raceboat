@@ -19,7 +19,7 @@
 #include "PluginWrapper.h"
 #include "SdkWrapper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 PluginContainer::~PluginContainer() {
     // make sure the plugin is destroyed before the sdk wrapper
@@ -27,4 +27,4 @@ PluginContainer::~PluginContainer() {
     sdk.reset();
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

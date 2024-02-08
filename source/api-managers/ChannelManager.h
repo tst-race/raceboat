@@ -22,7 +22,7 @@
 #include "race/common/ChannelProperties.h"
 #include "race/common/RaceHandle.h"
 
-namespace RaceLib {
+namespace Raceboat {
 class Core;
 
 enum class ActivateChannelStatusCode {
@@ -55,4 +55,4 @@ protected:
     std::unordered_map<ChannelId, ChannelProperties> channelProps;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

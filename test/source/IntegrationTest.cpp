@@ -22,7 +22,7 @@
 #include "gtest/gtest.h"
 #include "helper.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 using testing::_;
 using testing::Return;
 

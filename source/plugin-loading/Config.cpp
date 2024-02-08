@@ -21,9 +21,9 @@
 
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
-bool Config::parsePluginManifests(RaceLib::FileSystem &fs) {
+bool Config::parsePluginManifests(Raceboat::FileSystem &fs) {
     TRACE_METHOD();
     bool success = false;
     nlohmann::json json;
@@ -35,7 +35,7 @@ bool Config::parsePluginManifests(RaceLib::FileSystem &fs) {
 
         if (parseJson(path, json)) {
             try {
-                manifests.push_back(json.get<RaceLib::Config::PluginManifest>());
+                manifests.push_back(json.get<Raceboat::Config::PluginManifest>());
                 success = true;
             } catch (nlohmann::json::exception &ex) {
                 helper::logWarning(logPrefix + " " + path.string() +
@@ -106,7 +106,7 @@ void from_json(const nlohmann::json &j, Config::ChannelParameter &response) {
     }
 }
 
-void from_json(const nlohmann::json &j, RaceLib::Config::PluginManifest &manifest) {
+void from_json(const nlohmann::json &j, Raceboat::Config::PluginManifest &manifest) {
     manifest.plugins = j.at("plugins").get<std::vector<PluginDef>>();
     manifest.channelIdChannelPropsMap =
         j.at("channel_properties").get<std::map<std::string, ChannelProperties>>();
@@ -131,4 +131,4 @@ void from_json(const nlohmann::json &j, RaceLib::Config::PluginManifest &manifes
         }
     }
 }
-}  // namespace RaceLib
+}  // namespace Raceboat

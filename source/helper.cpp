@@ -30,7 +30,7 @@
 #include "race/common/LinkStatus.h"
 #include "race/common/RaceLog.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 using json = nlohmann::json;
 
@@ -80,4 +80,4 @@ std::string stringVectorToString(const std::vector<std::string> &vec) {
     return s;
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

@@ -28,7 +28,7 @@
 #pragma GCC error "Need Plugin Path from cmake"
 #endif
 
-using namespace RaceLib;
+using namespace Raceboat;
 
 class PythonCommsDecompositionTextFixture : public ::testing::Test {
 public:

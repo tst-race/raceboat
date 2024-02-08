@@ -18,7 +18,7 @@
 
 #include "ApiContext.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ApiDialContext : public ApiContext {
 public:
@@ -54,4 +54,4 @@ public:
 
 using DialState = BaseApiState<ApiDialContext>;
 
-}  // namespace RaceLib
+}  // namespace Raceboat

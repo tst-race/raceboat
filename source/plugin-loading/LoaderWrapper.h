@@ -28,7 +28,7 @@
 #include "helper.h"
 #include "race/common/RacePluginExports.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class Core;
 
@@ -52,4 +52,4 @@ protected:
     static std::string versionToString(const RaceVersionInfo &version);
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

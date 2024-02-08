@@ -16,7 +16,7 @@
 
 #include "CompositeWrapper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 CompositeWrapper::CompositeWrapper(
     PluginContainer &container, Core &, Composition composition, const std::string &description,
@@ -35,4 +35,4 @@ CompositeWrapper::CompositeWrapper(
 CompositeWrapper::~CompositeWrapper() {
     TRACE_METHOD();
 }
-}  // namespace RaceLib
+}  // namespace Raceboat

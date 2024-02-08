@@ -21,7 +21,7 @@
 
 #include "helper.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 
 ChannelProperties::ChannelProperties() :
     channelStatus(CHANNEL_UNDEF),

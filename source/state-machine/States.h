@@ -18,7 +18,7 @@
 
 #include "StateMachine.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 enum ApiManagerState : StateType {
     // STATE_INVALID = 0,

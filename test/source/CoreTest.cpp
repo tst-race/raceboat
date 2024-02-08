@@ -19,7 +19,7 @@
 #include "../../source/SdkWrapper.h"
 #include "gtest/gtest.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 
 TEST(CoreTest, getEntropy) {
     Core core;

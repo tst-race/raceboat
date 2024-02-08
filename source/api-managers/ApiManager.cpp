@@ -23,7 +23,7 @@
 #include "base64.h"
 #include "state-machine/Events.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 ApiManager::ApiManager(Core &_core) : handler("api-mananger-thread", 0, 0), impl(_core, *this) {
     handler.create_queue("wait queue", std::numeric_limits<int>::min());
@@ -1017,4 +1017,4 @@ EventResult ApiManagerInternal::triggerEvent(ApiContext &context, EventType even
     return result;
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

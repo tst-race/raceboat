@@ -19,7 +19,7 @@
 #include <memory>
 #include <string>
 
-namespace RaceLib {
+namespace Raceboat {
 
 class PluginWrapper;
 class SdkWrapper;
@@ -40,4 +40,4 @@ public:
     PluginContainer &operator=(PluginContainer &&other) = delete;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

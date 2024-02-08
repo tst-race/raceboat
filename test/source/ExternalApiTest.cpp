@@ -21,7 +21,7 @@
 #include "Race.h"
 #include "gtest/gtest.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 using testing::_;
 using testing::Return;
 

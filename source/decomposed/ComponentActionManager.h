@@ -26,7 +26,7 @@
 #include "SdkWrappers.h"
 #include "plugin-loading/ComponentPlugin.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ComponentManagerInternal;
 
@@ -93,4 +93,4 @@ protected:
 
 std::ostream &operator<<(std::ostream &out, const ComponentActionManager &cam);
 
-}  // namespace RaceLib
+}  // namespace Raceboat

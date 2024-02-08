@@ -26,7 +26,7 @@
 #include "SdkWrappers.h"
 #include "plugin-loading/ComponentPlugin.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ComponentManagerInternal;
 
@@ -75,4 +75,4 @@ protected:
 
     std::unordered_map<CMTypes::DecodingHandle, LinkID> pendingDecodings;
 };
-}  // namespace RaceLib
+}  // namespace Raceboat

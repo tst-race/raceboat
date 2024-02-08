@@ -16,7 +16,7 @@
 
 #include "Events.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 std::string eventToString(EventType event) {
     switch (event) {
@@ -76,4 +76,4 @@ std::string eventToString(EventType event) {
     return "event " + std::to_string(event);
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

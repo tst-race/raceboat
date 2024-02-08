@@ -30,7 +30,7 @@
 
 class EncPkg;
 
-namespace RaceLib {
+namespace Raceboat {
 
 class PluginContainer;
 
@@ -100,4 +100,4 @@ protected:
     std::unique_ptr<ApiManager> apiManager;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

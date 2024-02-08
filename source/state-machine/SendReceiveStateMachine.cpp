@@ -26,7 +26,7 @@
 #include "base64.h"
 #include "helper.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 //-----------------------------------------------------------------------------------------------
 // Context
@@ -252,7 +252,7 @@ SendReceiveStateEngine::SendReceiveStateEngine() {
 }
 
 std::string SendReceiveStateEngine::eventToString(EventType event) {
-    return RaceLib::eventToString(event);
+    return Raceboat::eventToString(event);
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

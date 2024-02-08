@@ -18,7 +18,7 @@
 #include "../../source/UserInput.h"
 #include "gmock/gmock.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 
 class MockUserInput : public UserInput {
 public:

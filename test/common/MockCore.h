@@ -25,7 +25,7 @@
 #include "race/common/EncPkg.h"
 #include "gmock/gmock.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class MockCore : public Core {
 public:
@@ -113,4 +113,4 @@ public:
     RaceHandle handle = 1;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat

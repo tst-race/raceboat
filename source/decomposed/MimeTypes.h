@@ -19,7 +19,7 @@
 
 #include <string>
 
-namespace RaceLib {
+namespace Raceboat {
 
 bool mimeTypeMatches(const std::string &mimeType, const std::string &pattern);
 

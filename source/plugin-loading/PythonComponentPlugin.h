@@ -25,7 +25,7 @@
 #include "race/decomposed/ITransportComponent.h"
 #include "race/decomposed/IUserModelComponent.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 static const std::string SDK_TYPE_TRANSPORT = "ITransportSdk*";
 static const std::string SDK_TYPE_ENCODING = "IEncodingSdk*";
@@ -67,5 +67,5 @@ private:
     std::string pythonShimsPath;
 };
 
-}  // namespace RaceLib
+}  // namespace Raceboat
 #endif

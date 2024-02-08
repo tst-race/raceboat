@@ -20,7 +20,7 @@
 #include "FileSystem.h"
 #include "gmock/gmock.h"
 
-using namespace RaceLib;
+using namespace Raceboat;
 
 class MockFileSystem : public FileSystem {
 public:

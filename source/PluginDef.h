@@ -23,7 +23,7 @@
 
 #include "race/common/RaceEnums.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 using json = nlohmann::json;
 
@@ -67,4 +67,4 @@ inline std::ostream &operator<<(std::ostream &os, const PluginDef &pluginDef) {
     return os;
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

@@ -18,7 +18,7 @@
 
 #include <optional>
 
-namespace RaceLib {
+namespace Raceboat {
 
 UserInput::UserInput(ChannelParamStore params) : params(std::move(params.params)) {}
 
@@ -36,4 +36,4 @@ std::optional<std::string> UserInput::getCommonUserInput(std::string key) const 
     }
 }
 
-}  // namespace RaceLib
+}  // namespace Raceboat

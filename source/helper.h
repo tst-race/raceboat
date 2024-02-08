@@ -23,7 +23,7 @@
 #include "race/common/PluginResponse.h"
 #include "race/common/RaceLog.h"
 
-namespace RaceLib {
+namespace Raceboat {
 namespace helper {
 
 /**
@@ -94,4 +94,4 @@ std::string stringVectorToString(const std::vector<std::string> &vec);
 #define TRACE_FUNCTION(...) TRACE_FUNCTION_BASE(Raceboat, ##__VA_ARGS__)
 #define TRACE_METHOD(...) TRACE_METHOD_BASE(Raceboat, ##__VA_ARGS__)
 
-}  // namespace RaceLib
+}  // namespace Raceboat

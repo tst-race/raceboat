@@ -26,7 +26,7 @@
 #include "SdkWrappers.h"
 #include "plugin-loading/ComponentPlugin.h"
 
-namespace RaceLib {
+namespace Raceboat {
 
 class ComponentManagerInternal;
 
@@ -51,4 +51,4 @@ public:
 protected:
     ComponentManagerInternal &manager;
 };
-}  // namespace RaceLib
+}  // namespace Raceboat
