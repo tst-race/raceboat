@@ -1,0 +1,95 @@
+name: Continuous Integration
+
+on:
+  push:
+  pull_request:
+    branches:
+      - 'main'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/tst-race/race-images/race-compile:main
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build
+        run: ./build_it_all.sh
+
+      - name: Build-pt
+        run: ./pluggable-transport/build.sh -p=build/LINUX_x86_64/language-shims/source/include/src/core
+
+      - name: Create Build Artifact
+        # NOTE: _commsPluginBindings.so not in racesdk/package/
+        run: "tar cvf ${{ github.event.repository.name }}.tar.gz -C racesdk/package/ ."
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "${{ github.event.repository.name }}-linux-x86_64.tar.gz"
+          path: "${{ github.event.repository.name }}-linux-x86_64.tar.gz"
+          retention-days: 10
+
+  # todo base these on the raceboat image
+  test-unit:
+    # needs: build
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/tst-race/race-images/race-compile:main
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: unit test
+        uses: actions/checkout@v3
+
+      - name: Build and Run Unit Tests
+        # shuffle the order of the tests to potentially uncover weirdness
+        # note that you can reproduce the test results by finding the seed in the log output and
+        # setting the environment variable GTEST_RANDOM_SEED to that value.
+        env:
+          GTEST_SHUFFLE: 1
+        run: |
+          ./build_it_all.sh
+          cmake --build --preset=LINUX_x86_64 --target run_tests -j
+  test-coverage:
+    # needs: build
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/tst-race/race-images/race-compile:main
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build and Run Unit Tests
+        # shuffle the order of the tests to potentially uncover weirdness
+        # note that you can reproduce the test results by finding the seed in the log output and
+        # setting the environment variable GTEST_RANDOM_SEED to that value.
+        env:
+          GTEST_SHUFFLE: 1
+        run: |
+          cmake --preset=coverage
+          cmake --build --preset=coverage --target coverage
+  test-format:
+    # needs: build
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/tst-race/race-images/race-compile:main
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Check Format
+        run: |
+          ./build_it_all.sh
+          cmake --build --preset=LINUX_x86_64 --target check_format -j

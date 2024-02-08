@@ -1,0 +1,144 @@
+{
+  "android_python_path": "/data/data/com.twosix.race/python3.7/:/data/data/com.twosix.race/python3.7/encodings/:/data/data/com.twosix.race/python3.7/lib-dynload/:/data/data/com.twosix.race/race/python/:/data/data/com.twosix.race/race/artifacts/networkManager/:data/data/com.twosix.race/race/artifacts/comms/:data/data/com.twosix.race/python3.7/ordered-set-4.0.2:data/data/com.twosix.race/python3.7/jaeger-client-4.3.0:data/data/com.twosix.race/python3.7/pycryptodome-3.9.9:/data/data/com.twosix.race/python3.7/simplejson-3.16.0:/data/data/com.twosix.race/python3.7/PyYAML-5.3.1:/data/data/com.twosix.race/python3.7/opentracing-2.4.0:/data/data/com.twosix.race/python3.7/thrift-0.13.0:/data/data/com.twosix.race/python3.7/tornado-6.1",
+  "bandwidth": "-1",
+  "channels": [
+    {
+      "bootstrap": false,
+      "channelGid": "twoSixDirectCpp",
+      "connectionType": "CT_DIRECT",
+      "creatorExpected": {
+        "receive": {
+          "bandwidth_bps": 25700000,
+          "latency_ms": 16,
+          "loss": -1.0
+        },
+        "send": {
+          "bandwidth_bps": -1,
+          "latency_ms": -1,
+          "loss": -1.0
+        }
+      },
+      "creatorsPerLoader": -1,
+      "description": "Implementation of the Two Six Labs Direct communications utilizing Sockets",
+      "duration_s": -1,
+      "intervalEndTime": 0,
+      "isFlushable": false,
+      "linkDirection": "LD_LOADER_TO_CREATOR",
+      "loaderExpected": {
+        "receive": {
+          "bandwidth_bps": -1,
+          "latency_ms": -1,
+          "loss": -1.0
+        },
+        "send": {
+          "bandwidth_bps": 25700000,
+          "latency_ms": 16,
+          "loss": -1.0
+        }
+      },
+      "loadersPerCreator": -1,
+      "maxLinks": 2000,
+      "maxSendsPerInterval": -1,
+      "mtu": -1,
+      "multiAddressable": false,
+      "period_s": -1,
+      "reliable": false,
+      "roles": [
+        {
+          "behavioralTags": [],
+          "linkSide": "LS_BOTH",
+          "mechanicalTags": [],
+          "roleName": "default"
+        }
+      ],
+      "secondsPerInterval": -1,
+      "sendType": "ST_EPHEM_SYNC",
+      "sendsRemainingInInterval": -1,
+      "supported_hints": [],
+      "transmissionType": "TT_UNICAST"
+    }
+  ],
+  "compositions": [],
+  "debug": "false",
+  "environment_tags": {
+    "any": [],
+    "dmz": [
+      "service",
+      "linux"
+    ],
+    "home": [
+      "service",
+      "user",
+      "linux",
+      "gaming"
+    ],
+    "phone": [
+      "user"
+    ],
+    "service": [
+      "service",
+      "user",
+      "linux"
+    ],
+    "user": [
+      "user",
+      "linux"
+    ]
+  },
+  "isPluginFetchOnStartEnabled": "false",
+  "loglevel": "DEBUG",
+  "log-race-config": "true",
+  "log-networkManager-config": "false",
+  "log-comms-config": "false",
+  "msg-log-length": "256",
+  "plugins": [
+    {
+      "architecture": "arm64-v8a",
+      "channels": [
+        "twoSixDirectCpp"
+      ],
+      "file_path": "PluginCommsTwoSixStub",
+      "file_type": "shared_library",
+      "node_type": "client",
+      "platform": "android",
+      "plugin_type": "comms",
+      "shared_library_path": "libPluginCommsTwoSixStub.so"
+    },
+    {
+      "architecture": "x86_64",
+      "channels": [
+        "twoSixDirectCpp"
+      ],
+      "file_path": "PluginCommsTwoSixStub",
+      "file_type": "shared_library",
+      "node_type": "client",
+      "platform": "android",
+      "plugin_type": "comms",
+      "shared_library_path": "libPluginCommsTwoSixStub.so"
+    },
+    {
+      "architecture": "x86_64",
+      "channels": [
+        "twoSixDirectCpp"
+      ],
+      "file_path": "PluginCommsTwoSixStub",
+      "file_type": "shared_library",
+      "node_type": "client",
+      "platform": "linux",
+      "plugin_type": "comms",
+      "shared_library_path": "libPluginCommsTwoSixStub.so"
+    },
+    {
+      "architecture": "x86_64",
+      "channels": [
+        "twoSixDirectCpp"
+      ],
+      "file_path": "PluginCommsTwoSixStub",
+      "file_type": "shared_library",
+      "node_type": "server",
+      "platform": "linux",
+      "plugin_type": "comms",
+      "shared_library_path": "libPluginCommsTwoSixStub.so"
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+%module(directors="1") commsPluginBindingsGolang
+
+%include <typemaps.i>
+
+// We need to include CommsPlugin.h in the SWIG generated C++ file
+%{
+#include <iostream>
+#include <vector>
+#include <unordered_map>
+#include <string>
+
+#include "race/common/constants.h"
+
+#include "race/common/ChannelProperties.h"
+#include "race/common/ChannelRole.h"
+#include "race/common/ChannelStatus.h"
+#include "race/common/ConnectionStatus.h"
+#include "race/common/ConnectionType.h"
+#include "race/common/EncPkg.h"
+#include "race/common/LinkProperties.h"
+#include "race/common/LinkPropertyPair.h"
+#include "race/common/LinkPropertySet.h"
+#include "race/common/LinkStatus.h"
+#include "race/common/LinkType.h"
+#include "race/common/PackageStatus.h"
+#include "race/common/PackageType.h"
+#include "race/common/PackageStatus.h"
+#include "race/common/PluginConfig.h"
+#include "race/common/PluginResponse.h"
+#include "race/common/RaceEnums.h"
+#include "race/common/RaceHandle.h"
+#include "race/common/RaceLog.h"
+#include "race/common/SendType.h"
+#include "race/common/TransmissionType.h"
+
+#include "race/decomposed/ComponentTypes.h"
+#include "race/decomposed/IComponentBase.h"
+#include "race/decomposed/IComponentSdkBase.h"
+#include "race/decomposed/IEncodingComponent.h"
+#include "race/decomposed/IEncodingSdk.h"
+#include "race/decomposed/ITransportComponent.h"
+#include "race/decomposed/ITransportSdk.h"
+#include "race/decomposed/IUserModelComponent.h"
+#include "race/decomposed/IUserModelSdk.h"
+
+#include "race/unified/IRacePluginComms.h"
+#include "race/unified/IRaceSdkCommon.h"
+#include "race/unified/IRaceSdkComms.h"
+#include "race/unified/SdkResponse.h"
+%}
+
+// Enable cross-language polymorphism in the SWIG wrapper.
+// It's pretty slow so not enable by default
+%feature("director") IRacePluginComms;
+
+// Tell swig to wrap everything in CommsPlugin.h
+%include "stdint.i"
+%include "std_string.i"
+%include "std_vector.i"
+
+%template(RoleVector) std::vector<ChannelRole>;
+%template(StringVector) std::vector<std::string>;
+%template(ByteVector) std::vector<uint8_t>;
+
+// %typemap(gotype) (std::vector<std::string>) %{[]string%}
+
+// %typemap(in) (std::vector<std::string>) {
+//   printf("swigggg typemap start");
+//   $1 = std::vector<std::string>();
+//   for (int i = 0; i < $input.len; ++i) {
+//     _gostring_ *str = static_cast<_gostring_*>($input.array);
+//     $1.push_back(std::string(str[i].p, str[i].n));
+//   }
+// }
+
+
+%include "race/common/constants.h"
+
+%include "race/common/ChannelProperties.h"
+%include "race/common/ChannelRole.h"
+%include "race/common/ChannelStatus.h"
+%include "race/common/ConnectionStatus.h"
+%include "race/common/ConnectionType.h"
+%include "race/common/EncPkg.h"
+%include "race/common/LinkProperties.h"
+%include "race/common/LinkPropertyPair.h"
+%include "race/common/LinkPropertySet.h"
+%include "race/common/LinkStatus.h"
+%include "race/common/LinkType.h"
+%include "race/common/PackageStatus.h"
+%include "race/common/PackageType.h"
+%include "race/common/PackageStatus.h"
+%include "race/common/PluginConfig.h"
+%include "race/common/PluginResponse.h"
+%include "race/common/RaceEnums.h"
+%include "race/common/RaceExport.h"
+%include "race/common/RaceHandle.h"
+%include "race/common/RaceLog.h"
+%include "race/common/SendType.h"
+%include "race/common/TransmissionType.h"
+
+%include "race/decomposed/ComponentTypes.h"
+%include "race/decomposed/IComponentBase.h"
+%include "race/decomposed/IComponentSdkBase.h"
+%include "race/decomposed/IEncodingComponent.h"
+%include "race/decomposed/IEncodingSdk.h"
+%include "race/decomposed/ITransportComponent.h"
+%include "race/decomposed/ITransportSdk.h"
+%include "race/decomposed/IUserModelComponent.h"
+%include "race/decomposed/IUserModelSdk.h"
+
+%include "race/unified/IRacePluginComms.h"
+%include "race/unified/IRaceSdkCommon.h"
+%include "race/unified/IRaceSdkComms.h"
+%include "race/unified/SdkResponse.h"

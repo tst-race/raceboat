@@ -1,0 +1,10 @@
+{
+  "Common": {
+    "env": "any",
+    "hostname": "localhost"
+  },
+  "PluginCommsTwoSixStub": {
+    "endPort": "23999",
+    "startPort": "22000"
+  }
+}

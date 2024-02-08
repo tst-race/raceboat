@@ -1,0 +1,75 @@
+
+// Copyright 2023 Two Six Technologies
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// 
+
+#pragma once
+
+#include "StateMachine.h"
+
+namespace RaceLib {
+
+enum ApiManagerState : StateType {
+    // STATE_INVALID = 0,
+    // STATE_FAILED,
+    // STATE_INIT,
+    STATE_CONN_INITIAL = STATE_FIRST_UNUSED,
+    STATE_CONN_ACTIVATED,
+    STATE_CONN_LINK_ESTABLISHED,
+    STATE_CONN_CONNECTION_OPEN,
+    STATE_CONN_CONNECTED,
+    STATE_CONN_CLOSING,
+    STATE_CONN_CONNECTION_CLOSED,
+    STATE_CONN_LINK_CLOSED,
+    STATE_CONN_FAILED,
+    STATE_SEND_INITIAL,
+    STATE_SEND_CONNECTION_OPEN,
+    STATE_SEND_FINISHED,
+    STATE_SEND_FAILED,
+    STATE_RECV_INITIAL,
+    STATE_RECV_CONNECTION_OPEN,
+    STATE_RECV_WAITING_FOR_APP_AND_PLUGIN,
+    STATE_RECV_WAITING_FOR_APP,
+    STATE_RECV_WAITING_FOR_PLUGIN,
+    STATE_RECV_RECEIVED,
+    STATE_RECV_FINISHED,
+    STATE_RECV_FAILED,
+    STATE_SEND_RECEIVE_INITIAL,
+    STATE_SEND_RECEIVE_WAITING_FOR_SECOND_CONNECTION,
+    STATE_SEND_RECEIVE_CONNECTIONS_OPEN,
+    STATE_SEND_RECEIVE_PACKAGE_SENT,
+    STATE_SEND_RECEIVE_FINISHED,
+    STATE_SEND_RECEIVE_FAILED,
+    STATE_LISTEN_INITIAL,
+    STATE_LISTEN_CONNECTION_OPEN,
+    STATE_LISTEN_WAITING,
+    STATE_LISTEN_FINISHED,
+    STATE_LISTEN_FAILED,
+    STATE_DIAL_INITIAL,
+    STATE_DIAL_WAITING_FOR_SECOND_CONNECTION,
+    STATE_DIAL_CONNECTIONS_OPEN,
+    STATE_DIAL_FINISHED,
+    STATE_DIAL_FAILED,
+    STATE_CONNECTION_OBJECT_INITIAL,
+    STATE_CONNECTION_OBJECT_CONNECTED,
+    STATE_CONNECTION_OBJECT_FINISHED,
+    STATE_CONNECTION_OBJECT_FAILED,
+    STATE_PRE_CONN_OBJ_INITIAL,
+    STATE_PRE_CONN_OBJ_ACCEPTED,
+    STATE_PRE_CONN_OBJ_OPENING,
+    STATE_PRE_CONN_OBJ_FINISHED,
+    STATE_PRE_CONN_OBJ_FAILED,
+};
+
+}
