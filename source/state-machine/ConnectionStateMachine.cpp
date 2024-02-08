@@ -154,7 +154,7 @@ struct StateConnLinkEstablished : public ConnState {
 
         ctx.manager.registerId(ctx, ctx.linkId);
 
-        if (!ctx.send && !ctx.linkAddress.empty() && !ctx.updatedLinkAddress.empty()) {
+        if (!ctx.send && !ctx.linkAddress.empty() && ctx.updatedLinkAddress != ctx.linkAddress) {
             nlohmann::json updatedJson = nlohmann::json::parse(ctx.updatedLinkAddress);
             nlohmann::json originalJson = nlohmann::json::parse(ctx.linkAddress);
             if (updatedJson != originalJson) {

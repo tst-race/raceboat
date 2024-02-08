@@ -10,7 +10,7 @@ docker run  -it --rm  -v $(pwd):/code/ -w /code race-compile:main bash
 ./build_it_all.sh
 ./create-package.sh --linux<-arm64>
 exit
-./docker-image/build_raceboat_image.sh --platform-arm64
+./docker-image/build_image.sh --platform-arm64
 ```
 
 Building results in several libraries.  Two of which are suitable for real-world use.  The others support tests.
