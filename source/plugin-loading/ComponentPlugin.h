@@ -59,7 +59,7 @@ private:
   using createTransportImplType = ITransportComponent *(const std::string &,
                                                         ITransportSdk *sdk,
                                                         const std::string &,
-                                                        const PluginConfig &);
+                                                        PluginConfig &);
   createTransportImplType *createTransportImpl;
 
   using destroyTransportImplType = void(ITransportComponent *);
@@ -68,7 +68,7 @@ private:
   using createUserModelImplType = IUserModelComponent *(const std::string &,
                                                         IUserModelSdk *sdk,
                                                         const std::string &,
-                                                        const PluginConfig &);
+                                                        PluginConfig &);
   createUserModelImplType *createUserModelImpl;
 
   using destroyUserModelImplType = void(IUserModelComponent *);
@@ -77,7 +77,7 @@ private:
   using createEncodingImplType = IEncodingComponent *(const std::string &,
                                                       IEncodingSdk *sdk,
                                                       const std::string &,
-                                                      const PluginConfig &);
+                                                      PluginConfig &);
   createEncodingImplType *createEncodingImpl;
 
   using destroyEncodingImplType = void(IEncodingComponent *);
