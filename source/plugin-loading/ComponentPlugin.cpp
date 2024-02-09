@@ -58,9 +58,10 @@ void ComponentPlugin::initEncoding() {
 std::shared_ptr<ITransportComponent>
 ComponentPlugin::createTransport(const std::string &name, ITransportSdk *sdk,
                                  const std::string &roleName,
-                                 const PluginConfig &pluginConfig) {
+                                 PluginConfig &pluginConfig) {
   TRACE_METHOD(path, name);
   initTransport();
+  pluginConfig.pluginDirectory = path;
   ITransportComponent *transport =
       createTransportImpl(name.c_str(), sdk, roleName.c_str(), pluginConfig);
   return std::shared_ptr<ITransportComponent>(transport, destroyTransportImpl);
@@ -69,9 +70,10 @@ ComponentPlugin::createTransport(const std::string &name, ITransportSdk *sdk,
 std::shared_ptr<IUserModelComponent>
 ComponentPlugin::createUserModel(const std::string &name, IUserModelSdk *sdk,
                                  const std::string &roleName,
-                                 const PluginConfig &pluginConfig) {
+                                 PluginConfig &pluginConfig) {
   TRACE_METHOD(path, name);
   initUserModel();
+  pluginConfig.pluginDirectory = path;
   return std::shared_ptr<IUserModelComponent>(
       createUserModelImpl(name.c_str(), sdk, roleName.c_str(), pluginConfig),
       destroyUserModelImpl);
@@ -80,9 +82,10 @@ ComponentPlugin::createUserModel(const std::string &name, IUserModelSdk *sdk,
 std::shared_ptr<IEncodingComponent>
 ComponentPlugin::createEncoding(const std::string &name, IEncodingSdk *sdk,
                                 const std::string &roleName,
-                                const PluginConfig &pluginConfig) {
+                                PluginConfig &pluginConfig) {
   TRACE_METHOD(path, name);
   initEncoding();
+  const std::string pluginPath = path;
   return std::shared_ptr<IEncodingComponent>(
       createEncodingImpl(name.c_str(), sdk, roleName.c_str(), pluginConfig),
       destroyEncodingImpl);

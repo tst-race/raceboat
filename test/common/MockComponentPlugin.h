@@ -33,7 +33,7 @@ public:
         using ::testing::_;
         ON_CALL(*this, createTransport(_, _, _, _))
             .WillByDefault([this](const std::string &name, ITransportSdk *sdk,
-                                  const std::string &roleName, const PluginConfig &pluginConfig) {
+                                  const std::string &roleName, PluginConfig &pluginConfig) {
                 LOG_EXPECT(this->logger, this->id + ".createTransport", name, roleName,
                            pluginConfig);
                 transport = std::make_shared<MockTransport>(this->logger, *sdk);
@@ -41,7 +41,7 @@ public:
             });
         ON_CALL(*this, createUserModel(_, _, _, _))
             .WillByDefault([this](const std::string &name, IUserModelSdk *sdk,
-                                  const std::string &roleName, const PluginConfig &pluginConfig) {
+                                  const std::string &roleName, PluginConfig &pluginConfig) {
                 LOG_EXPECT(this->logger, this->id + ".createUserModel", name, roleName,
                            pluginConfig);
                 userModel = std::make_shared<MockUserModel>(this->logger, *sdk);
@@ -49,7 +49,7 @@ public:
             });
         ON_CALL(*this, createEncoding(_, _, _, _))
             .WillByDefault([this](const std::string &name, IEncodingSdk *sdk,
-                                  const std::string &roleName, const PluginConfig &pluginConfig) {
+                                  const std::string &roleName, PluginConfig &pluginConfig) {
                 LOG_EXPECT(this->logger, this->id + ".createEncoding", name, roleName,
                            pluginConfig);
                 encoding = std::make_shared<MockEncoding>(this->logger, *sdk);
@@ -59,15 +59,15 @@ public:
 
     MOCK_METHOD(std::shared_ptr<ITransportComponent>, createTransport,
                 (const std::string &name, ITransportSdk *sdk, const std::string &roleName,
-                 const PluginConfig &pluginConfig),
+                 PluginConfig &pluginConfig),
                 (override));
     MOCK_METHOD(std::shared_ptr<IUserModelComponent>, createUserModel,
                 (const std::string &name, IUserModelSdk *sdk, const std::string &roleName,
-                 const PluginConfig &pluginConfig),
+                 PluginConfig &pluginConfig),
                 (override));
     MOCK_METHOD(std::shared_ptr<IEncodingComponent>, createEncoding,
                 (const std::string &name, IEncodingSdk *sdk, const std::string &roleName,
-                 const PluginConfig &pluginConfig),
+                 PluginConfig &pluginConfig),
                 (override));
 
 public:

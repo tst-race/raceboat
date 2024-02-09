@@ -30,16 +30,13 @@ public:
 
   virtual std::shared_ptr<ITransportComponent>
   createTransport(const std::string &name, ITransportSdk *sdk,
-                  const std::string &roleName,
-                  const PluginConfig &pluginConfig) = 0;
+                  const std::string &roleName, PluginConfig &pluginConfig) = 0;
   virtual std::shared_ptr<IUserModelComponent>
   createUserModel(const std::string &name, IUserModelSdk *sdk,
-                  const std::string &roleName,
-                  const PluginConfig &pluginConfig) = 0;
+                  const std::string &roleName, PluginConfig &pluginConfig) = 0;
   virtual std::shared_ptr<IEncodingComponent>
   createEncoding(const std::string &name, IEncodingSdk *sdk,
-                 const std::string &roleName,
-                 const PluginConfig &pluginConfig) = 0;
+                 const std::string &roleName, PluginConfig &pluginConfig) = 0;
   virtual std::string get_path() = 0;
 };
 

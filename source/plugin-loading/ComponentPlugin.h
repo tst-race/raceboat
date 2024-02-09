@@ -34,15 +34,15 @@ public:
   virtual std::shared_ptr<ITransportComponent>
   createTransport(const std::string &name, ITransportSdk *sdk,
                   const std::string &roleName,
-                  const PluginConfig &pluginConfig) override;
+                  PluginConfig &pluginConfig) override;
   virtual std::shared_ptr<IUserModelComponent>
   createUserModel(const std::string &name, IUserModelSdk *sdk,
                   const std::string &roleName,
-                  const PluginConfig &pluginConfig) override;
+                  PluginConfig &pluginConfig) override;
   virtual std::shared_ptr<IEncodingComponent>
   createEncoding(const std::string &name, IEncodingSdk *sdk,
                  const std::string &roleName,
-                 const PluginConfig &pluginConfig) override;
+                 PluginConfig &pluginConfig) override;
 
   virtual std::string get_path() override;
 
@@ -59,7 +59,7 @@ private:
   using createTransportImplType = ITransportComponent *(const std::string &,
                                                         ITransportSdk *sdk,
                                                         const std::string &,
-                                                        const PluginConfig &);
+                                                        PluginConfig &);
   createTransportImplType *createTransportImpl;
 
   using destroyTransportImplType = void(ITransportComponent *);
@@ -68,7 +68,7 @@ private:
   using createUserModelImplType = IUserModelComponent *(const std::string &,
                                                         IUserModelSdk *sdk,
                                                         const std::string &,
-                                                        const PluginConfig &);
+                                                        PluginConfig &);
   createUserModelImplType *createUserModelImpl;
 
   using destroyUserModelImplType = void(IUserModelComponent *);
@@ -77,7 +77,7 @@ private:
   using createEncodingImplType = IEncodingComponent *(const std::string &,
                                                       IEncodingSdk *sdk,
                                                       const std::string &,
-                                                      const PluginConfig &);
+                                                      PluginConfig &);
   createEncodingImplType *createEncodingImpl;
 
   using destroyEncodingImplType = void(IEncodingComponent *);
