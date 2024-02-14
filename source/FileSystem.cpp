@@ -170,8 +170,9 @@ std::vector<fs::path> FileSystem::listInstalledPluginDirs() {
 }
 
 fs::path FileSystem::makePluginInstallBasePath() {
-  fs::path basePath =
-      pluginsInstallPath / "plugins" / getHostOsType() / getHostArch();
+  fs::path basePath = pluginsInstallPath;
+  // Previously:
+  // pluginsInstallPath / "plugins" / getHostOsType() / getHostArch();
   createDirectories(basePath);
   return basePath;
 }
