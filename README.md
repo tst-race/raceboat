@@ -29,7 +29,6 @@ As with any C++ API, the header files are necessary for use.
 
 `./racesdk/package/LINUX*/` will be `./racesdk/package/ANDROID*/` when building for Android.  
 
-
 ## Testing using race-cli
 See race-email channel README.md for examples
 
@@ -40,6 +39,7 @@ NOTE: see `FileSystem::makePluginInstallBasePath()` for path requirements of whe
 NOTE: `--param hostname=localhost` does not work in this test.  You can use the ip addresses reported from ifconfig on both nodes.  
 ### server
 ```bash
+
 docker run -it -v $(pwd):/code/ -v /tmp/:/tmp/ race-sdk:latest bash 
 cp -r /code/private-race-core/plugin-comms-twosix-cpp/kit/artifacts/linux-arm64-v8a-server/PluginCommsTwoSixStub/* /tmp/race/plugins/unix/arm64-v8a/PluginCommsTwoSixStub
 ln -s /code/private-raceboat/build/LINUX_arm64-v8a/source/libraceboat.so /usr/local/lib/raceSdkCommon.so
@@ -74,3 +74,33 @@ cmake --build --preset=LINUX_x86_64 --target check_format -j
 
 ## APIs
 See CommPluginDeveloperGuide.md in the `race-docs` repository for information about working with Comms plugins.  
+
+
+## Updated Running Instructions
+Work-in-progress as we make small tweaks/improvements to the race-cli user experience.
+
+___Preliminaries:___
+This approach volume-mounts plugin(s) of the appropriate architecture, so "path/to/plugin" would look something like: `/your/path/to/race-core/plugin-comms-twosix-cpp/kit/artifacts/linux-arm64-v8a-server/` to use channels from PluginCommsTwoSixStub on an arm64-v8a host.
+
+### Server:
+
+```bash
+docker run --rm -it --name=rbserv \
+--network=rib-overlay-network --ip=10.11.1.2 \
+ -v /path/to/plugin:/kits \
+raceboat:latest bash
+
+echo "Hello from the Raceboat Server!" | race-cli --dir /kits -m --recv-reply --send-channel twoSixDirectCpp --recv-channel twoSixDirectCpp --param hostname="10.11.1.2" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26264 
+```
+
+### Client:
+
+```bash
+docker run --rm -it --name=raceboat-client \
+--network=rib-overlay-network --ip=10.11.1.3 \
+ -v /path/to/plugin:/kits \
+raceboat:latest bash
+
+echo "Hi, I'm the client!" | race-cli --dir /kits -m --send-recv --send-channel twoSixDirectCpp --recv-channel twoSixDirectCpp --param hostname="10.11.1.3" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26264 --send-address="{\"hostname\":\"10.11.1.2\",\"port\":26262}"
+
+```
