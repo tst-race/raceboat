@@ -54,7 +54,26 @@ class Link:
 
         return f"{self.link}: {dir_symbol}"
 
+    def __hash__(self):
+        return hash(f"{self.link}{self.send}{self.recv}")
+
     def __gt__(self, other):
+        val = (
+            self.ready and
+            # self.channel.name == other.channel.name and
+            ((not other.isolated) or self.isolated) and
+            ((not other.send) or self.send) and
+            ((not other.recv) or self.recv)
+            )
+        # print(f"{self} >? {other} : {val}")
+        # print(f"{self.ready=}")
+        # print(f"{self.channel.name == other.channel.name=}")
+        # print(f"{((not other.isolated) or self.isolated)=}")
+        # print(f"{((not other.send) or self.send)=}")
+        # print(f"{((not other.recv) or self.recv)=}")
+
+        return val
+ 
         return (
             self.ready and
             self.channel.name == other.channel.name and
@@ -67,7 +86,9 @@ class Link:
         return other.__gt__(self)
 
     def __eq__(self, other):
-        return self.__gt__(other) and other.__gt__(self)
+        return hash(self) == hash(other)
+    # return self.__gt__(other) and other.__gt__(self)
+
 from pprint import pprint, pp
 global link_idx
 link_idx = 1
@@ -99,7 +120,6 @@ class NodeState:
             [print(l) for l in self.links.values()]
 
         addrs = []
-        # TODO - needs to try other links even if final links can't be done yet
         if self.can_send():
             for required in self.requirements:
                 if not any([link > required for link in self.links.values()]):
@@ -271,7 +291,7 @@ def make_args(init_c2s, init_s2c, final_c2s, final_s2c):
     
 
 def make_requirements(init_c2s, init_s2c, final_c2s, final_s2c, isolated=True):
-    server_requirements = [
+    server_requirements = {
         Link(f"{init_s2c.name}",
              init_s2c,
              send=True,
@@ -300,9 +320,9 @@ def make_requirements(init_c2s, init_s2c, final_c2s, final_s2c, isolated=True):
              isolated=isolated,
              ready=True
              )
-    ]
+    }
 
-    client_requirements = [
+    client_requirements = {
         Link(f"{init_c2s.name}",
              init_c2s,
              send=True,
@@ -331,7 +351,7 @@ def make_requirements(init_c2s, init_s2c, final_c2s, final_s2c, isolated=True):
              isolated=isolated,
              ready=True
              )
-    ]
+    }
 
     return server_requirements, client_requirements
 
@@ -422,17 +442,23 @@ def generate_scenarios():
 
     for idx, params in enumerate(paramsets):
         print(f'\n\n====={idx}=====\n')
-        run_params(params)
+        run_params(params, collapse=False)
 
-def run_params(params):
+        
+def run_params(params, collapse=False):
     init_c2s = Channel(f"^c2s{params['init_c2s']}", params['init_c2s'])
     init_s2c = Channel(f"^s2c{params['init_s2c']}", params['init_s2c'])
     final_c2s = Channel(f"$c2s{params['final_c2s']}", params['final_c2s'])
     final_s2c = Channel(f"$s2c{params['final_s2c']}", params['final_s2c'])
+
+    if collapse:
+        final_c2s = init_c2s
+        init_s2c = final_c2s
+        final_s2c = init_s2c
     
     print(f"'{json.dumps(params)}'")
     success = run(make_args(init_c2s, init_s2c, final_c2s, final_s2c),
-                  make_requirements(init_c2s, init_s2c, final_c2s, final_s2c),
+                  make_requirements(init_c2s, init_s2c, final_c2s, final_s2c, True),
                   client_oob=params['client_oob'])
     
     if not success:
