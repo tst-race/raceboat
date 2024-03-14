@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-#include "ListenStateMachine.h"
+#include "BootstrapListenStateMachine.h"
 
 #include "../../include/race/Race.h"
 #include "Core.h"
@@ -32,40 +32,45 @@ namespace Raceboat {
 // Context
 //-----------------------------------------------------------------------------------------------
 
-void ApiListenContext::updateListen(
-    const ReceiveOptions &_recvOptions,
+void ApiBootstrapListenContext::updateBootstrapListen(
+    const BootstrapConnectionOptions &_options,
     std::function<void(ApiStatus, LinkAddress, RaceHandle)> _cb) {
-  this->opts = _recvOptions;
-  this->listenCb = _cb;
+  this->opts = _options;
+  this->bootstrapListenCb = _cb;
 };
-void ApiListenContext::updateAccept(
+void ApiBootstrapListenContext::updateAccept(
     RaceHandle /* _handle */, std::function<void(ApiStatus, RaceHandle)> _cb) {
   this->acceptCb.push_back(_cb);
 };
-void ApiListenContext::updateClose(RaceHandle /* handle */,
+void ApiBootstrapListenContext::updateClose(RaceHandle /* handle */,
                                    std::function<void(ApiStatus)> _cb) {
   this->closeCb = _cb;
 }
 
-void ApiListenContext::updateReceiveEncPkg(
+void ApiBootstrapListenContext::updateReceiveEncPkg(
     ConnectionID /* _connId */, std::shared_ptr<std::vector<uint8_t>> _data) {
   this->data.push(std::move(_data));
 };
-void ApiListenContext::updateConnStateMachineConnected(
+void ApiBootstrapListenContext::updateConnStateMachineConnected(
     RaceHandle /* contextHandle */, ConnectionID connId,
     std::string linkAddress) {
   this->recvConnId = connId;
   this->recvLinkAddress = linkAddress;
 };
 
+
+
 //-----------------------------------------------------------------------------------------------
 // States
 //-----------------------------------------------------------------------------------------------
 
-struct StateListenInitial : public ListenState {
-  explicit StateListenInitial(StateType id = STATE_LISTEN_INITIAL)
-      : ListenState(id, "STATE_LISTEN_INITIAL") {}
+struct StateBootstrapListenInitial : public BootstrapListenState {
+  explicit StateBootstrapListenInitial(StateType id = STATE_BOOTSTRAP_LISTEN_INITIAL)
+      : BootstrapListenState(id, "STATE_BOOTSTRAP_LISTEN_INITIAL") {}
   virtual EventResult enter(Context &context) {
+    //
+    // Overall: check for provided addresses and create/load as appropriate. If necessary, create links and output their addresses for out-of-band sharing
+    //
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
@@ -76,25 +81,25 @@ struct StateListenInitial : public ListenState {
     if (channelId.empty()) {
       helper::logError(logPrefix +
                        "Invalid receive channel id passed to getReceiver");
-      ctx.listenCb(ApiStatus::CHANNEL_INVALID, "", {});
-      ctx.listenCb = {};
+      ctx.bootstrapListenCb(ApiStatus::CHANNEL_INVALID, "", {});
+      ctx.bootstrapListenCb = {};
       return EventResult::NOT_SUPPORTED;
     } else if (role.empty()) {
       helper::logError(logPrefix +
                        "Invalid receive role passed to getReceiver");
-      ctx.listenCb(ApiStatus::INVALID_ARGUMENT, "", {});
-      ctx.listenCb = {};
+      ctx.bootstrapListenCb(ApiStatus::INVALID_ARGUMENT, "", {});
+      ctx.bootstrapListenCb = {};
       return EventResult::NOT_SUPPORTED;
     } else if (ctx.opts.send_channel.empty()) {
       helper::logError(logPrefix +
                        "Invalid send channel id passed to getReceiver");
-      ctx.listenCb(ApiStatus::INVALID_ARGUMENT, "", {});
-      ctx.listenCb = {};
+      ctx.bootstrapListenCb(ApiStatus::INVALID_ARGUMENT, "", {});
+      ctx.bootstrapListenCb = {};
       return EventResult::NOT_SUPPORTED;
     } else if (ctx.opts.send_role.empty()) {
       helper::logError(logPrefix + "Invalid send role passed to getReceiver");
-      ctx.listenCb(ApiStatus::INVALID_ARGUMENT, "", {});
-      ctx.listenCb = {};
+      ctx.bootstrapListenCb(ApiStatus::INVALID_ARGUMENT, "", {});
+      ctx.bootstrapListenCb = {};
       return EventResult::NOT_SUPPORTED;
     }
 
@@ -102,8 +107,8 @@ struct StateListenInitial : public ListenState {
     if (container == nullptr) {
       helper::logError(logPrefix + "Failed to get channel with id " +
                        channelId);
-      ctx.listenCb(ApiStatus::CHANNEL_INVALID, "", {});
-      ctx.listenCb = {};
+      ctx.bootstrapListenCb(ApiStatus::CHANNEL_INVALID, "", {});
+      ctx.bootstrapListenCb = {};
       return EventResult::NOT_SUPPORTED;
     }
 
@@ -121,17 +126,17 @@ struct StateListenInitial : public ListenState {
   }
 };
 
-struct StateListenConnectionOpen : public ListenState {
-  explicit StateListenConnectionOpen(
-      StateType id = STATE_LISTEN_CONNECTION_OPEN)
-      : ListenState(id, "STATE_LISTEN_CONNECTION_OPEN") {}
+struct StateBootstrapListenConnectionsOpen : public BootstrapListenState {
+  explicit StateBootstrapListenConnectionsOpen(
+      StateType id = STATE_BOOTSTRAP_LISTEN_CONNECTIONS_OPEN)
+      : BootstrapListenState(id, "STATE_BOOTSTRAP_LISTEN_CONNECTIONS_OPEN") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
     RaceHandle receiverHandle = ctx.manager.getCore().generateHandle();
 
-    ctx.listenCb(ApiStatus::OK, ctx.recvLinkAddress, receiverHandle);
-    ctx.listenCb = {};
+    ctx.bootstrapListenCb(ApiStatus::OK, ctx.recvLinkAddress, receiverHandle);
+    ctx.bootstrapListenCb = {};
 
     ctx.manager.registerHandle(ctx, receiverHandle);
 
@@ -144,16 +149,15 @@ struct StateListenConnectionOpen : public ListenState {
   }
 };
 
-struct StateListenWaiting : public ListenState {
-  explicit StateListenWaiting(StateType id = STATE_LISTEN_WAITING)
-      : ListenState(id, "STATE_LISTEN_WAITING") {}
+struct StateBootstrapListenWaiting : public BootstrapListenState {
+  explicit StateBootstrapListenWaiting(StateType id = STATE_BOOTSTRAP_LISTEN_WAITING)
+      : BootstrapListenState(id, "STATE_BOOTSTRAP_LISTEN_WAITING") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
     while (!ctx.data.empty()) {
       auto data = std::move(ctx.data.front());
-
       ctx.data.pop();
 
       try {
@@ -210,7 +214,7 @@ struct StateListenWaiting : public ListenState {
       ctx.acceptCb.pop_front();
       RaceHandle preConnSMHandle = std::move(ctx.preConnObjSM.front());
       ctx.preConnObjSM.pop();
-      if (!ctx.manager.onListenAccept(preConnSMHandle, cb)) {
+      if (!ctx.manager.onBootstrapListenAccept(preConnSMHandle, cb)) {
         cb(ApiStatus::INTERNAL_ERROR, {});
       };
     }
@@ -219,9 +223,9 @@ struct StateListenWaiting : public ListenState {
   }
 };
 
-struct StateListenFinished : public ListenState {
-  explicit StateListenFinished(StateType id = STATE_LISTEN_FINISHED)
-      : ListenState(id, "STATE_LISTEN_FINISHED") {}
+struct StateBootstrapListenFinished : public BootstrapListenState {
+  explicit StateBootstrapListenFinished(StateType id = STATE_BOOTSTRAP_LISTEN_FINISHED)
+      : BootstrapListenState(id, "STATE_BOOTSTRAP_LISTEN_FINISHED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -240,16 +244,16 @@ struct StateListenFinished : public ListenState {
   virtual bool finalState() { return true; }
 };
 
-struct StateListenFailed : public ListenState {
-  explicit StateListenFailed(StateType id = STATE_LISTEN_FAILED)
-      : ListenState(id, "STATE_LISTEN_FAILED") {}
+struct StateBootstrapListenFailed : public BootstrapListenState {
+  explicit StateBootstrapListenFailed(StateType id = STATE_BOOTSTRAP_LISTEN_FAILED)
+      : BootstrapListenState(id, "STATE_BOOTSTRAP_LISTEN_FAILED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
-    if (ctx.listenCb) {
-      ctx.listenCb(ApiStatus::INTERNAL_ERROR, {}, {});
-      ctx.listenCb = {};
+    if (ctx.bootstrapListenCb) {
+      ctx.bootstrapListenCb(ApiStatus::INTERNAL_ERROR, {}, {});
+      ctx.bootstrapListenCb = {};
     }
 
     for (auto &cb : ctx.acceptCb) {
@@ -271,30 +275,31 @@ struct StateListenFailed : public ListenState {
 // StateEngine
 //-----------------------------------------------------------------------------------------------
 
-ListenStateEngine::ListenStateEngine() {
+BootstrapListenStateEngine::BootstrapListenStateEngine() {
   // calls startConnectionStateMachine on manager, waits for
   // connStateMachineConnected
-  addInitialState<StateListenInitial>(STATE_LISTEN_INITIAL);
+  addInitialState<StateBootstrapListenInitial>(STATE_BOOTSTRAP_LISTEN_INITIAL);
   // calls user supplied callback to return the receiver object, always
   // transitions to next state
-  addState<StateListenConnectionOpen>(STATE_LISTEN_CONNECTION_OPEN);
+  addState<StateBootstrapListenConnectionsOpen>(STATE_BOOTSTRAP_LISTEN_CONNECTIONS_OPEN);
   // do nothing, wait for a package to be received, accept to be called, or
-  // listener to be closed
-  addState<StateListenWaiting>(STATE_LISTEN_WAITING);
+  // bootstrapListener to be closed
+  addState<StateBootstrapListenWaiting>(STATE_BOOTSTRAP_LISTEN_WAITING);
   // calls state machine finished on manager, final state
-  addState<StateListenFinished>(STATE_LISTEN_FINISHED);
-  addFailedState<StateListenFailed>(STATE_LISTEN_FAILED);
+  addState<StateBootstrapListenFinished>(STATE_BOOTSTRAP_LISTEN_FINISHED);
+  addFailedState<StateBootstrapListenFailed>(STATE_BOOTSTRAP_LISTEN_FAILED);
 
   // clang-format off
-    declareStateTransition(STATE_LISTEN_INITIAL,                       EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_LISTEN_CONNECTION_OPEN);
-    declareStateTransition(STATE_LISTEN_CONNECTION_OPEN,               EVENT_ALWAYS,                       STATE_LISTEN_WAITING);
-    declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_RECEIVE_PACKAGE,              STATE_LISTEN_WAITING);
-    declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_ACCEPT,                       STATE_LISTEN_WAITING);
-    declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_CLOSE,                        STATE_LISTEN_FINISHED);
+    declareStateTransition(STATE_BOOTSTRAP_LISTEN_INITIAL,                       EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_BOOTSTRAP_LISTEN_INITIAL);
+    declareStateTransition(STATE_BOOTSTRAP_LISTEN_INITIAL,                       EVENT_SATISFIED,                    STATE_BOOTSTRAP_LISTEN_CONNECTION_OPEN);
+    declareStateTransition(STATE_BOOTSTRAP_LISTEN_CONNECTIONS_OPEN,              EVENT_ALWAYS,                       STATE_BOOTSTRAP_LISTEN_WAITING);
+    declareStateTransition(STATE_BOOTSTRAP_LISTEN_WAITING,                       EVENT_RECEIVE_PACKAGE,              STATE_BOOTSTRAP_LISTEN_WAITING);
+    declareStateTransition(STATE_BOOTSTRAP_LISTEN_WAITING,                       EVENT_ACCEPT,                       STATE_BOOTSTRAP_LISTEN_WAITING);
+    declareStateTransition(STATE_BOOTSTRAP_LISTEN_WAITING,                       EVENT_CLOSE,                        STATE_BOOTSTRAP_LISTEN_FINISHED);
   // clang-format on
 }
 
-std::string ListenStateEngine::eventToString(EventType event) {
+std::string BootstrapListenStateEngine::eventToString(EventType event) {
   return Raceboat::eventToString(event);
 }
 

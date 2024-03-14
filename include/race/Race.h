@@ -64,8 +64,24 @@ public:
   std::string recv_role;
   int timeout_ms = 0;
 };
+
+struct BootstrapConnectionOptions {
+public:
+  ChannelId init_send_channel;
+  ChannelId init_recv_channel;
+  ChannelId final_send_channel;
+  ChannelId final_recv_channel;
+  LinkAddress init_send_address;
+  LinkAddress init_recv_address;
+  std::string init_send_role;
+  std::string init_recv_role;
+  std::string final_send_role;
+  std::string final_recv_role;
+  int timeout_ms = 0;
+};
 std::string recvOptionsToString(const ReceiveOptions &sendOptions);
 std::string sendOptionsToString(const SendOptions &sendOptions);
+std::string bootstrapConnectionOptionsToString(const BootstrapConnectionOptions &bootstrapConnectionOptions);
 
 class ConnectionObject {
 public:
@@ -261,6 +277,19 @@ public:
   listen(ReceiveOptions options);
 
   /**
+   * @brief Open the server side of a long-lived bidirection connection and
+   * start listening for
+   *
+   * @param options The options to use when opening. The send_channel field must
+   * be set.
+   * @return std::pair<LinkAddress, AcceptObject> The link address to use to
+   * connect to this node and the AcceptObject to use to accept connection
+   * requests
+   */
+  std::tuple<ApiStatus, LinkAddress, AcceptObject>
+  bootstrap_listen(BootstrapConnectionOptions options);
+
+  /**
    * @brief Send a unidirectional message to a server
    *
    * @param options The options to use when sending. The send_channel and
@@ -321,5 +350,25 @@ public:
    */
   std::pair<ApiStatus, ConnectionObject> dial_str(SendOptions options,
                                                   std::string message);
+
+  /**
+   * @brief Create a connection to a server
+   *
+   * @param options The options to use when sending.
+   * @param bytes A message to send along with the introduction
+   * @return ConnectionObject an object to use to communicate with the server
+   */
+  std::pair<ApiStatus, ConnectionObject> bootstrap_dial(BootstrapConnectionOptions options,
+                                                            std::vector<uint8_t> bytes);
+  
+  /**
+   * @brief Create a connection to a server
+   *
+   * @param options The options to use when sending. 
+   * @param message A message to send along with the introduction
+   * @return ConnectionObject an object to use to communicate with the server
+   */
+  std::pair<ApiStatus, ConnectionObject> bootstrap_dial_str(BootstrapConnectionOptions options,
+                                                            std::string message);
 };
 } // namespace Raceboat

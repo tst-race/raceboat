@@ -42,7 +42,12 @@ public:
 
   // prevent contexts from being copied accidentally
   ApiContext(const ApiContext &) = delete;
-  virtual void updateSend(const SendOptions & /* sendOptions */,
+
+  bool shouldCreate(const ChannelId &channelId,
+                    bool useForRecv);
+  bool shouldCreateSender(const ChannelId &channelId);
+  bool shouldCreateReceiver(const ChannelId &channelId);
+   virtual void updateSend(const SendOptions & /* sendOptions */,
                           std::vector<uint8_t> && /* data */,
                           std::function<void(ApiStatus)> /* cb */){};
   virtual void updateSendReceive(
@@ -52,12 +57,19 @@ public:
                           std::vector<uint8_t> && /* data */,
                           std::function<void(ApiStatus, RaceHandle)> /* cb */) {
   }
+  virtual void updateBootstrapDial(const BootstrapConnectionOptions & /* options */,
+                          std::vector<uint8_t> && /* data */,
+                          std::function<void(ApiStatus, RaceHandle)> /* cb */) {
+  }
   virtual void updateListen(
       const ReceiveOptions & /* recvOptions */,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> /* cb */) {}
   virtual void
   updateAccept(RaceHandle /* handle */,
                std::function<void(ApiStatus, RaceHandle)> /* cb */) {}
+  virtual void updateBootstrapListen(
+      const BootstrapConnectionOptions & /* options */,
+      std::function<void(ApiStatus, LinkAddress, RaceHandle)> /* cb */) {}
   virtual void updateGetReceiver(
       const ReceiveOptions & /* recvOptions */,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> /* cb */){};
@@ -99,6 +111,7 @@ public:
                                            ChannelId /* channelId */,
                                            std::string /* role */,
                                            std::string /* linkAddress */,
+                                           bool /* creating */,
                                            bool /* sending */){};
   virtual void updateConnObjectStateMachineStart(
       RaceHandle /* contextHandle */, RaceHandle /* recvHandle */,
@@ -110,6 +123,15 @@ public:
       RaceHandle /* apiHandle */){};
 
   virtual void updatePreConnObjStateMachineStart(
+      RaceHandle /* contextHandle */, RaceHandle /* recvHandle */,
+      const ConnectionID & /* _recvConnId */,
+      const ChannelId & /* _recvChannel */,
+      const ChannelId & /* _sendChannel */, const std::string & /* _sendRole */,
+      const std::string & /* _sendLinkAddress */,
+      const std::string & /* _packageId */,
+      std::vector<std::vector<uint8_t>> /* recvMessages */){};
+
+  virtual void updateBootstrapPreConnObjStateMachineStart(
       RaceHandle /* contextHandle */, RaceHandle /* recvHandle */,
       const ConnectionID & /* _recvConnId */,
       const ChannelId & /* _recvChannel */,

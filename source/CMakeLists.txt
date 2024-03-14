@@ -63,9 +63,12 @@ add_library(raceboat SHARED
     state-machine/ConnectionObjectStateMachine.cpp
     state-machine/ConnectionStateMachine.cpp
     state-machine/DialStateMachine.cpp
+    state-machine/BootstrapDialStateMachine.cpp
     state-machine/Events.cpp
     state-machine/ListenStateMachine.cpp
+    state-machine/BootstrapListenStateMachine.cpp
     state-machine/PreConnObjStateMachine.cpp
+    state-machine/BootstrapPreConnObjStateMachine.cpp
     state-machine/ReceiveStateMachine.cpp
     state-machine/SendStateMachine.cpp
     state-machine/SendReceiveStateMachine.cpp

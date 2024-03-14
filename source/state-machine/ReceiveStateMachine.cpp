@@ -95,7 +95,7 @@ struct StateRecvInitial : public RecvState {
     }
 
     RaceHandle connStateMachineHandle = ctx.manager.startConnStateMachine(
-        ctx.handle, channelId, role, linkAddress, false);
+                                                                          ctx.handle, channelId, role, linkAddress, true, false);
 
     if (connStateMachineHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");

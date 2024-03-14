@@ -35,7 +35,9 @@ bool Config::parsePluginManifests(Raceboat::FileSystem &fs) {
 
     if (parseJson(path, json)) {
       try {
+        helper::logInfo(logPrefix + " " + "Parsing to a PluginManifest");
         manifests.push_back(json.get<Raceboat::Config::PluginManifest>());
+        helper::logInfo(logPrefix + " " + "Parsed to a PluginManifest");
         success = true;
       } catch (nlohmann::json::exception &ex) {
         helper::logWarning(logPrefix + " " + path.string() +

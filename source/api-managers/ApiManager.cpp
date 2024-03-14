@@ -126,6 +126,19 @@ ApiManager::dial(SendOptions sendOptions, std::vector<uint8_t> data,
               callback);
 }
 
+SdkResponse
+ApiManager::bootstrapDial(BootstrapConnectionOptions options, std::vector<uint8_t> data,
+                 std::function<void(ApiStatus, RaceHandle)> callback) {
+  TRACE_METHOD();
+
+  if (!callback) {
+    return SDK_INVALID_ARGUMENT;
+  }
+
+  return post(logPrefix, &ApiManagerInternal::bootstrapDial, options, data,
+              callback);
+}
+
 SdkResponse ApiManager::getReceiveObject(
     ReceiveOptions recvOptions,
     std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback) {
@@ -174,6 +187,18 @@ SdkResponse ApiManager::listen(
   }
 
   return post(logPrefix, &ApiManagerInternal::listen, recvOptions, callback);
+}
+
+SdkResponse ApiManager::bootstrapListen(
+    BootstrapConnectionOptions options,
+    std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback) {
+  TRACE_METHOD();
+
+  if (!callback) {
+    return SDK_INVALID_ARGUMENT;
+  }
+
+  return post(logPrefix, &ApiManagerInternal::bootstrapListen, options, callback);
 }
 
 SdkResponse
@@ -303,7 +328,7 @@ SdkResponse ApiManager::onPackageStatusChanged(PluginContainer & /* plugin */,
 ApiManagerInternal::ApiManagerInternal(Core &_core, ApiManager &manager)
     : core(_core), manager(manager), connEngine(), sendEngine(), recvEngine() {}
 
-void ApiManagerInternal::send(uint64_t postId, SendOptions sendOptions,
+  void ApiManagerInternal::send(uint64_t postId, SendOptions sendOptions,
                               std::vector<uint8_t> data,
                               std::function<void(ApiStatus)> cb) {
   TRACE_METHOD(postId, sendOptionsToString(sendOptions), data);
@@ -333,6 +358,15 @@ void ApiManagerInternal::dial(
   dialEngine.start(*context);
 }
 
+void ApiManagerInternal::bootstrapDial(
+    uint64_t postId, BootstrapConnectionOptions options, std::vector<uint8_t> data,
+    std::function<void(ApiStatus, RaceHandle)> callback) {
+  TRACE_METHOD(postId, bootstrapConnectionOptionsToString(options), data);
+
+  auto context = newBootstrapDialContext();
+  context->updateBootstrapDial(options, std::move(data), callback);
+  bootstrapDialEngine.start(*context);
+}
 void ApiManagerInternal::getReceiveObject(
     uint64_t postId, ReceiveOptions recvOptions,
     std::function<void(ApiStatus, LinkAddress, RaceHandle)> cb) {
@@ -442,6 +476,16 @@ void ApiManagerInternal::listen(
   auto context = newListenContext();
   context->updateListen(recvOptions, callback);
   listenEngine.start(*context);
+}
+
+void ApiManagerInternal::bootstrapListen(
+    uint64_t postId, BootstrapConnectionOptions options,
+    std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback) {
+  TRACE_METHOD(postId, bootstrapConnectionOptionsToString(options));
+
+  auto context = newBootstrapListenContext();
+  context->updateBootstrapListen(options, callback);
+  bootstrapListenEngine.start(*context);
 }
 
 void ApiManagerInternal::accept(
@@ -797,13 +841,16 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
                                                      ChannelId channelId,
                                                      std::string role,
                                                      std::string linkAddress,
+                                                     bool creating,
                                                      bool sending) {
   TRACE_METHOD(contextHandle);
 
+  // TODO do validation checks
+  
   // create a connection context and copy information from the send/recv context
   auto context = newConnContext();
   context->updateConnStateMachineStart(contextHandle, channelId, role,
-                                       linkAddress, sending);
+                                       linkAddress, creating, sending);
 
   EventResult result = connEngine.start(*context);
   if (result != EventResult::SUCCESS) {
@@ -1002,8 +1049,23 @@ ApiContext *ApiManagerInternal::newDialContext() {
   return activeContexts[handle].get();
 }
 
+ApiContext *ApiManagerInternal::newBootstrapDialContext() {
+  auto newContext = std::make_unique<ApiBootstrapDialContext>(*this, bootstrapDialEngine);
+  auto handle = newContext->handle;
+  activeContexts[handle] = (std::move(newContext));
+  return activeContexts[handle].get();
+}
+
+
 ApiContext *ApiManagerInternal::newListenContext() {
   auto newContext = std::make_unique<ApiListenContext>(*this, listenEngine);
+  auto handle = newContext->handle;
+  activeContexts[handle] = (std::move(newContext));
+  return activeContexts[handle].get();
+}
+
+ApiContext *ApiManagerInternal::newBootstrapListenContext() {
+  auto newContext = std::make_unique<ApiBootstrapListenContext>(*this, bootstrapListenEngine);
   auto handle = newContext->handle;
   activeContexts[handle] = (std::move(newContext));
   return activeContexts[handle].get();

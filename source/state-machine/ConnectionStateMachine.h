@@ -31,6 +31,7 @@ public:
                                            ChannelId channelId,
                                            std::string role,
                                            std::string linkAddress,
+                                           bool creating,
                                            bool sending) override;
   // virtual void updateConnStateMachineStop(RaceHandle /* contextHandle */)
   // override;
@@ -54,6 +55,7 @@ public:
   std::unordered_set<RaceHandle> dependents;
   RaceHandle newestDependent = NULL_RACE_HANDLE;
   RaceHandle detachedDependent = NULL_RACE_HANDLE;
+  bool create = false;
   bool send = false;
   ChannelId channelId;
   std::string channelRole;

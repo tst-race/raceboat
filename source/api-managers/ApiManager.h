@@ -33,6 +33,9 @@
 #include "../state-machine/DialStateMachine.h"
 #include "../state-machine/ListenStateMachine.h"
 #include "../state-machine/PreConnObjStateMachine.h"
+#include "../state-machine/BootstrapDialStateMachine.h"
+#include "../state-machine/BootstrapListenStateMachine.h"
+#include "../state-machine/BootstrapPreConnObjStateMachine.h"
 #include "../state-machine/ReceiveStateMachine.h"
 #include "../state-machine/SendReceiveStateMachine.h"
 #include "../state-machine/SendStateMachine.h"
@@ -82,6 +85,9 @@ public:
   virtual void dial(uint64_t postId, SendOptions sendOptions,
                     std::vector<uint8_t> data,
                     std::function<void(ApiStatus, RaceHandle)> callback);
+  virtual void bootstrapDial(uint64_t postId, BootstrapConnectionOptions options,
+                    std::vector<uint8_t> data,
+                    std::function<void(ApiStatus, RaceHandle)> callback);
   virtual void getReceiveObject(
       uint64_t postId, ReceiveOptions recvOptions,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
@@ -95,6 +101,9 @@ public:
 
   virtual void
   listen(uint64_t postId, ReceiveOptions recvOptions,
+         std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
+  virtual void
+  bootstrapListen(uint64_t postId, BootstrapConnectionOptions options,
          std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
   virtual void accept(uint64_t postId, OpHandle handle,
                       std::function<void(ApiStatus, RaceHandle)> callback);
@@ -153,6 +162,7 @@ public:
                                            ChannelId channelId,
                                            std::string role,
                                            std::string linkAddress,
+                                           bool creating,
                                            bool sending);
   virtual RaceHandle startConnObjectStateMachine(
       RaceHandle contextHandle, RaceHandle recvHandle,
@@ -193,6 +203,9 @@ protected:
   virtual ApiContext *newConnContext();
   virtual ApiContext *newConnObjectContext();
   virtual ApiContext *newPreConnObjContext();
+  virtual ApiContext *newBootstrapDialContext();
+  virtual ApiContext *newBootstrapListenContext();
+  virtual ApiContext *newBootstrapPreConnObjContext();
 
   virtual Contexts getContexts(RaceHandle handle);
   virtual Contexts getContexts(const std::string &id);
@@ -216,6 +229,9 @@ public:
   DialStateEngine dialEngine;
   ListenStateEngine listenEngine;
   RecvStateEngine recvEngine;
+  BootstrapDialStateEngine bootstrapDialEngine;
+  BootstrapListenStateEngine bootstrapListenEngine;
+  BootstrapPreConnObjStateEngine bootstrapPreConnObjEngine;
 
   // channel, link, and connection IDs are strings, and will never conflict
   // map IDs and system event handles to the appropriate context
@@ -242,6 +258,8 @@ public:
               std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
   virtual SdkResponse dial(SendOptions sendOptions, std::vector<uint8_t> data,
                            std::function<void(ApiStatus, RaceHandle)> callback);
+  virtual SdkResponse bootstrapDial(BootstrapConnectionOptions options, std::vector<uint8_t> data,
+                           std::function<void(ApiStatus, RaceHandle)> callback);
   virtual SdkResponse getReceiveObject(
       ReceiveOptions recvOptions,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
@@ -254,6 +272,9 @@ public:
           callback);
   virtual SdkResponse
   listen(ReceiveOptions recvOptions,
+         std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
+  virtual SdkResponse
+  bootstrapListen(BootstrapConnectionOptions options,
          std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
   virtual SdkResponse
   accept(OpHandle handle, std::function<void(ApiStatus, RaceHandle)> callback);

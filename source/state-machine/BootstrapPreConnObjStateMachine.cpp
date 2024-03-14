@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-#include "PreConnObjStateMachine.h"
+#include "BootstrapPreConnObjStateMachine.h"
 
 #include "../../include/race/Race.h"
 #include "Core.h"
@@ -31,7 +31,7 @@ namespace Raceboat {
 // Context
 //-----------------------------------------------------------------------------------------------
 
-void PreConnObjContext::updatePreConnObjStateMachineStart(
+void BootstrapPreConnObjContext::updateBootstrapPreConnObjStateMachineStart(
     RaceHandle contextHandle, RaceHandle recvHandle,
     const ConnectionID &_recvConnId, const ChannelId &_recvChannel,
     const ChannelId &_sendChannel, const std::string &_sendRole,
@@ -48,18 +48,18 @@ void PreConnObjContext::updatePreConnObjStateMachineStart(
   this->recvQueue = recvMessages;
 }
 
-void PreConnObjContext::updateReceiveEncPkg(
+void BootstrapPreConnObjContext::updateReceiveEncPkg(
     ConnectionID /* connId */, std::shared_ptr<std::vector<uint8_t>> data) {
   this->recvQueue.push_back(*data);
 }
 
-void PreConnObjContext::updateConnStateMachineConnected(
+void BootstrapPreConnObjContext::updateConnStateMachineConnected(
     RaceHandle /* contextHandle */, ConnectionID connId,
     std::string /* linkAddress */) {
   this->sendConnId = connId;
 }
 
-void PreConnObjContext::updateListenAccept(
+void BootstrapPreConnObjContext::updateListenAccept(
     std::function<void(ApiStatus, RaceHandle)> cb) {
   this->acceptCb = cb;
 }
@@ -68,9 +68,9 @@ void PreConnObjContext::updateListenAccept(
 // States
 //-----------------------------------------------------------------------------------------------
 
-struct StatePreConnObjInitial : public PreConnObjState {
-  explicit StatePreConnObjInitial(StateType id = STATE_PRE_CONN_OBJ_INITIAL)
-      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_INITIAL") {}
+struct StateBootstrapPreConnObjInitial : public BootstrapPreConnObjState {
+  explicit StateBootstrapPreConnObjInitial(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL)
+      : BootstrapPreConnObjState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -82,9 +82,9 @@ struct StatePreConnObjInitial : public PreConnObjState {
   }
 };
 
-struct StatePreConnObjAccepted : public PreConnObjState {
-  explicit StatePreConnObjAccepted(StateType id = STATE_PRE_CONN_OBJ_ACCEPTED)
-      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_ACCEPTED") {}
+struct StateBootstrapPreConnObjAccepted : public BootstrapPreConnObjState {
+  explicit StateBootstrapPreConnObjAccepted(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED)
+      : BootstrapPreConnObjState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -104,18 +104,18 @@ struct StatePreConnObjAccepted : public PreConnObjState {
   }
 };
 
-struct StatePreConnObjOpening : public PreConnObjState {
-  explicit StatePreConnObjOpening(StateType id = STATE_PRE_CONN_OBJ_OPENING)
-      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_OPENING") {}
+struct StateBootstrapPreConnObjOpening : public BootstrapPreConnObjState {
+  explicit StateBootstrapPreConnObjOpening(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_OPENING)
+      : BootstrapPreConnObjState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_OPENING") {}
   virtual EventResult enter(Context & /* context */) {
     TRACE_METHOD();
     return EventResult::SUCCESS;
   }
 };
 
-struct StatePreConnObjOpen : public PreConnObjState {
-  explicit StatePreConnObjOpen(StateType id = STATE_PRE_CONN_OBJ_FINISHED)
-      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_FINISHED") {}
+struct StateBootstrapPreConnObjOpen : public BootstrapPreConnObjState {
+  explicit StateBootstrapPreConnObjOpen(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED)
+      : BootstrapPreConnObjState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -148,9 +148,9 @@ struct StatePreConnObjOpen : public PreConnObjState {
   virtual bool finalState() { return true; }
 };
 
-struct StatePreConnObjFailed : public PreConnObjState {
-  explicit StatePreConnObjFailed(StateType id = STATE_PRE_CONN_OBJ_FAILED)
-      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_FAILED") {}
+struct StateBootstrapPreConnObjFailed : public BootstrapPreConnObjState {
+  explicit StateBootstrapPreConnObjFailed(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_FAILED)
+      : BootstrapPreConnObjState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_FAILED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -169,24 +169,24 @@ struct StatePreConnObjFailed : public PreConnObjState {
 // StateEngine
 //-----------------------------------------------------------------------------------------------
 
-PreConnObjStateEngine::PreConnObjStateEngine() {
-  addInitialState<StatePreConnObjInitial>(STATE_PRE_CONN_OBJ_INITIAL);
-  addState<StatePreConnObjAccepted>(STATE_PRE_CONN_OBJ_ACCEPTED);
-  addState<StatePreConnObjOpening>(STATE_PRE_CONN_OBJ_OPENING);
-  addState<StatePreConnObjOpen>(STATE_PRE_CONN_OBJ_FINISHED);
-  addFailedState<StatePreConnObjFailed>(STATE_PRE_CONN_OBJ_FAILED);
+BootstrapPreConnObjStateEngine::BootstrapPreConnObjStateEngine() {
+  addInitialState<StateBootstrapPreConnObjInitial>(STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL);
+  addState<StateBootstrapPreConnObjAccepted>(STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED);
+  addState<StateBootstrapPreConnObjOpening>(STATE_BOOTSTRAP_PRE_CONN_OBJ_OPENING);
+  addState<StateBootstrapPreConnObjOpen>(STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED);
+  addFailedState<StateBootstrapPreConnObjFailed>(STATE_BOOTSTRAP_PRE_CONN_OBJ_FAILED);
 
   // clang-format off
     // initial -> opening -> open
-    declareStateTransition(STATE_PRE_CONN_OBJ_INITIAL,   EVENT_RECEIVE_PACKAGE,              STATE_PRE_CONN_OBJ_INITIAL);
-    declareStateTransition(STATE_PRE_CONN_OBJ_INITIAL,   EVENT_LISTEN_ACCEPTED,              STATE_PRE_CONN_OBJ_ACCEPTED);
-    declareStateTransition(STATE_PRE_CONN_OBJ_ACCEPTED,  EVENT_ALWAYS,                       STATE_PRE_CONN_OBJ_OPENING);
-    declareStateTransition(STATE_PRE_CONN_OBJ_OPENING,   EVENT_RECEIVE_PACKAGE,              STATE_PRE_CONN_OBJ_OPENING);
-    declareStateTransition(STATE_PRE_CONN_OBJ_OPENING,   EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_PRE_CONN_OBJ_FINISHED);
+    declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL,   EVENT_RECEIVE_PACKAGE,              STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL);
+    declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL,   EVENT_LISTEN_ACCEPTED,              STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED);
+    declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED,  EVENT_ALWAYS,                       STATE_BOOTSTRAP_PRE_CONN_OBJ_OPENING);
+    declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_OPENING,   EVENT_RECEIVE_PACKAGE,              STATE_BOOTSTRAP_PRE_CONN_OBJ_OPENING);
+    declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_OPENING,   EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED);
   // clang-format on
 }
 
-std::string PreConnObjStateEngine::eventToString(EventType event) {
+std::string BootstrapPreConnObjStateEngine::eventToString(EventType event) {
   return Raceboat::eventToString(event);
 }
 
