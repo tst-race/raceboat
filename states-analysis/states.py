@@ -98,7 +98,7 @@ class NodeState:
         self.other_node = None
         self.requirements = requirements
 
-    def start(self, args):
+    def start(self, args, msgs=None):
         pass
     def finished_or(self, status, messages):
         if self.is_final_state(self.requirements):
@@ -124,7 +124,7 @@ class NodeState:
             for required in self.requirements:
                 if not any([link > required for link in self.links.values()]):
                     print(f"Missing: {required}")
-                    if ((required.channel.directionality == "BIDI") or
+                    if ((required.channel.directionality == "BIDI" and required.recv) or
                         (required.channel.directionality == "L2C" and required.recv) or
                         (required.channel.directionality == "C2L" and required.send)):
                         addrs.append(self.create_link(required.channel, isolated=True))
@@ -188,22 +188,22 @@ class NodeState:
         return False
 
 class Client(NodeState):
-    def start(self, args):
+    def start(self, args, msgs=None):
         addrs = []
         if args.init_send.directionality in ["C2L"]:
             # create a link and share its address to the server
             addr = self.create_link(args.init_send, isolated=False)
             # not isolated because OOB shared addr is assumed seen by multiple servers
             addrs.append(addr)
-        if args.init_recv.directionality in ["L2C"]:
-            addr = self.create_link(args.init_recv, isolated=False)
-            addrs.append(addr)
 
         return addrs
 
  
 class Server(NodeState):
-    def start(self, args):
+    def start(self, args, msgs=None):
+        for msg in msgs:
+            self.load_link(msg)
+
         addrs = []
         if args.init_recv.directionality in ["L2C", "BIDI"]:
             # create a link and share its address to the client
@@ -367,26 +367,27 @@ def run(args, reqs, client_oob=True):
     client.other_node = server
 
     server_args, client_args = args
-    server_msgs = server.start(server_args)
     client_msgs = client.start(client_args)
-
     if not client_oob:
         client_msgs = []
 
+    server_msgs = server.start(server_args, client_msgs)
+
     idx = 0
     while not client.is_final_state(client_reqs) or not server.is_final_state(server_reqs):
-        print("---\nSERVER")
-        status, msgs = server.step(client_msgs)
-        client_msgs = []
-        print(f"{status=}")
-        server_msgs.extend(msgs)
-                
+               
         print("---\nCLIENT")
         status, msgs = client.step(server_msgs)
         server_msgs = []
         print(f"{status=}")
         client_msgs.extend(msgs)
 
+        print("---\nSERVER")
+        status, msgs = server.step(client_msgs)
+        client_msgs = []
+        print(f"{status=}")
+        server_msgs.extend(msgs)
+ 
         idx += 1
         if idx > 5:
             print("MAX ITERATIONS REACHED")
@@ -394,7 +395,7 @@ def run(args, reqs, client_oob=True):
             break
 
     
-    print("FIN")
+    print(f"FIN {idx}")
     return (server.is_final_state(server_reqs) and
             client.is_final_state(client_reqs))
 

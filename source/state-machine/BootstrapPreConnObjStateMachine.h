@@ -28,10 +28,13 @@ public:
       : ApiContext(manager, engine) {}
 
   virtual void updateBootstrapPreConnObjStateMachineStart(
-      RaceHandle contextHandle, RaceHandle recvHandle,
-      const ConnectionID &_recvConnId, const ChannelId &_recvChannel,
-      const ChannelId &_sendChannel, const std::string &_sendRole,
-      const std::string &_sendLinkAddress, const std::string &_packageId,
+      RaceHandle contextHandle,
+      const ApiBootstrapListenContext &parentContext,
+      // RaceHandle recvHandle,
+      // const ConnectionID &_recvConnId, const ChannelId &_recvChannel,
+      // const ChannelId &_sendChannel, const std::string &_sendRole,
+      // const std::string &_sendLinkAddress,
+      const std::string &_packageId,
       std::vector<std::vector<uint8_t>> recvMessages) override;
   virtual void
   updateReceiveEncPkg(ConnectionID connId,
@@ -49,16 +52,23 @@ public:
 
   RaceHandle parentHandle;
 
-  RaceHandle sendConnSMHandle;
-  std::string sendRole;
-  LinkAddress sendLinkAddress;
-  ConnectionID sendConnId;
+  BootstrapConnectionOptions opts;
+  
+  RaceHandle initSendConnSMHandle;
+  LinkAddress initSendLinkAddress;
+  ConnectionID initSendConnId;
 
-  RaceHandle recvConnSMHandle;
-  ConnectionID recvConnId;
+  RaceHandle initRecvConnSMHandle;
+  LinkAddress initRecvLinkAddress;
+  ConnectionID initRecvConnId;
 
-  ChannelId sendChannel;
-  ChannelId recvChannel;
+  RaceHandle finalSendConnSMHandle;
+  LinkAddress finalSendLinkAddress;
+  ConnectionID finalSendConnId;
+
+  RaceHandle finalRecvConnSMHandle;
+  LinkAddress finalRecvLinkAddress;
+  ConnectionID finalRecvConnId;
 
   std::string packageId;
   RaceHandle apiHandle;

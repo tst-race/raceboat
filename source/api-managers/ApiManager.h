@@ -68,6 +68,7 @@ static const int packageIdLen = 16;
 class PluginContainer;
 
 class ApiManager;
+class BootstrapPreConnObjContext;
 enum class ActivateChannelStatusCode;
 
 class ApiManagerInternal {
@@ -176,11 +177,23 @@ public:
       const ChannelId &sendChannel, const std::string &sendRole,
       const std::string &sendLinkAddress, const std::string &packageId,
       std::vector<std::vector<uint8_t>> recvMessages);
+  virtual RaceHandle startBootstrapPreConnObjStateMachine(
+      RaceHandle contextHandle, 
+      // const ConnectionID &initSendConnId, const ChannelId &initSendChannel, const std::string &initSendRole,
+      // const ConnectionID &initRecvConnId, const ChannelId &initRecvChannel, const std::string &initRecvRole,
+      // const ConnectionID &finalSendConnId, const ChannelId &finalSendChannel, const std::string &finalSendRole, const LinkAddress &finalSendAddress
+      // const ConnectionID &finalRecvConnId, const ChannelId &finalRecvChannel, const std::string &finalRecvRole, const LinkAddress &finalRecvAddress
+      const std::string &packageId,
+      std::vector<std::vector<uint8_t>> recvMessages);
   virtual bool
   onListenAccept(RaceHandle contextHandle,
                  std::function<void(ApiStatus, RaceHandle)> acceptCb);
+  virtual bool
+  onBootstrapListenAccept(RaceHandle contextHandle,
+                          std::function<void(ApiStatus, RaceHandle)> acceptCb);
   virtual bool detachConnSM(RaceHandle contextHandle,
                             RaceHandle connSMContextHandle);
+  virtual void addDependent(RaceHandle contextHandle, RaceHandle newDependentHandle);
 
   virtual Core &getCore();
 

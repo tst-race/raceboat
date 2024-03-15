@@ -22,6 +22,7 @@
 #include "PluginWrapper.h"
 #include "base64.h"
 #include "state-machine/Events.h"
+#include "state-machine/BootstrapListenStateMachine.h"
 
 namespace Raceboat {
 
@@ -927,7 +928,57 @@ RaceHandle ApiManagerInternal::startPreConnObjStateMachine(
   return context->handle;
 }
 
+RaceHandle ApiManagerInternal::startBootstrapPreConnObjStateMachine(
+                                                RaceHandle contextHandle,
+                                                const std::string &packageId,
+                                                std::vector<std::vector<uint8_t>> recvMessages) {
+  // create a connection context and copy information from the send/recv context
+  auto context = newBootstrapPreConnObjContext();
+  auto listenContextIt = activeContexts.find(contextHandle);
+  if (listenContextIt == activeContexts.end()) {
+    return NULL_RACE_HANDLE;
+  }
+
+  // This may need to be a reinterpret_cast - don't want to lose the extended link info
+  ApiBootstrapListenContext listenContext = static_cast<ApiBootstrapListenContext>(*listenContextIt->second);
+  context->updateBootstrapPreConnObjStateMachineStart(contextHandle,
+                                                      listenContext,
+                                                      packageId, recvMessages);
+  EventResult result = preConnObjEngine.start(*context);
+  if (result != EventResult::SUCCESS) {
+    return NULL_RACE_HANDLE;
+  }
+
+  addDependent(listenContext.initSendConnSMHandle, context->handle);
+  addDependent(listenContext.initRecvConnSMHandle, context->handle);
+  return context->handle;
+}
+
+void ApiManagerInternal::addDependent(RaceHandle contextHandle, RaceHandle newDependentHandle) {
+  auto connContextIt = activeContexts.find(contextHandle);
+  if (connContextIt == activeContexts.end()) {
+    return;
+  }
+  connContextIt->second->updateDependent(newDependentHandle);
+  triggerEvent(*connContextIt->second, EVENT_ADD_DEPENDENT);
+}
 bool ApiManagerInternal::onListenAccept(
+    RaceHandle contextHandle,
+    std::function<void(ApiStatus, RaceHandle)> acceptCb) {
+  TRACE_METHOD(contextHandle);
+
+  EventType event = EVENT_LISTEN_ACCEPTED;
+  auto context = activeContexts.find(contextHandle);
+  if (context == activeContexts.end()) {
+    helper::logError(logPrefix + "Could not find context for handle");
+    return false;
+  }
+  context->second->updateListenAccept(acceptCb);
+  triggerEvent(*context->second, event);
+  return true;
+}
+
+bool ApiManagerInternal::onBootstrapListenAccept(
     RaceHandle contextHandle,
     std::function<void(ApiStatus, RaceHandle)> acceptCb) {
   TRACE_METHOD(contextHandle);
@@ -1015,6 +1066,14 @@ ApiContext *ApiManagerInternal::newConnObjectContext() {
 ApiContext *ApiManagerInternal::newPreConnObjContext() {
   auto newContext =
       std::make_unique<PreConnObjContext>(*this, preConnObjEngine);
+  auto handle = newContext->handle;
+  activeContexts[handle] = (std::move(newContext));
+  return activeContexts[handle].get();
+}
+
+ApiContext *ApiManagerInternal::newBootstrapPreConnObjContext() {
+  auto newContext =
+      std::make_unique<BootstrapPreConnObjContext>(*this, bootstrapPreConnObjEngine);
   auto handle = newContext->handle;
   activeContexts[handle] = (std::move(newContext));
   return activeContexts[handle].get();

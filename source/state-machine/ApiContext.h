@@ -34,6 +34,7 @@
 namespace Raceboat {
 
 class ApiManagerInternal;
+class ApiBootstrapListenContext;
 class PluginWrapper;
 
 class ApiContext : public Context {
@@ -132,11 +133,13 @@ public:
       std::vector<std::vector<uint8_t>> /* recvMessages */){};
 
   virtual void updateBootstrapPreConnObjStateMachineStart(
-      RaceHandle /* contextHandle */, RaceHandle /* recvHandle */,
-      const ConnectionID & /* _recvConnId */,
-      const ChannelId & /* _recvChannel */,
-      const ChannelId & /* _sendChannel */, const std::string & /* _sendRole */,
-      const std::string & /* _sendLinkAddress */,
+      RaceHandle /* contextHandle */,
+      const ApiBootstrapListenContext &/* parentContext */,
+      // RaceHandle /* recvHandle */,
+      // const ConnectionID & /* _recvConnId */,
+      // const ChannelId & /* _recvChannel */,
+      // const ChannelId & /* _sendChannel */, const std::string & /* _sendRole */,
+      // const std::string & /* _sendLinkAddress */,
       const std::string & /* _packageId */,
       std::vector<std::vector<uint8_t>> /* recvMessages */){};
 

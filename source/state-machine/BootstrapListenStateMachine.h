@@ -24,6 +24,8 @@ class ApiBootstrapListenContext : public ApiContext {
 public:
   ApiBootstrapListenContext(ApiManagerInternal &manager, StateEngine &engine)
       : ApiContext(manager, engine) {}
+  ApiBootstrapListenContext(const ApiContext &context)
+      : ApiContext(context.manager, context.engine) {}
   virtual void updateBootstrapListen(
       const BootstrapConnectionOptions &options,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> cb) override;
@@ -42,15 +44,25 @@ public:
 public:
   BootstrapConnectionOptions opts;
   std::queue<std::shared_ptr<std::vector<uint8_t>>> data;
-  std::function<void(ApiStatus, LinkAddress, RaceHandle)> bootstrapListenCb;
+  std::function<void(ApiStatus, LinkAddress, RaceHandle)> listenCb;
   std::deque<std::function<void(ApiStatus, RaceHandle)>> acceptCb;
   std::function<void(ApiStatus)> closeCb;
 
-  RaceHandle recvConnSMHandle;
-  ConnectionID recvConnId;
-  std::string recvLinkAddress;
+  RaceHandle initSendConnSMHandle;
+  ConnectionID initSendConnId;
+  std::string initSendLinkAddress;
+  RaceHandle initRecvConnSMHandle;
+  ConnectionID initRecvConnId;
+  std::string initRecvLinkAddress;
 
-  std::queue<RaceHandle> preConnObjSM;
+  RaceHandle finalSendConnSMHandle;
+  ConnectionID finalSendConnId;
+  std::string finalSendLinkAddress;
+  RaceHandle finalRecvConnSMHandle;
+  ConnectionID finalRecvConnId;
+  std::string finalRecvLinkAddress;
+
+  std::queue<RaceHandle> preBootstrapConnObjSM;
 };
 
 class BootstrapListenStateEngine : public StateEngine {

@@ -42,6 +42,7 @@ void ApiBootstrapDialContext::updateReceiveEncPkg(
   this->responseData.push(std::move(_data));
 }
   
+  // TODO Code Reuse
 void ApiBootstrapDialContext::updateConnStateMachineConnected(RaceHandle contextHandle,
                                                      ConnectionID connId,
                                                      std::string linkAddress) {
@@ -88,9 +89,8 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
     }
     // Normal case: we are provided an address from out-of-band to load
     else {
-      if (ctx.opts.init_send_address == "") {
+      if (ctx.opts.init_send_address.empty()) {
         // Need an address to load
-        // TODO HARD FAIL ERROR
       helper::logError(logPrefix +
                        "Invalid options: initial send address is required");
       ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {});
@@ -195,6 +195,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
   }
 };
 
+  // TODO Code Reuse
 struct StateBootstrapDialWaitingForConnections : public BootstrapDialState {
   explicit StateBootstrapDialWaitingForConnections(
       StateType id = STATE_BOOTSTRAP_DIAL_WAITING_FOR_CONNECTIONS)
@@ -241,8 +242,6 @@ struct StateBootstrapDialSendHello : public BootstrapDialState {
                           ctx.packageId.begin(), ctx.packageId.end()))},
     };
 
-        // {"linkAddress", ctx.recvLinkAddress},
-        // {"replyChannel", ctx.opts.recv_channel},
     // Any final links we have at this point represent links we have created, so we should send their addressed  to the server
     if (!ctx.finalSendLinkAddress.empty()) {
       // Json name is relative to the recipient, so this is a "recv" link for them
@@ -250,7 +249,7 @@ struct StateBootstrapDialSendHello : public BootstrapDialState {
         json["finalRecvChannel"] = ctx.opts.final_send_channel;
     }
     if (!ctx.finalRecvLinkAddress.empty()) {
-      // Json name is relative to the recipient, so this is a "recv" link for them
+      // Json name is relative to the recipient, so this is a "send" link for them
         json["finalSendLinkAddress"] = ctx.finalRecvLinkAddress;
         json["finalSendChannel"] = ctx.opts.final_recv_channel;
     }
@@ -368,7 +367,6 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
 
         }
  
-        std::string messageB64 = json.at("message");
         std::string packageId = json.at("packageId");
         std::vector<uint8_t> packageIdBytes = base64::decode(packageId);
 
@@ -380,8 +378,6 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
 
         std::string replyPackageId =
             std::string(packageIdBytes.begin(), packageIdBytes.end());
-
-        std::vector<uint8_t> dialMessage = base64::decode(messageB64);
 
         // Processing succeeded
         ctx.pendingEvents.push(EVENT_SATISFIED);
@@ -395,6 +391,7 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
   }
 };
 
+  // TODO Code Reuse
 struct StateBootstrapDialWaitingForFinalConnections : public BootstrapDialState {
   explicit StateBootstrapDialWaitingForFinalConnections(StateType id = STATE_BOOTSTRAP_DIAL_WAITING_FOR_FINAL_CONNECTIONS)
       : BootstrapDialState(id, "StateBootstrapDialWaitingForFinalConnections") {}
