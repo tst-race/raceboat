@@ -45,7 +45,7 @@ if(NOT ANDROID)
     add_subdirectory(app/race-cli)
     add_subdirectory(test/common/UnifiedTestStub EXCLUDE_FROM_ALL)
     add_subdirectory(test/common/DecomposedTestStub EXCLUDE_FROM_ALL)
-    add_subdirectory(test/common/plugins/myOS/myArch/DecomposedTestImplementation EXCLUDE_FROM_ALL)
+    add_subdirectory(test/common/plugins/DecomposedTestImplementation EXCLUDE_FROM_ALL)
     add_subdirectory(test/source EXCLUDE_FROM_ALL)
 endif()
 

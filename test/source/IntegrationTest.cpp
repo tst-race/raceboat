@@ -32,16 +32,16 @@ using testing::Return;
 
 struct IntegrationFileSystem : public FileSystem {
   IntegrationFileSystem(const fs::path &path) : FileSystem(path) {}
-  virtual const char *getHostArch() { return "myArch"; }
-  virtual const char *getHostOsType() { return "myOS"; }
+  virtual const char *getHostArch() { return ""; }
+  virtual const char *getHostOsType() { return ""; }
 };
 
 struct IntegrationCore : public Core {
   IntegrationCore(const fs::path &path, const ChannelParamStore &params)
-      : Core("", params), integrationFS(IntegrationFileSystem(path)) {
-    helper::logDebug("path:" + path.string());
-    helper::logDebug("plugin path:" + getFS().pluginsInstallPath.string());
-    init();
+      : Core(path, params), integrationFS(IntegrationFileSystem(path)) {
+    helper::logInfo("path:" + path.string());
+    helper::logInfo("plugin path:" + getFS().pluginsInstallPath.string());
+    // init();
   }
 
   virtual FileSystem &getFS() override { return integrationFS; }
@@ -63,14 +63,16 @@ TEST(IntegrationTest, oneshot) {
 
     auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
     auto plugin_path = stub_path.parent_path()
-                           .parent_path()
-                           .parent_path()
-                           .parent_path()
                            .parent_path();
+
+    helper::logInfo("stub_path:" + stub_path.string());
+    helper::logInfo("plugin_path:" + plugin_path.string());
+    
 
     auto core = std::make_shared<IntegrationCore>(plugin_path.string(), params);
     Race race(core);
     // Race race(plugin_path.string(), params);
+    helper::logInfo("CORE INSTANTIATED");
 
     ReceiveOptions opt;
     opt.recv_channel = "DecomposedTestImplementation";
@@ -93,9 +95,6 @@ TEST(IntegrationTest, oneshot) {
 
     auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
     auto plugin_path = stub_path.parent_path()
-                           .parent_path()
-                           .parent_path()
-                           .parent_path()
                            .parent_path();
     auto core = std::make_shared<IntegrationCore>(plugin_path.string(), params);
     Race race(core);
@@ -131,9 +130,6 @@ TEST(IntegrationTest, bidi) {
 
     auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
     auto plugin_path = stub_path.parent_path()
-                           .parent_path()
-                           .parent_path()
-                           .parent_path()
                            .parent_path();
 
     auto core = std::make_shared<IntegrationCore>(plugin_path.string(), params);
@@ -166,9 +162,6 @@ TEST(IntegrationTest, bidi) {
 
         auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
         auto plugin_path = stub_path.parent_path()
-                               .parent_path()
-                               .parent_path()
-                               .parent_path()
                                .parent_path();
         auto core =
             std::make_shared<IntegrationCore>(plugin_path.string(), params);
@@ -209,9 +202,6 @@ TEST(IntegrationTest, connect) {
 
     auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
     auto plugin_path = stub_path.parent_path()
-                           .parent_path()
-                           .parent_path()
-                           .parent_path()
                            .parent_path();
 
     auto core = std::make_shared<IntegrationCore>(plugin_path.string(), params);
@@ -258,9 +248,6 @@ TEST(IntegrationTest, connect) {
 
     auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
     auto plugin_path = stub_path.parent_path()
-                           .parent_path()
-                           .parent_path()
-                           .parent_path()
                            .parent_path();
     auto core = std::make_shared<IntegrationCore>(plugin_path.string(), params);
     Race race(core);
