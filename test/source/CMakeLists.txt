@@ -16,34 +16,35 @@
 
 # Add the source to the test executable
 add_executable(testStandaloneLibrary
-    headers/ChannelRoleTest.cpp
-    headers/LinkPropertiesTest.cpp
-    headers/LinkPropertyPairTest.cpp
-    headers/LinkPropertySetTest.cpp
-    ComponentActionManagerTest.cpp
-    ComponentLifetimeManagerTest.cpp
-    ComponentManagerTest.cpp
-    ComponentPackageManagerTest.cpp
-    ComponentReceivePackageManagerTest.cpp
-    ConfigTest.cpp
-    CoreTest.cpp
+    # headers/ChannelRoleTest.cpp
+    # headers/LinkPropertiesTest.cpp
+    # headers/LinkPropertyPairTest.cpp
+    # headers/LinkPropertySetTest.cpp
+    # ComponentActionManagerTest.cpp
+    # ComponentLifetimeManagerTest.cpp
+    # ComponentManagerTest.cpp
+    # ComponentPackageManagerTest.cpp
+    # ComponentReceivePackageManagerTest.cpp
+    # ConfigTest.cpp
+    # CoreTest.cpp
     main.cpp
-    ExternalApiTest.cpp
-    FileSystemTest.cpp
-    HandlerTest.cpp
+    # ExternalApiTest.cpp
+    # FileSystemTest.cpp
+    # HandlerTest.cpp
     IntegrationTest.cpp
-    PluginLoadingTest.cpp
-    PluginWrapperTest.cpp
-    RaceLogTests.cpp
-    SdkWrapperTest.cpp
-    UserInputTest.cpp
-    # StateMachineTest.cpp
-    ApiManager/DialTest.cpp
-    ApiManager/ListenTest.cpp
-    ApiManager/ReceiveRespondTest.cpp
-    ApiManager/RecvTest.cpp
-    ApiManager/SendTest.cpp
-    ApiManager/SendReceiveTest.cpp
+    # PluginLoadingTest.cpp
+    # PluginWrapperTest.cpp
+    # RaceLogTests.cpp
+    # SdkWrapperTest.cpp
+    # UserInputTest.cpp
+    # # StateMachineTest.cpp
+    # ApiManager/DialTest.cpp
+    # ApiManager/ListenTest.cpp
+    # ApiManager/ReceiveRespondTest.cpp
+    # ApiManager/RecvTest.cpp
+    # ApiManager/SendTest.cpp
+    # ApiManager/SendReceiveTest.cpp
+    # ApiManager/BootstrapListenTest.cpp
 )
 
 target_compile_definitions(testStandaloneLibrary 

@@ -44,7 +44,8 @@ void BootstrapPreConnObjContext::updateBootstrapPreConnObjStateMachineStart(
   this->initSendConnSMHandle = parentContext.initSendConnSMHandle;
   this->initSendConnId = parentContext.initSendConnId;
   this->initSendLinkAddress = parentContext.initSendLinkAddress;
-  
+  helper::logInfo("updateBootstrapPreConnObjStateMachineStart initSendLinkAddress: " + parentContext.initSendLinkAddress);
+   
   this->initRecvConnSMHandle = parentContext.initRecvConnSMHandle;
   this->initRecvConnId = parentContext.initRecvConnId;
   this->initRecvLinkAddress = parentContext.initRecvLinkAddress;
@@ -52,6 +53,7 @@ void BootstrapPreConnObjContext::updateBootstrapPreConnObjStateMachineStart(
   this->finalSendConnSMHandle = parentContext.finalSendConnSMHandle;
   this->finalSendConnId = parentContext.finalSendConnId;
   this->finalSendLinkAddress = parentContext.finalSendLinkAddress;
+  helper::logInfo("updateBootstrapPreConnObjStateMachineStart finalSendLinkAddress: " + parentContext.finalSendLinkAddress);
   
   this->finalRecvConnSMHandle = parentContext.finalRecvConnSMHandle;
   this->finalRecvConnId = parentContext.finalRecvConnId;
@@ -134,7 +136,7 @@ struct StateBootstrapPreConnObjAccepted : public BootstrapPreConnObjState {
         helper::logError(logPrefix + " initSend should have been created during listener initialization (StateBootstrapListenInitial)");
         return EventResult::NOT_SUPPORTED;
       } else if (ctx.initSendLinkAddress.empty()) {
-        helper::logError(logPrefix + " initSend should have been created during listener initialization (StateBootstrapListenInitial)");
+        helper::logError(logPrefix + " initSend address is missing but we are expecting to load it");
         return EventResult::NOT_SUPPORTED;
       } else {
         bool sending = true;
@@ -289,11 +291,7 @@ struct StateBootstrapPreConnObjSendResponse : public BootstrapPreConnObjState {
 
     ctx.manager.registerHandle(ctx, connectionHandle);
 
-    // TODO: There's better ways to encode than base64 inside json
-    nlohmann::json json = {
-        {"packageId", base64::encode(std::vector<uint8_t>(
-                          ctx.packageId.begin(), ctx.packageId.end()))},
-    };
+    nlohmann::json json = {};
 
     if (ctx.shouldCreateSender(ctx.opts.final_send_channel)) {
       if (ctx.finalSendLinkAddress.empty()) {
@@ -315,10 +313,14 @@ struct StateBootstrapPreConnObjSendResponse : public BootstrapPreConnObjState {
         json["finalSendChannel"] = ctx.opts.final_recv_channel;
       }
 
-    std::string message = std::string(packageIdLen, '\0') + json.dump();
+    std::string message = json.dump();
     std::vector<uint8_t> bytes(message.begin(), message.end());
-
-    EncPkg pkg(0, 0, bytes);
+    std::vector<uint8_t> prefixedBytes;
+    prefixedBytes.reserve(bytes.size() + packageIdLen);
+    prefixedBytes.insert(prefixedBytes.end(), ctx.packageId.begin(),
+                         ctx.packageId.end());
+    prefixedBytes.insert(prefixedBytes.end(), bytes.begin(), bytes.end());
+    EncPkg pkg(0, 0, prefixedBytes);
     RaceHandle pkgHandle = ctx.manager.getCore().generateHandle();
     SdkResponse response =
         plugin.sendPackage(pkgHandle, ctx.initSendConnId, pkg, 0, 0);
@@ -414,7 +416,7 @@ BootstrapPreConnObjStateEngine::BootstrapPreConnObjStateEngine() {
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_CONN_STATE_MACHINE_CONNECTED,              STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_NEEDS_SEND,              STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE);
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_SATISFIED,              STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED);
-    declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE,      PACKAGE_SENT,              STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED);
+    declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE,      EVENT_PACKAGE_SENT,              STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED);
   // clang-format on
 }
 

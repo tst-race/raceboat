@@ -191,6 +191,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
         ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
       }
     }
+    ctx.pendingEvents.push(EVENT_ALWAYS);
     return EventResult::SUCCESS;
   }
 };
@@ -242,7 +243,12 @@ struct StateBootstrapDialSendHello : public BootstrapDialState {
                           ctx.packageId.begin(), ctx.packageId.end()))},
     };
 
-    // Any final links we have at this point represent links we have created, so we should send their addressed  to the server
+    //
+    if (ctx.shouldCreateReceiver(ctx.opts.init_recv_channel) and !ctx.initRecvLinkAddress.empty()) {
+      // Json name is relative to the recipient, so this is a "send" link for them
+        json["initSendLinkAddress"] = ctx.initRecvLinkAddress;
+        json["initSendChannel"] = ctx.opts.init_recv_channel;
+    }
     if (!ctx.finalSendLinkAddress.empty()) {
       // Json name is relative to the recipient, so this is a "recv" link for them
         json["finalRecvLinkAddress"] = ctx.finalSendLinkAddress;
@@ -285,6 +291,9 @@ struct StateBootstrapDialHelloSent : public BootstrapDialState {
 
     // If any final links are missing, we must be waiting for the server to send us addresses in a response
     if (ctx.finalSendConnId.empty() or ctx.finalRecvConnId.empty()) {
+      // Register to listen for the response from the server
+      ctx.manager.registerPackageId(ctx, ctx.initRecvConnId, ctx.packageId);
+    
       ctx.pendingEvents.push(EVENT_NEEDS_RECV);
       return EventResult::SUCCESS;
     }
@@ -296,7 +305,7 @@ struct StateBootstrapDialHelloSent : public BootstrapDialState {
   
 struct StateBootstrapDialAwaitResponse : public BootstrapDialState {
   explicit StateBootstrapDialAwaitResponse(StateType id = STATE_BOOTSTRAP_DIAL_AWAIT_RESPONSE)
-      : BootstrapDialState(id, "StateBootstrapDialRecvResponse") {}
+      : BootstrapDialState(id, "StateBootstrapDialAwaitResponse") {}
 };
 
     
@@ -317,6 +326,7 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
         if (ctx.finalSendConnId.empty()) {
           LinkAddress finalSendLinkAddress = json.at("finalSendLinkAddress");
           std::string finalSendChannel = json.at("finalSendChannel");
+          helper::logInfo(logPrefix + "loading finalSendLink: " + ctx.opts.final_send_channel + " " + finalSendLinkAddress);
           if (ctx.opts.final_send_channel != finalSendChannel) {
             helper::logError(logPrefix + "Requested final channel does not match specified final channel: " + finalSendChannel + " vs. " + ctx.opts.final_send_channel);
             continue;
@@ -324,7 +334,7 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
 
           bool sending = true;
           bool create = false;
-          ctx.finalRecvConnSMHandle = ctx.manager.
+          ctx.finalSendConnSMHandle = ctx.manager.
             startConnStateMachine(ctx.handle,
                                   ctx.opts.final_send_channel,
                                   ctx.opts.final_send_role,
@@ -367,18 +377,6 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
 
         }
  
-        std::string packageId = json.at("packageId");
-        std::vector<uint8_t> packageIdBytes = base64::decode(packageId);
-
-        if (packageIdBytes.size() != packageIdLen) {
-          helper::logError(logPrefix + "Invalid package id len: " +
-                           std::to_string(packageIdBytes.size()));
-          continue;
-        }
-
-        std::string replyPackageId =
-            std::string(packageIdBytes.begin(), packageIdBytes.end());
-
         // Processing succeeded
         ctx.pendingEvents.push(EVENT_SATISFIED);
         return EventResult::SUCCESS;
@@ -471,20 +469,25 @@ BootstrapDialStateEngine::BootstrapDialStateEngine() {
   // package sent
   addState<StateBootstrapDialSendHello>(STATE_BOOTSTRAP_DIAL_SEND_HELLO);
   // creates connection object, calls dial callback, calls state machine
-  // finished on manager, final state
+  addState<StateBootstrapDialHelloSent>(STATE_BOOTSTRAP_DIAL_HELLO_SENT);
+  addState<StateBootstrapDialAwaitResponse>(STATE_BOOTSTRAP_DIAL_AWAIT_RESPONSE);
+  addState<StateBootstrapDialRecvResponse>(STATE_BOOTSTRAP_DIAL_RECV_RESPONSE);
+  addState<StateBootstrapDialWaitingForFinalConnections>(STATE_BOOTSTRAP_DIAL_WAITING_FOR_FINAL_CONNECTIONS);
+   // finished on manager, final state
   addState<StateBootstrapDialFinished>(STATE_BOOTSTRAP_DIAL_FINISHED);
   // call state machine failed, manager will forward event to connection state
   // machine
   addFailedState<StateBootstrapDialFailed>(STATE_BOOTSTRAP_DIAL_FAILED);
 
   // clang-format off
-    declareStateTransition(STATE_BOOTSTRAP_DIAL_INITIAL,                 EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_BOOTSTRAP_DIAL_WAITING_FOR_CONNECTIONS);
+    declareStateTransition(STATE_BOOTSTRAP_DIAL_INITIAL,                 EVENT_ALWAYS, STATE_BOOTSTRAP_DIAL_WAITING_FOR_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_WAITING_FOR_CONNECTIONS, EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_BOOTSTRAP_DIAL_WAITING_FOR_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_WAITING_FOR_CONNECTIONS, EVENT_SATISFIED,                    STATE_BOOTSTRAP_DIAL_SEND_HELLO);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_SEND_HELLO,              EVENT_PACKAGE_SENT,                 STATE_BOOTSTRAP_DIAL_HELLO_SENT);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_HELLO_SENT,              EVENT_NEEDS_RECV,                STATE_BOOTSTRAP_DIAL_AWAIT_RESPONSE);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_AWAIT_RESPONSE,          EVENT_RECEIVE_PACKAGE,                STATE_BOOTSTRAP_DIAL_RECV_RESPONSE);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_RECV_RESPONSE,           EVENT_SATISFIED,              STATE_BOOTSTRAP_DIAL_WAITING_FOR_FINAL_CONNECTIONS);
+    declareStateTransition(STATE_BOOTSTRAP_DIAL_WAITING_FOR_FINAL_CONNECTIONS,              EVENT_CONN_STATE_MACHINE_CONNECTED,                    STATE_BOOTSTRAP_DIAL_WAITING_FOR_FINAL_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_WAITING_FOR_FINAL_CONNECTIONS,              EVENT_SATISFIED,                    STATE_BOOTSTRAP_DIAL_FINISHED);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_HELLO_SENT,              EVENT_SATISFIED,                    STATE_BOOTSTRAP_DIAL_FINISHED);
   // clang-format on

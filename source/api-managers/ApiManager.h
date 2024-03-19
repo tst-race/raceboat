@@ -179,6 +179,7 @@ public:
       std::vector<std::vector<uint8_t>> recvMessages);
   virtual RaceHandle startBootstrapPreConnObjStateMachine(
       RaceHandle contextHandle, 
+      const ApiBootstrapListenContext &listenContext,
       // const ConnectionID &initSendConnId, const ChannelId &initSendChannel, const std::string &initSendRole,
       // const ConnectionID &initRecvConnId, const ChannelId &initRecvChannel, const std::string &initRecvRole,
       // const ConnectionID &finalSendConnId, const ChannelId &finalSendChannel, const std::string &finalSendRole, const LinkAddress &finalSendAddress

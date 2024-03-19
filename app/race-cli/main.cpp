@@ -34,6 +34,8 @@ enum class Mode : int {
   RECV_ONESHOT,
   RECV_RESPOND,
   SERVER_CONNECT,
+  CLIENT_BOOTSTRAP_CONNECT,
+  SERVER_BOOTSTRAP_CONNECT,
 };
 
 struct CmdOptions {
@@ -43,14 +45,20 @@ struct CmdOptions {
 
   std::string plugin_path = "/etc/race";
 
-  ChannelId recv_channel;
-  std::string recv_role = "default";
-  ChannelId send_channel;
-  std::string send_role = "default";
+  ChannelId init_recv_channel;
+  std::string init_recv_role = "default";
+  ChannelId init_send_channel;
+  std::string init_send_role = "default";
   ChannelId alt_channel;
   std::string alt_role = "default";
-  LinkAddress send_address;
-  LinkAddress recv_address;
+  LinkAddress init_send_address;
+  LinkAddress init_recv_address;
+  ChannelId final_recv_channel;
+  std::string final_recv_role = "default";
+  ChannelId final_send_channel;
+  std::string final_send_role = "default";
+  LinkAddress final_send_address;
+  LinkAddress final_recv_address;
   int timeout_ms = 0;
   bool multi_channel = false;
 
@@ -75,6 +83,10 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       {"recv-reply", no_argument, &mode, static_cast<int>(Mode::RECV_RESPOND)},
       {"server-connect", no_argument, &mode,
        static_cast<int>(Mode::SERVER_CONNECT)},
+      {"server-bootstrap-connect", no_argument, &mode,
+       static_cast<int>(Mode::SERVER_BOOTSTRAP_CONNECT)},
+      {"client-bootstrap-connect", no_argument, &mode,
+       static_cast<int>(Mode::CLIENT_BOOTSTRAP_CONNECT)},
 
       // channel selection
       {"recv-channel", required_argument, nullptr, 'R'},
@@ -84,6 +96,11 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       {"alt-channel", required_argument, nullptr, 'T'},
       {"alt-role", required_argument, nullptr, 't'},
 
+      {"final-recv-channel", required_argument, nullptr, 'K'},
+      {"final-recv-role", required_argument, nullptr, 'k'},
+      {"final-send-channel", required_argument, nullptr, 'L'},
+      {"final-send-role", required_argument, nullptr, 'l'},
+      
       // destination selection
       {"send-address", required_argument, nullptr, 'a'},
       {"recv-address", required_argument, nullptr, 'e'},
@@ -126,19 +143,35 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       break;
 
     case 'R':
-      opts.recv_channel = optarg;
+      opts.init_recv_channel = optarg;
       break;
 
     case 'r':
-      opts.recv_role = optarg;
+      opts.init_recv_role = optarg;
       break;
 
     case 'S':
-      opts.send_channel = optarg;
+      opts.init_send_channel = optarg;
       break;
 
     case 's':
-      opts.send_role = optarg;
+      opts.init_send_role = optarg;
+      break;
+
+    case 'K':
+      opts.final_recv_channel = optarg;
+      break;
+
+    case 'k':
+      opts.final_recv_role = optarg;
+      break;
+
+    case 'L':
+      opts.final_send_channel = optarg;
+      break;
+
+    case 'l':
+      opts.final_send_role = optarg;
       break;
 
     case 'T':
@@ -150,11 +183,11 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       break;
 
     case 'a':
-      opts.send_address = optarg;
+      opts.init_send_address = optarg;
       break;
 
     case 'e':
-      opts.recv_address = optarg;
+      opts.init_recv_address = optarg;
       break;
 
     case 'd':
@@ -298,11 +331,11 @@ int handle_send_oneshot(const CmdOptions &opts) {
   Race race(opts.plugin_path, params);
 
   SendOptions send_opt;
-  send_opt.send_channel = opts.send_channel;
-  send_opt.send_role = opts.send_role;
-  send_opt.send_address = opts.send_address;
-  send_opt.recv_channel = opts.recv_channel;
-  send_opt.recv_role = opts.recv_role;
+  send_opt.send_channel = opts.init_send_channel;
+  send_opt.send_role = opts.init_send_role;
+  send_opt.send_address = opts.init_send_address;
+  send_opt.recv_channel = opts.init_recv_channel;
+  send_opt.recv_role = opts.init_recv_role;
   send_opt.alt_channel = opts.alt_channel;
 
   // TODO: support channel role for alt channel
@@ -325,12 +358,12 @@ int handle_recv_oneshot(const CmdOptions &opts) {
   Race race(opts.plugin_path, params);
 
   ReceiveOptions recv_opt;
-  recv_opt.recv_channel = opts.recv_channel;
-  recv_opt.recv_role = opts.recv_role;
+  recv_opt.recv_channel = opts.init_recv_channel;
+  recv_opt.recv_role = opts.init_recv_role;
 
-  recv_opt.recv_address = opts.recv_address;
-  recv_opt.send_channel = opts.send_channel;
-  recv_opt.send_role = opts.send_role;
+  recv_opt.recv_address = opts.init_recv_address;
+  recv_opt.send_channel = opts.init_send_channel;
+  recv_opt.send_role = opts.init_send_role;
   recv_opt.alt_channel = opts.alt_channel;
   recv_opt.multi_channel = opts.multi_channel;
 
@@ -370,11 +403,11 @@ int handle_send_recv(const CmdOptions &opts) {
   Race race(opts.plugin_path, params);
 
   SendOptions send_opt;
-  send_opt.send_channel = opts.send_channel;
-  send_opt.send_role = opts.send_role;
-  send_opt.send_address = opts.send_address;
-  send_opt.recv_channel = opts.recv_channel;
-  send_opt.recv_role = opts.recv_role;
+  send_opt.send_channel = opts.init_send_channel;
+  send_opt.send_role = opts.init_send_role;
+  send_opt.send_address = opts.init_send_address;
+  send_opt.recv_channel = opts.init_recv_channel;
+  send_opt.recv_role = opts.init_recv_role;
   send_opt.alt_channel = opts.alt_channel;
 
   // TODO: support channel role for alt channel
@@ -399,12 +432,12 @@ int handle_recv_respond(const CmdOptions &opts) {
   Race race(opts.plugin_path, params);
 
   ReceiveOptions recv_opt;
-  recv_opt.recv_channel = opts.recv_channel;
-  recv_opt.recv_role = opts.recv_role;
+  recv_opt.recv_channel = opts.init_recv_channel;
+  recv_opt.recv_role = opts.init_recv_role;
 
-  recv_opt.recv_address = opts.recv_address;
-  recv_opt.send_channel = opts.send_channel;
-  recv_opt.send_role = opts.send_role;
+  recv_opt.recv_address = opts.init_recv_address;
+  recv_opt.send_channel = opts.init_send_channel;
+  recv_opt.send_role = opts.init_send_role;
   recv_opt.alt_channel = opts.alt_channel;
   recv_opt.multi_channel = opts.multi_channel;
 
@@ -452,18 +485,18 @@ int handle_client_connect(const CmdOptions &opts) {
 
   Race race(opts.plugin_path, params);
 
-  if (opts.send_address.empty()) {
+  if (opts.init_send_address.empty()) {
     printf("link address required\n");
     return -1;
   }
 
   SendOptions send_opt;
-  send_opt.send_channel = opts.send_channel;
-  send_opt.send_role = opts.send_role;
+  send_opt.send_channel = opts.init_send_channel;
+  send_opt.send_role = opts.init_send_role;
   send_opt.send_address =
-      opts.send_address; // generated in handle_server_connect
-  send_opt.recv_channel = opts.recv_channel;
-  send_opt.recv_role = opts.recv_role;
+      opts.init_send_address; // generated in handle_server_connect
+  send_opt.recv_channel = opts.init_recv_channel;
+  send_opt.recv_role = opts.init_recv_role;
   send_opt.alt_channel = opts.alt_channel;
 
   std::string introductionMsg = "hello";
@@ -512,10 +545,10 @@ int handle_server_connect(const CmdOptions &opts) {
   Race race(opts.plugin_path, params);
 
   ReceiveOptions recv_opt;
-  recv_opt.recv_channel = opts.recv_channel;
-  recv_opt.recv_role = opts.recv_role;
-  recv_opt.send_channel = opts.send_channel;
-  recv_opt.send_role = opts.send_role;
+  recv_opt.recv_channel = opts.init_recv_channel;
+  recv_opt.recv_role = opts.init_recv_role;
+  recv_opt.send_channel = opts.init_send_channel;
+  recv_opt.send_role = opts.init_send_role;
 
   auto [status, link_addr, listener] = race.listen(recv_opt);
   if (status != ApiStatus::OK) {
@@ -578,6 +611,146 @@ int handle_server_connect(const CmdOptions &opts) {
   return (status == ApiStatus::OK);
 }
 
+int handle_client_bootstrap_connect(const CmdOptions &opts) {
+  ChannelParamStore params = getParams(opts);
+
+  Race race(opts.plugin_path, params);
+
+  if (opts.init_send_address.empty()) {
+    printf("link address required\n");
+    return -1;
+  }
+
+  BootstrapConnectionOptions conn_opt;
+  conn_opt.init_send_channel = opts.init_send_channel;
+  conn_opt.init_send_role = opts.init_send_role;
+  conn_opt.init_send_address =
+      opts.init_send_address; // generated in handle_server_connect
+  conn_opt.init_recv_channel = opts.init_recv_channel;
+  conn_opt.init_recv_role = opts.init_recv_role;
+  conn_opt.final_send_channel = opts.final_send_channel;
+  conn_opt.final_send_role = opts.final_send_role;
+  conn_opt.final_recv_channel = opts.final_recv_channel;
+  conn_opt.final_recv_role = opts.final_recv_role;
+
+  std::string introductionMsg = "hello";
+  auto [status, connection] = race.bootstrap_dial_str(conn_opt, introductionMsg);
+  if (status != ApiStatus::OK) {
+    printf("dial failed with status: %i\n", status);
+    return -1;
+  }
+  printf("dial success\n");
+
+  printf("\ntype message to send followed by <ctrl+d>\n");
+  auto message = readStdin();
+  std::string msgStr(message.begin(), message.end());
+
+  int packages_remaining = opts.num_packages;
+  while (opts.num_packages == -1 || packages_remaining > 0) {
+    status = connection.write_str(msgStr);
+    if (status != ApiStatus::OK) {
+      printf("write failed with status: %i\n", status);
+      break;
+    } else {
+      printf("wrote message: %s\n", msgStr.c_str());
+    }
+
+    auto [status2, received_message] = connection.read_str();
+    if (status2 != ApiStatus::OK) {
+      printf("read_str failed with status: %i\n", status2);
+      status = status2;
+      break;
+    } else {
+      printf("received message: %s\n", received_message.c_str());
+    }
+    packages_remaining--;
+  }
+  auto status2 = connection.close();
+  if (status2 != ApiStatus::OK) {
+    printf("close failed with status: %i\n", status2);
+    status = status2;
+  }
+
+  return (status == ApiStatus::OK);
+}
+
+int handle_server_bootstrap_connect(const CmdOptions &opts) {
+  ChannelParamStore params = getParams(opts);
+
+  Race race(opts.plugin_path, params);
+
+  BootstrapConnectionOptions conn_opt;
+  conn_opt.init_recv_channel = opts.init_recv_channel;
+  conn_opt.init_recv_role = opts.init_recv_role;
+  conn_opt.init_send_channel = opts.init_send_channel;
+  conn_opt.init_send_role = opts.init_send_role;
+  conn_opt.final_recv_channel = opts.final_recv_channel;
+  conn_opt.final_recv_role = opts.final_recv_role;
+  conn_opt.final_send_channel = opts.final_send_channel;
+  conn_opt.final_send_role = opts.final_send_role;
+
+  auto [status, link_addr, listener] = race.bootstrap_listen(conn_opt);
+  if (status != ApiStatus::OK) {
+    printf("listen failed with status: %i\n", status);
+    return -1;
+  }
+
+  // assume the link address is passed in out of band
+  // start client with this link address
+  printf("\nlistening on link address: '%s'\nbe sure to escape quotes for "
+         "client\n\n",
+         link_addr.c_str());
+
+  auto [status2, connection] = listener.accept();
+  if (status2 != ApiStatus::OK) {
+    printf("accept failed with status: %i\n", status2);
+    return -2;
+  }
+  printf("accept success\n");
+
+  printf("\ntype message to send followed by <ctrl+d>\n");
+  auto message = readStdin();
+  std::string msgStr(message.begin(), message.end());
+
+  auto [status5, received_message2] = connection.read_str();
+  if (status5 != ApiStatus::OK) {
+    printf("read failed with status: %i\n", status5);
+    status = status5;
+  } else {
+    printf("received message: %s\n", received_message2.c_str());
+  }
+
+  int packages_remaining = opts.num_packages;
+  while (opts.num_packages == -1 || packages_remaining > 0) {
+    auto status3 = connection.write_str(msgStr);
+    if (status3 != ApiStatus::OK) {
+      printf("write failed with status: %i\n", status3);
+      status = status3;
+      break;
+    } else {
+      printf("wrote message: %s\n", msgStr.c_str());
+    }
+
+    auto [status4, received_message] = connection.read_str();
+    if (status4 != ApiStatus::OK) {
+      printf("read failed with status: %i\n", status4);
+      status = status4;
+      break;
+    } else {
+      printf("received message: %s\n", received_message.c_str());
+    }
+    packages_remaining--;
+  }
+
+  auto status6 = connection.close();
+  if (status6 != ApiStatus::OK) {
+    printf("close failed with status: %i\n", status6);
+    status = status6;
+  }
+
+  return (status == ApiStatus::OK);
+}
+
 int main(int argc, char **argv) {
   auto opts = parseOpts(argc, argv);
   if (!opts.has_value()) {
@@ -606,6 +779,12 @@ int main(int argc, char **argv) {
     break;
   case Mode::SERVER_CONNECT:
     result = handle_server_connect(*opts);
+    break;
+  case Mode::SERVER_BOOTSTRAP_CONNECT:
+    result = handle_server_bootstrap_connect(*opts);
+    break;
+  case Mode::CLIENT_BOOTSTRAP_CONNECT:
+    result = handle_client_bootstrap_connect(*opts);
     break;
   default:
     printf("%s: A mode must be selected [send, send-recv, client-connect, "

@@ -906,6 +906,8 @@ RaceHandle ApiManagerInternal::startPreConnObjStateMachine(
     const ChannelId &sendChannel, const std::string &sendRole,
     const std::string &sendLinkAddress, const std::string &packageId,
     std::vector<std::vector<uint8_t>> recvMessages) {
+        helper::logInfo(
+                         " START PRECONN OBJECT being called");
   // create a connection context and copy information from the send/recv context
   auto context = newPreConnObjContext();
   context->updatePreConnObjStateMachineStart(
@@ -930,21 +932,24 @@ RaceHandle ApiManagerInternal::startPreConnObjStateMachine(
 
 RaceHandle ApiManagerInternal::startBootstrapPreConnObjStateMachine(
                                                 RaceHandle contextHandle,
+                                                const ApiBootstrapListenContext &listenContext,
                                                 const std::string &packageId,
                                                 std::vector<std::vector<uint8_t>> recvMessages) {
+        helper::logInfo(
+                         " START BOOTSTRAP PRECONN OBJECT being called");
   // create a connection context and copy information from the send/recv context
   auto context = newBootstrapPreConnObjContext();
-  auto listenContextIt = activeContexts.find(contextHandle);
-  if (listenContextIt == activeContexts.end()) {
-    return NULL_RACE_HANDLE;
-  }
+  // auto listenContextIt = activeContexts.find(contextHandle);
+  // if (listenContextIt == activeContexts.end()) {
+  //   return NULL_RACE_HANDLE;
+  // }
 
   // This may need to be a reinterpret_cast - don't want to lose the extended link info
-  ApiBootstrapListenContext listenContext = static_cast<ApiBootstrapListenContext>(*listenContextIt->second);
+  // ApiBootstrapListenContext listenContext = static_cast<ApiBootstrapListenContext>(*listenContextIt->second);
   context->updateBootstrapPreConnObjStateMachineStart(contextHandle,
                                                       listenContext,
                                                       packageId, recvMessages);
-  EventResult result = preConnObjEngine.start(*context);
+  EventResult result = bootstrapPreConnObjEngine.start(*context);
   if (result != EventResult::SUCCESS) {
     return NULL_RACE_HANDLE;
   }

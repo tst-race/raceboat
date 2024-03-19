@@ -221,6 +221,7 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
     //     ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
     //   }
     // }
+    ctx.pendingEvents.push(EVENT_ALWAYS);
     return EventResult::SUCCESS;
   }
 };
@@ -248,6 +249,28 @@ struct StateBootstrapListenWaitingForConnections : public BootstrapListenState {
     }
 
     // No early returns indicate all expected connections are satisfied
+    nlohmann::json json = {};
+
+    if (!ctx.initSendLinkAddress.empty()) {
+      // Json name is relative to the recipient, so this is a "recv" link for them
+        json["initRecvLinkAddress"] = ctx.initSendLinkAddress;
+        json["initRecvChannel"] = ctx.opts.init_send_channel;
+    }
+    if (!ctx.initRecvLinkAddress.empty()) {
+      // Json name is relative to the recipient, so this is a "send" link for them
+        json["initSendLinkAddress"] = ctx.initRecvLinkAddress;
+        json["initSendChannel"] = ctx.opts.init_recv_channel;
+    }
+
+    LinkAddress multiAddress = json.dump();
+    RaceHandle receiverHandle = ctx.manager.getCore().generateHandle();
+    ctx.listenCb(ApiStatus::OK, multiAddress, receiverHandle);
+    ctx.listenCb = {};
+
+    ctx.manager.registerHandle(ctx, receiverHandle);
+    std::string packageId(packageIdLen, '\0');
+    ctx.manager.registerPackageId(ctx, ctx.initRecvConnId, packageId);
+
     ctx.pendingEvents.push(EVENT_SATISFIED);
     return EventResult::SUCCESS;
   }
@@ -278,14 +301,17 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
         if (json.contains("initSendLinkAddress")) {
           ctx.initSendLinkAddress = json["initSendLinkAddress"];
           initSendChannel = json["initSendChannel"];
+          helper::logInfo("Setting initSendLinkAddress from hello message: " + ctx.initSendLinkAddress);
         }
         if (json.contains("finalSendLinkAddress")) {
           ctx.finalSendLinkAddress = json["finalSendLinkAddress"];
-              finalSendChannel = json["finalSendChannel"];
+          finalSendChannel = json["finalSendChannel"];
+          helper::logInfo("Setting finalSendLinkAddress from hello message: " + ctx.finalSendLinkAddress);
         }
         if (json.contains("finalRecvLinkAddress")) {
           ctx.finalRecvLinkAddress = json["finalRecvLinkAddress"];
-              finalRecvChannel = json["finalRecvChannel"];
+          finalRecvChannel = json["finalRecvChannel"];
+          helper::logInfo("Setting finalRecvLinkAddress from hello message: " + ctx.finalRecvLinkAddress);
         }
 
         // TODO: validate the channel statements align with the args of the listen run unless we intend to do it dynamically based on client request
@@ -309,8 +335,11 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
         //     ctx.handle, ctx.recvConnSMHandle, ctx.recvConnId,
         //     ctx.opts.recv_channel, ctx.opts.send_channel, ctx.opts.send_role,
         //     linkAddress, replyPackageId, {std::move(dialMessage)});
+        helper::logInfo(logPrefix +
+                         " startBootstrapPreConnObjStateMachine being called");
         RaceHandle preBootstrapConnSMHandle = ctx.manager.startBootstrapPreConnObjStateMachine(
             ctx.handle,
+            ctx,
             replyPackageId, {std::move(dialMessage)});
 
 
@@ -410,7 +439,7 @@ BootstrapListenStateEngine::BootstrapListenStateEngine() {
   addFailedState<StateBootstrapListenFailed>(STATE_BOOTSTRAP_LISTEN_FAILED);
 
   // clang-format off
-    declareStateTransition(STATE_BOOTSTRAP_LISTEN_INITIAL,                       EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_BOOTSTRAP_LISTEN_WAITING_FOR_CONNECTIONS);
+    declareStateTransition(STATE_BOOTSTRAP_LISTEN_INITIAL,                       EVENT_ALWAYS, STATE_BOOTSTRAP_LISTEN_WAITING_FOR_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_LISTEN_WAITING_FOR_CONNECTIONS,       EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_BOOTSTRAP_LISTEN_WAITING_FOR_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_LISTEN_WAITING_FOR_CONNECTIONS,       EVENT_SATISFIED,                    STATE_BOOTSTRAP_LISTEN_WAITING_FOR_HELLOS);
     declareStateTransition(STATE_BOOTSTRAP_LISTEN_WAITING_FOR_HELLOS,            EVENT_RECEIVE_PACKAGE,              STATE_BOOTSTRAP_LISTEN_WAITING_FOR_HELLOS);
