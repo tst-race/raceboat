@@ -62,7 +62,7 @@ public:
   ConnectionID finalRecvConnId;
   std::string finalRecvLinkAddress;
 
-  std::queue<RaceHandle> preBootstrapConnObjSM;
+  std::queue<RaceHandle> preBootstrapConduitSM;
 };
 
 class BootstrapListenStateEngine : public StateEngine {

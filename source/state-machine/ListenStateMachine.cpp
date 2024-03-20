@@ -185,7 +185,7 @@ struct StateListenWaiting : public ListenState {
 
         std::vector<uint8_t> dialMessage = base64::decode(messageB64);
 
-        RaceHandle preConnSMHandle = ctx.manager.startPreConnObjStateMachine(
+        RaceHandle preConnSMHandle = ctx.manager.startPreConduitStateMachine(
             ctx.handle, ctx.recvConnSMHandle, ctx.recvConnId,
             ctx.opts.recv_channel, ctx.opts.send_channel, ctx.opts.send_role,
             linkAddress, replyPackageId, {std::move(dialMessage)});
@@ -196,7 +196,7 @@ struct StateListenWaiting : public ListenState {
           return EventResult::NOT_SUPPORTED;
         }
 
-        ctx.preConnObjSM.push(preConnSMHandle);
+        ctx.preConduitSM.push(preConnSMHandle);
 
         break;
       } catch (std::exception &e) {
@@ -205,11 +205,11 @@ struct StateListenWaiting : public ListenState {
       }
     }
 
-    while (!ctx.acceptCb.empty() && !ctx.preConnObjSM.empty()) {
+    while (!ctx.acceptCb.empty() && !ctx.preConduitSM.empty()) {
       auto cb = std::move(ctx.acceptCb.front());
       ctx.acceptCb.pop_front();
-      RaceHandle preConnSMHandle = std::move(ctx.preConnObjSM.front());
-      ctx.preConnObjSM.pop();
+      RaceHandle preConnSMHandle = std::move(ctx.preConduitSM.front());
+      ctx.preConduitSM.pop();
       if (!ctx.manager.onListenAccept(preConnSMHandle, cb)) {
         cb(ApiStatus::INTERNAL_ERROR, {});
       };

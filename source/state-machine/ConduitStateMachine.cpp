@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-#include "ConnectionObjectStateMachine.h"
+#include "ConduitStateMachine.h"
 
 #include "Core.h"
 #include "Events.h"
@@ -29,7 +29,7 @@ namespace Raceboat {
 // Context
 //-----------------------------------------------------------------------------------------------
 
-void ConnectionObjectContext::updateConnObjectStateMachineStart(
+void ConduitContext::updateConduitectStateMachineStart(
     RaceHandle /* contextHandle */, RaceHandle recvHandle,
     const ConnectionID &_recvConnId, RaceHandle sendHandle,
     const ConnectionID &_sendConnId, const ChannelId &_sendChannel,
@@ -49,12 +49,12 @@ void ConnectionObjectContext::updateConnObjectStateMachineStart(
   }
 }
 
-void ConnectionObjectContext::updateReceiveEncPkg(
+void ConduitContext::updateReceiveEncPkg(
     ConnectionID /* connId */, std::shared_ptr<std::vector<uint8_t>> data) {
   this->recvQueue.push(*data);
 }
 
-void ConnectionObjectContext::updatePackageStatusChanged(RaceHandle pkgHandle,
+void ConduitContext::updatePackageStatusChanged(RaceHandle pkgHandle,
                                                          PackageStatus status) {
   if (status == PACKAGE_SENT) {
     sentList.push_back(pkgHandle);
@@ -63,7 +63,7 @@ void ConnectionObjectContext::updatePackageStatusChanged(RaceHandle pkgHandle,
   }
 }
 
-void ConnectionObjectContext::updateRead(
+void ConduitContext::updateRead(
     RaceHandle /* handle */,
     std::function<void(ApiStatus, std::vector<uint8_t>)> cb) {
   if (this->readCallback) {
@@ -73,13 +73,13 @@ void ConnectionObjectContext::updateRead(
   this->readCallback = cb;
 }
 
-void ConnectionObjectContext::updateWrite(RaceHandle /* handle */,
+void ConduitContext::updateWrite(RaceHandle /* handle */,
                                           std::vector<uint8_t> bytes,
                                           std::function<void(ApiStatus)> cb) {
   this->sendQueue.push_back({cb, std::move(bytes)});
 }
 
-void ConnectionObjectContext::updateClose(RaceHandle /* handle */,
+void ConduitContext::updateClose(RaceHandle /* handle */,
                                           std::function<void(ApiStatus)> cb) {
   this->closeCallback = cb;
 }
@@ -88,10 +88,10 @@ void ConnectionObjectContext::updateClose(RaceHandle /* handle */,
 // States
 //-----------------------------------------------------------------------------------------------
 
-struct StateConnectionObjectInitial : public ConnectionObjectState {
-  explicit StateConnectionObjectInitial(
+struct StateConduitInitial : public ConduitState {
+  explicit StateConduitInitial(
       StateType id = STATE_CONNECTION_OBJECT_INITIAL)
-      : ConnectionObjectState(id, "STATE_CONNECTION_OBJECT_INITIAL") {}
+      : ConduitState(id, "STATE_CONNECTION_OBJECT_INITIAL") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -118,10 +118,10 @@ struct StateConnectionObjectInitial : public ConnectionObjectState {
   }
 };
 
-struct StateConnectionObjectConnected : public ConnectionObjectState {
-  explicit StateConnectionObjectConnected(
+struct StateConduitConnected : public ConduitState {
+  explicit StateConduitConnected(
       StateType id = STATE_CONNECTION_OBJECT_CONNECTED)
-      : ConnectionObjectState(id, "STATE_CONNECTION_OBJECT_CONNECTED") {}
+      : ConduitState(id, "STATE_CONNECTION_OBJECT_CONNECTED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -183,10 +183,10 @@ struct StateConnectionObjectConnected : public ConnectionObjectState {
   }
 };
 
-struct StateConnectionObjectFinished : public ConnectionObjectState {
-  explicit StateConnectionObjectFinished(
+struct StateConduitFinished : public ConduitState {
+  explicit StateConduitFinished(
       StateType id = STATE_CONNECTION_OBJECT_FINISHED)
-      : ConnectionObjectState(id, "STATE_CONNECTION_OBJECT_FINISHED") {}
+      : ConduitState(id, "STATE_CONNECTION_OBJECT_FINISHED") {}
   virtual bool finalState() { return true; }
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
@@ -215,10 +215,10 @@ struct StateConnectionObjectFinished : public ConnectionObjectState {
   }
 };
 
-struct StateConnectionObjectFailed : public ConnectionObjectState {
-  explicit StateConnectionObjectFailed(
+struct StateConduitFailed : public ConduitState {
+  explicit StateConduitFailed(
       StateType id = STATE_CONNECTION_OBJECT_FAILED)
-      : ConnectionObjectState(id, "STATE_CONNECTION_OBJECT_FAILED") {}
+      : ConduitState(id, "STATE_CONNECTION_OBJECT_FAILED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -257,16 +257,16 @@ struct StateConnectionObjectFailed : public ConnectionObjectState {
 // StateEngine
 //-----------------------------------------------------------------------------------------------
 
-ConnectionObjectStateEngine::ConnectionObjectStateEngine() {
+ConduitStateEngine::ConduitStateEngine() {
   // calls sendPackage on plugin with any package in queue, re-enters state if
   // read, write, or receiveEncPkg is called, transitions on close call
-  addInitialState<StateConnectionObjectInitial>(
+  addInitialState<StateConduitInitial>(
       STATE_CONNECTION_OBJECT_INITIAL);
-  addState<StateConnectionObjectConnected>(STATE_CONNECTION_OBJECT_CONNECTED);
+  addState<StateConduitConnected>(STATE_CONNECTION_OBJECT_CONNECTED);
   // calls state machine finished on manager, final state
-  addState<StateConnectionObjectFinished>(STATE_CONNECTION_OBJECT_FINISHED);
+  addState<StateConduitFinished>(STATE_CONNECTION_OBJECT_FINISHED);
   // call state machine failed
-  addFailedState<StateConnectionObjectFailed>(STATE_CONNECTION_OBJECT_FAILED);
+  addFailedState<StateConduitFailed>(STATE_CONNECTION_OBJECT_FAILED);
 
   // clang-format off
     declareStateTransition(STATE_CONNECTION_OBJECT_INITIAL,   EVENT_ALWAYS, STATE_CONNECTION_OBJECT_CONNECTED);
@@ -282,7 +282,7 @@ ConnectionObjectStateEngine::ConnectionObjectStateEngine() {
   // clang-format on
 }
 
-std::string ConnectionObjectStateEngine::eventToString(EventType event) {
+std::string ConduitStateEngine::eventToString(EventType event) {
   return Raceboat::eventToString(event);
 }
 

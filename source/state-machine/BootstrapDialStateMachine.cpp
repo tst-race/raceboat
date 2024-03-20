@@ -419,7 +419,7 @@ struct StateBootstrapDialFinished : public BootstrapDialState {
     auto &ctx = getContext(context);
     RaceHandle connObjectApiHandle = ctx.manager.getCore().generateHandle();
 
-    RaceHandle connObjectHandle = ctx.manager.startConnObjectStateMachine(
+    RaceHandle connObjectHandle = ctx.manager.startConduitectStateMachine(
         ctx.handle, ctx.finalRecvConnSMHandle, ctx.finalRecvConnId, ctx.finalSendConnSMHandle,
         ctx.finalSendConnId, ctx.opts.final_send_channel, ctx.opts.final_recv_channel,
         ctx.packageId, {}, connObjectApiHandle);

@@ -196,7 +196,7 @@ struct StateDialFinished : public DialState {
     auto &ctx = getContext(context);
     RaceHandle connObjectApiHandle = ctx.manager.getCore().generateHandle();
 
-    RaceHandle connObjectHandle = ctx.manager.startConnObjectStateMachine(
+    RaceHandle connObjectHandle = ctx.manager.startConduitectStateMachine(
         ctx.handle, ctx.recvConnSMHandle, ctx.recvConnId, ctx.sendConnSMHandle,
         ctx.sendConnId, ctx.opts.send_channel, ctx.opts.recv_channel,
         ctx.packageId, {}, connObjectApiHandle);

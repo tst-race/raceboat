@@ -23,12 +23,12 @@
 
 namespace Raceboat {
 
-class ConnectionObjectContext : public ApiContext {
+class ConduitContext : public ApiContext {
 public:
-  ConnectionObjectContext(ApiManagerInternal &manager, StateEngine &engine)
+  ConduitContext(ApiManagerInternal &manager, StateEngine &engine)
       : ApiContext(manager, engine) {}
 
-  virtual void updateConnObjectStateMachineStart(
+  virtual void updateConduitectStateMachineStart(
       RaceHandle contextHandle, RaceHandle recvHandle,
       const ConnectionID &recvConnId, RaceHandle sendHandle,
       const ConnectionID &sendConnId, const ChannelId &sendChannel,
@@ -86,12 +86,12 @@ public:
   RaceHandle apiHandle;
 };
 
-class ConnectionObjectStateEngine : public StateEngine {
+class ConduitStateEngine : public StateEngine {
 public:
-  ConnectionObjectStateEngine();
+  ConduitStateEngine();
   virtual std::string eventToString(EventType event);
 };
 
-using ConnectionObjectState = BaseApiState<ConnectionObjectContext>;
+using ConduitState = BaseApiState<ConduitContext>;
 
 } // namespace Raceboat

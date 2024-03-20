@@ -22,12 +22,12 @@
 
 namespace Raceboat {
 
-class BootstrapPreConnObjContext : public ApiContext {
+class BootstrapPreConduitContext : public ApiContext {
 public:
-  BootstrapPreConnObjContext(ApiManagerInternal &manager, StateEngine &engine)
+  BootstrapPreConduitContext(ApiManagerInternal &manager, StateEngine &engine)
       : ApiContext(manager, engine) {}
 
-  virtual void updateBootstrapPreConnObjStateMachineStart(
+  virtual void updateBootstrapPreConduitStateMachineStart(
       RaceHandle contextHandle,
       const ApiBootstrapListenContext &parentContext,
       // RaceHandle recvHandle,
@@ -74,12 +74,12 @@ public:
   RaceHandle apiHandle;
 };
 
-class BootstrapPreConnObjStateEngine : public StateEngine {
+class BootstrapPreConduitStateEngine : public StateEngine {
 public:
-  BootstrapPreConnObjStateEngine();
+  BootstrapPreConduitStateEngine();
   virtual std::string eventToString(EventType event);
 };
 
-using BootstrapPreConnObjState = BaseApiState<BootstrapPreConnObjContext>;
+using BootstrapPreConduitState = BaseApiState<BootstrapPreConduitContext>;
 
 } // namespace Raceboat

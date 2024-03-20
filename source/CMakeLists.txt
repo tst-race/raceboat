@@ -60,15 +60,15 @@ add_library(raceboat SHARED
     plugin-loading/PythonComponentPlugin.cpp
     plugin-loading/PythonLoaderWrapper.cpp
     state-machine/ApiContext.cpp
-    state-machine/ConnectionObjectStateMachine.cpp
+    state-machine/ConduitStateMachine.cpp
     state-machine/ConnectionStateMachine.cpp
     state-machine/DialStateMachine.cpp
     state-machine/BootstrapDialStateMachine.cpp
     state-machine/Events.cpp
     state-machine/ListenStateMachine.cpp
     state-machine/BootstrapListenStateMachine.cpp
-    state-machine/PreConnObjStateMachine.cpp
-    state-machine/BootstrapPreConnObjStateMachine.cpp
+    state-machine/PreConduitStateMachine.cpp
+    state-machine/BootstrapPreConduitStateMachine.cpp
     state-machine/ReceiveStateMachine.cpp
     state-machine/SendStateMachine.cpp
     state-machine/SendReceiveStateMachine.cpp

@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-#include "BootstrapPreConnObjStateMachine.h"
+#include "BootstrapPreConduitStateMachine.h"
 
 #include "../../include/race/Race.h"
 #include "Core.h"
@@ -33,7 +33,7 @@ namespace Raceboat {
 // Context
 //-----------------------------------------------------------------------------------------------
 
-void BootstrapPreConnObjContext::updateBootstrapPreConnObjStateMachineStart(
+void BootstrapPreConduitContext::updateBootstrapPreConduitStateMachineStart(
     RaceHandle contextHandle,
     const ApiBootstrapListenContext &parentContext,
     const std::string &_packageId,
@@ -44,7 +44,7 @@ void BootstrapPreConnObjContext::updateBootstrapPreConnObjStateMachineStart(
   this->initSendConnSMHandle = parentContext.initSendConnSMHandle;
   this->initSendConnId = parentContext.initSendConnId;
   this->initSendLinkAddress = parentContext.initSendLinkAddress;
-  helper::logInfo("updateBootstrapPreConnObjStateMachineStart initSendLinkAddress: " + parentContext.initSendLinkAddress);
+  helper::logInfo("updateBootstrapPreConduitStateMachineStart initSendLinkAddress: " + parentContext.initSendLinkAddress);
    
   this->initRecvConnSMHandle = parentContext.initRecvConnSMHandle;
   this->initRecvConnId = parentContext.initRecvConnId;
@@ -53,7 +53,7 @@ void BootstrapPreConnObjContext::updateBootstrapPreConnObjStateMachineStart(
   this->finalSendConnSMHandle = parentContext.finalSendConnSMHandle;
   this->finalSendConnId = parentContext.finalSendConnId;
   this->finalSendLinkAddress = parentContext.finalSendLinkAddress;
-  helper::logInfo("updateBootstrapPreConnObjStateMachineStart finalSendLinkAddress: " + parentContext.finalSendLinkAddress);
+  helper::logInfo("updateBootstrapPreConduitStateMachineStart finalSendLinkAddress: " + parentContext.finalSendLinkAddress);
   
   this->finalRecvConnSMHandle = parentContext.finalRecvConnSMHandle;
   this->finalRecvConnId = parentContext.finalRecvConnId;
@@ -63,13 +63,13 @@ void BootstrapPreConnObjContext::updateBootstrapPreConnObjStateMachineStart(
   this->recvQueue = recvMessages;
 }
 
-void BootstrapPreConnObjContext::updateReceiveEncPkg(
+void BootstrapPreConduitContext::updateReceiveEncPkg(
     ConnectionID /* connId */, std::shared_ptr<std::vector<uint8_t>> data) {
   this->recvQueue.push_back(*data);
 }
 
   // TODO Code Reuse
-void BootstrapPreConnObjContext::updateConnStateMachineConnected(
+void BootstrapPreConduitContext::updateConnStateMachineConnected(
     RaceHandle contextHandle, ConnectionID connId,
     std::string linkAddress) {
   if (this->initRecvConnSMHandle == contextHandle) {
@@ -87,13 +87,13 @@ void BootstrapPreConnObjContext::updateConnStateMachineConnected(
   }
 }
      
-// void BootstrapPreConnObjContext::updateConnStateMachineConnected(
+// void BootstrapPreConduitContext::updateConnStateMachineConnected(
 //     RaceHandle /* contextHandle */, ConnectionID connId,
 //     std::string /* linkAddress */) {
 //   this->finalSendConnId = connId;
 // }
 
-void BootstrapPreConnObjContext::updateListenAccept(
+void BootstrapPreConduitContext::updateListenAccept(
     std::function<void(ApiStatus, RaceHandle)> cb) {
   this->acceptCb = cb;
 }
@@ -102,9 +102,9 @@ void BootstrapPreConnObjContext::updateListenAccept(
 // States
 //-----------------------------------------------------------------------------------------------
 
-struct StateBootstrapPreConnObjInitial : public BootstrapPreConnObjState {
-  explicit StateBootstrapPreConnObjInitial(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL)
-      : BootstrapPreConnObjState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL") {}
+struct StateBootstrapPreConduitInitial : public BootstrapPreConduitState {
+  explicit StateBootstrapPreConduitInitial(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL)
+      : BootstrapPreConduitState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -116,9 +116,9 @@ struct StateBootstrapPreConnObjInitial : public BootstrapPreConnObjState {
   }
 };
 
-struct StateBootstrapPreConnObjAccepted : public BootstrapPreConnObjState {
-  explicit StateBootstrapPreConnObjAccepted(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED)
-      : BootstrapPreConnObjState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED") {}
+struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
+  explicit StateBootstrapPreConduitAccepted(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED)
+      : BootstrapPreConduitState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -246,9 +246,9 @@ struct StateBootstrapPreConnObjAccepted : public BootstrapPreConnObjState {
   }
 };
 
-struct StateBootstrapPreConnObjWaitingForConnections : public BootstrapPreConnObjState {
-  explicit StateBootstrapPreConnObjWaitingForConnections(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS)
-      : BootstrapPreConnObjState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS") {}
+struct StateBootstrapPreConduitWaitingForConnections : public BootstrapPreConduitState {
+  explicit StateBootstrapPreConduitWaitingForConnections(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS)
+      : BootstrapPreConduitState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -279,9 +279,9 @@ struct StateBootstrapPreConnObjWaitingForConnections : public BootstrapPreConnOb
   }
 };
 
-struct StateBootstrapPreConnObjSendResponse : public BootstrapPreConnObjState {
-  explicit StateBootstrapPreConnObjSendResponse(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE)
-      : BootstrapPreConnObjState(id, "StateBootstrapPreConnObjSendResponse") {}
+struct StateBootstrapPreConduitSendResponse : public BootstrapPreConduitState {
+  explicit StateBootstrapPreConduitSendResponse(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE)
+      : BootstrapPreConduitState(id, "StateBootstrapPreConduitSendResponse") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -334,15 +334,15 @@ struct StateBootstrapPreConnObjSendResponse : public BootstrapPreConnObjState {
   }
 };
 
-struct StateBootstrapPreConnObjFinished : public BootstrapPreConnObjState {
-  explicit StateBootstrapPreConnObjFinished(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED)
-      : BootstrapPreConnObjState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED") {}
+struct StateBootstrapPreConduitFinished : public BootstrapPreConduitState {
+  explicit StateBootstrapPreConduitFinished(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED)
+      : BootstrapPreConduitState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
     RaceHandle connObjectApiHandle = ctx.manager.getCore().generateHandle();
-    RaceHandle connObjectHandle = ctx.manager.startConnObjectStateMachine(
+    RaceHandle connObjectHandle = ctx.manager.startConduitectStateMachine(
         ctx.handle, ctx.finalRecvConnSMHandle, ctx.finalRecvConnId, ctx.finalSendConnSMHandle,
         ctx.finalSendConnId, ctx.opts.final_send_channel, ctx.opts.final_recv_channel, ctx.packageId,
         {std::move(ctx.recvQueue)}, connObjectApiHandle);
@@ -379,9 +379,9 @@ struct StateBootstrapPreConnObjFinished : public BootstrapPreConnObjState {
   virtual bool finalState() { return true; }
 };
 
-struct StateBootstrapPreConnObjFailed : public BootstrapPreConnObjState {
-  explicit StateBootstrapPreConnObjFailed(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_FAILED)
-      : BootstrapPreConnObjState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_FAILED") {}
+struct StateBootstrapPreConduitFailed : public BootstrapPreConduitState {
+  explicit StateBootstrapPreConduitFailed(StateType id = STATE_BOOTSTRAP_PRE_CONN_OBJ_FAILED)
+      : BootstrapPreConduitState(id, "STATE_BOOTSTRAP_PRE_CONN_OBJ_FAILED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -400,13 +400,13 @@ struct StateBootstrapPreConnObjFailed : public BootstrapPreConnObjState {
 // StateEngine
 //-----------------------------------------------------------------------------------------------
 
-BootstrapPreConnObjStateEngine::BootstrapPreConnObjStateEngine() {
-  addInitialState<StateBootstrapPreConnObjInitial>(STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL);
-  addState<StateBootstrapPreConnObjAccepted>(STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED);
-  addState<StateBootstrapPreConnObjWaitingForConnections>(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS);
-  addState<StateBootstrapPreConnObjSendResponse>(STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE);
-  addState<StateBootstrapPreConnObjFinished>(STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED);
-  addFailedState<StateBootstrapPreConnObjFailed>(STATE_BOOTSTRAP_PRE_CONN_OBJ_FAILED);
+BootstrapPreConduitStateEngine::BootstrapPreConduitStateEngine() {
+  addInitialState<StateBootstrapPreConduitInitial>(STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL);
+  addState<StateBootstrapPreConduitAccepted>(STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED);
+  addState<StateBootstrapPreConduitWaitingForConnections>(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS);
+  addState<StateBootstrapPreConduitSendResponse>(STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE);
+  addState<StateBootstrapPreConduitFinished>(STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED);
+  addFailedState<StateBootstrapPreConduitFailed>(STATE_BOOTSTRAP_PRE_CONN_OBJ_FAILED);
 
   // clang-format off
     // initial -> opening -> open
@@ -420,7 +420,7 @@ BootstrapPreConnObjStateEngine::BootstrapPreConnObjStateEngine() {
   // clang-format on
 }
 
-std::string BootstrapPreConnObjStateEngine::eventToString(EventType event) {
+std::string BootstrapPreConduitStateEngine::eventToString(EventType event) {
   return Raceboat::eventToString(event);
 }
 

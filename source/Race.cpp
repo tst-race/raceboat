@@ -69,14 +69,14 @@ std::string bootstrapConnectionOptionsToString(const BootstrapConnectionOptions 
   return ss.str();
 }
 
-ConnectionObject::ConnectionObject(std::shared_ptr<Core> core, OpHandle handle)
+Conduit::Conduit(std::shared_ptr<Core> core, OpHandle handle)
     : core(core), handle(handle) {}
-ConnectionObject::ConnectionObject(const ConnectionObject &that) {
+Conduit::Conduit(const Conduit &that) {
   core = that.core;
   handle = that.handle;
 }
 
-std::pair<ApiStatus, std::vector<uint8_t>> ConnectionObject::read() {
+std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read() {
   std::promise<std::pair<ApiStatus, std::vector<uint8_t>>> promise;
   auto future = promise.get_future();
 
@@ -98,13 +98,13 @@ std::pair<ApiStatus, std::vector<uint8_t>> ConnectionObject::read() {
   return future.get();
 }
 
-std::pair<ApiStatus, std::string> ConnectionObject::read_str() {
+std::pair<ApiStatus, std::string> Conduit::read_str() {
   auto [status, bytes] = read();
   std::string str{bytes.begin(), bytes.end()};
   return {status, str};
 }
 
-ApiStatus ConnectionObject::write(std::vector<uint8_t> bytes) {
+ApiStatus Conduit::write(std::vector<uint8_t> bytes) {
   std::promise<ApiStatus> promise;
   auto future = promise.get_future();
 
@@ -125,12 +125,12 @@ ApiStatus ConnectionObject::write(std::vector<uint8_t> bytes) {
   return future.get();
 }
 
-ApiStatus ConnectionObject::write_str(const std::string &message) {
+ApiStatus Conduit::write_str(const std::string &message) {
   std::vector<uint8_t> bytes{message.begin(), message.end()};
   return write(bytes);
 }
 
-ApiStatus ConnectionObject::close() {
+ApiStatus Conduit::close() {
   std::promise<ApiStatus> promise;
   auto future = promise.get_future();
   if (core == nullptr) {
@@ -282,7 +282,7 @@ ApiStatus ReceiveRespondObject::close() {
 AcceptObject::AcceptObject(std::shared_ptr<Core> core, OpHandle handle)
     : core(core), handle(handle) {}
 
-std::pair<ApiStatus, ConnectionObject> AcceptObject::accept() {
+std::pair<ApiStatus, Conduit> AcceptObject::accept() {
   std::promise<std::pair<ApiStatus, RaceHandle>> promise;
   auto future = promise.get_future();
   if (core == nullptr) {
@@ -298,7 +298,7 @@ std::pair<ApiStatus, ConnectionObject> AcceptObject::accept() {
   }
 
   auto [status, connHandle] = future.get();
-  ConnectionObject connection(core, connHandle);
+  Conduit connection(core, connHandle);
   return {status, connection};
 }
 
@@ -420,7 +420,7 @@ std::pair<ApiStatus, std::string> Race::send_receive_str(SendOptions options,
   return {status, str};
 }
 
-std::pair<ApiStatus, ConnectionObject> Race::dial(SendOptions options,
+std::pair<ApiStatus, Conduit> Race::dial(SendOptions options,
                                                   std::vector<uint8_t> bytes) {
   TRACE_METHOD();
   std::promise<std::tuple<ApiStatus, RaceHandle>> promise;
@@ -432,11 +432,11 @@ std::pair<ApiStatus, ConnectionObject> Race::dial(SendOptions options,
                              });
 
   auto [status, handle] = future.get();
-  ConnectionObject receiver(core, handle);
+  Conduit receiver(core, handle);
   return {status, receiver};
 }
 
-std::pair<ApiStatus, ConnectionObject> Race::dial_str(SendOptions options,
+std::pair<ApiStatus, Conduit> Race::dial_str(SendOptions options,
                                                       std::string message) {
   TRACE_METHOD();
   std::vector<uint8_t> bytes{message.begin(), message.end()};
@@ -444,7 +444,7 @@ std::pair<ApiStatus, ConnectionObject> Race::dial_str(SendOptions options,
 }
 
 
-std::pair<ApiStatus, ConnectionObject> Race::bootstrap_dial(BootstrapConnectionOptions options,
+std::pair<ApiStatus, Conduit> Race::bootstrap_dial(BootstrapConnectionOptions options,
                                                   std::vector<uint8_t> bytes) {
   TRACE_METHOD();
   std::promise<std::tuple<ApiStatus, RaceHandle>> promise;
@@ -456,11 +456,11 @@ std::pair<ApiStatus, ConnectionObject> Race::bootstrap_dial(BootstrapConnectionO
                              });
 
   auto [status, handle] = future.get();
-  ConnectionObject receiver(core, handle);
+  Conduit receiver(core, handle);
   return {status, receiver};
 }
 
-std::pair<ApiStatus, ConnectionObject> Race::bootstrap_dial_str(BootstrapConnectionOptions options,
+std::pair<ApiStatus, Conduit> Race::bootstrap_dial_str(BootstrapConnectionOptions options,
                                                       std::string message) {
   TRACE_METHOD();
   std::vector<uint8_t> bytes{message.begin(), message.end()};

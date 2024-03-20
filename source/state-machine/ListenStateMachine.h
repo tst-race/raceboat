@@ -50,7 +50,7 @@ public:
   ConnectionID recvConnId;
   std::string recvLinkAddress;
 
-  std::queue<RaceHandle> preConnObjSM;
+  std::queue<RaceHandle> preConduitSM;
 };
 
 class ListenStateEngine : public StateEngine {

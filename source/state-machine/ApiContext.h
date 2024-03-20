@@ -114,7 +114,7 @@ public:
                                            std::string /* linkAddress */,
                                            bool /* creating */,
                                            bool /* sending */){};
-  virtual void updateConnObjectStateMachineStart(
+  virtual void updateConduitectStateMachineStart(
       RaceHandle /* contextHandle */, RaceHandle /* recvHandle */,
       const ConnectionID & /* recvConnId */, RaceHandle /* sendHandle */,
       const ConnectionID & /* sendConnId */,
@@ -123,7 +123,7 @@ public:
       std::vector<std::vector<uint8_t>> /* recvMessages */,
       RaceHandle /* apiHandle */){};
 
-  virtual void updatePreConnObjStateMachineStart(
+  virtual void updatePreConduitStateMachineStart(
       RaceHandle /* contextHandle */, RaceHandle /* recvHandle */,
       const ConnectionID & /* _recvConnId */,
       const ChannelId & /* _recvChannel */,
@@ -132,7 +132,7 @@ public:
       const std::string & /* _packageId */,
       std::vector<std::vector<uint8_t>> /* recvMessages */){};
 
-  virtual void updateBootstrapPreConnObjStateMachineStart(
+  virtual void updateBootstrapPreConduitStateMachineStart(
       RaceHandle /* contextHandle */,
       const ApiBootstrapListenContext &/* parentContext */,
       // RaceHandle /* recvHandle */,

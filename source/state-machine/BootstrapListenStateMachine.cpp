@@ -331,13 +331,13 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
 
         std::vector<uint8_t> dialMessage = base64::decode(messageB64);
 
-        // RaceHandle preBootstrapConnSMHandle = ctx.manager.startBootstrapPreConnObjStateMachine(
+        // RaceHandle preBootstrapConnSMHandle = ctx.manager.startBootstrapPreConduitStateMachine(
         //     ctx.handle, ctx.recvConnSMHandle, ctx.recvConnId,
         //     ctx.opts.recv_channel, ctx.opts.send_channel, ctx.opts.send_role,
         //     linkAddress, replyPackageId, {std::move(dialMessage)});
         helper::logInfo(logPrefix +
-                         " startBootstrapPreConnObjStateMachine being called");
-        RaceHandle preBootstrapConnSMHandle = ctx.manager.startBootstrapPreConnObjStateMachine(
+                         " startBootstrapPreConduitStateMachine being called");
+        RaceHandle preBootstrapConnSMHandle = ctx.manager.startBootstrapPreConduitStateMachine(
             ctx.handle,
             ctx,
             replyPackageId, {std::move(dialMessage)});
@@ -349,7 +349,7 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
           return EventResult::NOT_SUPPORTED;
         }
 
-        ctx.preBootstrapConnObjSM.push(preBootstrapConnSMHandle);
+        ctx.preBootstrapConduitSM.push(preBootstrapConnSMHandle);
 
         break;
       } catch (std::exception &e) {
@@ -358,11 +358,11 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
       }
     }
 
-    while (!ctx.acceptCb.empty() && !ctx.preBootstrapConnObjSM.empty()) {
+    while (!ctx.acceptCb.empty() && !ctx.preBootstrapConduitSM.empty()) {
       auto cb = std::move(ctx.acceptCb.front());
       ctx.acceptCb.pop_front();
-      RaceHandle preBootstrapConnSMHandle = std::move(ctx.preBootstrapConnObjSM.front());
-      ctx.preBootstrapConnObjSM.pop();
+      RaceHandle preBootstrapConnSMHandle = std::move(ctx.preBootstrapConduitSM.front());
+      ctx.preBootstrapConduitSM.pop();
       if (!ctx.manager.onBootstrapListenAccept(preBootstrapConnSMHandle, cb)) {
         cb(ApiStatus::INTERNAL_ERROR, {});
       };

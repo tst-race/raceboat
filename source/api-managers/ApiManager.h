@@ -28,14 +28,14 @@
 #include "../../include/race/Race.h"
 #include "../../include/race/unified/SdkResponse.h"
 #include "../state-machine/ApiContext.h"
-#include "../state-machine/ConnectionObjectStateMachine.h"
+#include "../state-machine/ConduitStateMachine.h"
 #include "../state-machine/ConnectionStateMachine.h"
 #include "../state-machine/DialStateMachine.h"
 #include "../state-machine/ListenStateMachine.h"
-#include "../state-machine/PreConnObjStateMachine.h"
+#include "../state-machine/PreConduitStateMachine.h"
 #include "../state-machine/BootstrapDialStateMachine.h"
 #include "../state-machine/BootstrapListenStateMachine.h"
-#include "../state-machine/BootstrapPreConnObjStateMachine.h"
+#include "../state-machine/BootstrapPreConduitStateMachine.h"
 #include "../state-machine/ReceiveStateMachine.h"
 #include "../state-machine/SendReceiveStateMachine.h"
 #include "../state-machine/SendStateMachine.h"
@@ -68,7 +68,7 @@ static const int packageIdLen = 16;
 class PluginContainer;
 
 class ApiManager;
-class BootstrapPreConnObjContext;
+class BootstrapPreConduitContext;
 enum class ActivateChannelStatusCode;
 
 class ApiManagerInternal {
@@ -165,19 +165,19 @@ public:
                                            std::string linkAddress,
                                            bool creating,
                                            bool sending);
-  virtual RaceHandle startConnObjectStateMachine(
+  virtual RaceHandle startConduitectStateMachine(
       RaceHandle contextHandle, RaceHandle recvHandle,
       const ConnectionID &recvConnId, RaceHandle sendHandle,
       const ConnectionID &sendConnId, const ChannelId &sendChannel,
       const ChannelId &recvChannel, const std::string &packageId,
       std::vector<std::vector<uint8_t>> recvMessages, RaceHandle apiHandle);
-  virtual RaceHandle startPreConnObjStateMachine(
+  virtual RaceHandle startPreConduitStateMachine(
       RaceHandle contextHandle, RaceHandle recvHandle,
       const ConnectionID &recvConnId, const ChannelId &recvChannel,
       const ChannelId &sendChannel, const std::string &sendRole,
       const std::string &sendLinkAddress, const std::string &packageId,
       std::vector<std::vector<uint8_t>> recvMessages);
-  virtual RaceHandle startBootstrapPreConnObjStateMachine(
+  virtual RaceHandle startBootstrapPreConduitStateMachine(
       RaceHandle contextHandle, 
       const ApiBootstrapListenContext &listenContext,
       // const ConnectionID &initSendConnId, const ChannelId &initSendChannel, const std::string &initSendRole,
@@ -215,11 +215,11 @@ protected:
   virtual ApiContext *newDialContext();
   virtual ApiContext *newListenContext();
   virtual ApiContext *newConnContext();
-  virtual ApiContext *newConnObjectContext();
-  virtual ApiContext *newPreConnObjContext();
+  virtual ApiContext *newConduitectContext();
+  virtual ApiContext *newPreConduitContext();
   virtual ApiContext *newBootstrapDialContext();
   virtual ApiContext *newBootstrapListenContext();
-  virtual ApiContext *newBootstrapPreConnObjContext();
+  virtual ApiContext *newBootstrapPreConduitContext();
 
   virtual Contexts getContexts(RaceHandle handle);
   virtual Contexts getContexts(const std::string &id);
@@ -236,8 +236,8 @@ public:
 
   // stateless state engines support multiple contexts simultaneously
   ConnStateEngine connEngine;
-  ConnectionObjectStateEngine connObjectEngine;
-  PreConnObjStateEngine preConnObjEngine;
+  ConduitStateEngine connObjectEngine;
+  PreConduitStateEngine preConduitEngine;
   SendStateEngine sendEngine;
   SendReceiveStateEngine sendReceiveEngine;
   DialStateEngine dialEngine;
@@ -245,7 +245,7 @@ public:
   RecvStateEngine recvEngine;
   BootstrapDialStateEngine bootstrapDialEngine;
   BootstrapListenStateEngine bootstrapListenEngine;
-  BootstrapPreConnObjStateEngine bootstrapPreConnObjEngine;
+  BootstrapPreConduitStateEngine bootstrapPreConduitEngine;
 
   // channel, link, and connection IDs are strings, and will never conflict
   // map IDs and system event handles to the appropriate context

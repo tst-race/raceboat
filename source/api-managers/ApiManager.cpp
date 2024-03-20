@@ -861,7 +861,7 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
   return context->handle;
 }
 
-RaceHandle ApiManagerInternal::startConnObjectStateMachine(
+RaceHandle ApiManagerInternal::startConduitectStateMachine(
     RaceHandle contextHandle, RaceHandle recvHandle,
     const ConnectionID &recvConnId, RaceHandle sendHandle,
     const ConnectionID &sendConnId, const ChannelId &sendChannel,
@@ -871,8 +871,8 @@ RaceHandle ApiManagerInternal::startConnObjectStateMachine(
                sendHandle, sendConnId);
 
   // create a connection context and copy information from the send/recv context
-  auto context = newConnObjectContext();
-  context->updateConnObjectStateMachineStart(
+  auto context = newConduitectContext();
+  context->updateConduitectStateMachineStart(
       contextHandle, recvHandle, recvConnId, sendHandle, sendConnId,
       sendChannel, recvChannel, packageId, std::move(recvMessages), apiHandle);
 
@@ -900,7 +900,7 @@ RaceHandle ApiManagerInternal::startConnObjectStateMachine(
   return context->handle;
 }
 
-RaceHandle ApiManagerInternal::startPreConnObjStateMachine(
+RaceHandle ApiManagerInternal::startPreConduitStateMachine(
     RaceHandle contextHandle, RaceHandle recvHandle,
     const ConnectionID &recvConnId, const ChannelId &recvChannel,
     const ChannelId &sendChannel, const std::string &sendRole,
@@ -909,12 +909,12 @@ RaceHandle ApiManagerInternal::startPreConnObjStateMachine(
         helper::logInfo(
                          " START PRECONN OBJECT being called");
   // create a connection context and copy information from the send/recv context
-  auto context = newPreConnObjContext();
-  context->updatePreConnObjStateMachineStart(
+  auto context = newPreConduitContext();
+  context->updatePreConduitStateMachineStart(
       contextHandle, recvHandle, recvConnId, recvChannel, sendChannel, sendRole,
       sendLinkAddress, packageId, recvMessages);
 
-  EventResult result = preConnObjEngine.start(*context);
+  EventResult result = preConduitEngine.start(*context);
   if (result != EventResult::SUCCESS) {
     return NULL_RACE_HANDLE;
   }
@@ -930,7 +930,7 @@ RaceHandle ApiManagerInternal::startPreConnObjStateMachine(
   return context->handle;
 }
 
-RaceHandle ApiManagerInternal::startBootstrapPreConnObjStateMachine(
+RaceHandle ApiManagerInternal::startBootstrapPreConduitStateMachine(
                                                 RaceHandle contextHandle,
                                                 const ApiBootstrapListenContext &listenContext,
                                                 const std::string &packageId,
@@ -938,7 +938,7 @@ RaceHandle ApiManagerInternal::startBootstrapPreConnObjStateMachine(
         helper::logInfo(
                          " START BOOTSTRAP PRECONN OBJECT being called");
   // create a connection context and copy information from the send/recv context
-  auto context = newBootstrapPreConnObjContext();
+  auto context = newBootstrapPreConduitContext();
   // auto listenContextIt = activeContexts.find(contextHandle);
   // if (listenContextIt == activeContexts.end()) {
   //   return NULL_RACE_HANDLE;
@@ -946,10 +946,10 @@ RaceHandle ApiManagerInternal::startBootstrapPreConnObjStateMachine(
 
   // This may need to be a reinterpret_cast - don't want to lose the extended link info
   // ApiBootstrapListenContext listenContext = static_cast<ApiBootstrapListenContext>(*listenContextIt->second);
-  context->updateBootstrapPreConnObjStateMachineStart(contextHandle,
+  context->updateBootstrapPreConduitStateMachineStart(contextHandle,
                                                       listenContext,
                                                       packageId, recvMessages);
-  EventResult result = bootstrapPreConnObjEngine.start(*context);
+  EventResult result = bootstrapPreConduitEngine.start(*context);
   if (result != EventResult::SUCCESS) {
     return NULL_RACE_HANDLE;
   }
@@ -1060,25 +1060,25 @@ ApiContext *ApiManagerInternal::newConnContext() {
   return activeContexts[handle].get();
 }
 
-ApiContext *ApiManagerInternal::newConnObjectContext() {
+ApiContext *ApiManagerInternal::newConduitectContext() {
   auto newContext =
-      std::make_unique<ConnectionObjectContext>(*this, connObjectEngine);
+      std::make_unique<ConduitContext>(*this, connObjectEngine);
   auto handle = newContext->handle;
   activeContexts[handle] = (std::move(newContext));
   return activeContexts[handle].get();
 }
 
-ApiContext *ApiManagerInternal::newPreConnObjContext() {
+ApiContext *ApiManagerInternal::newPreConduitContext() {
   auto newContext =
-      std::make_unique<PreConnObjContext>(*this, preConnObjEngine);
+      std::make_unique<PreConduitContext>(*this, preConduitEngine);
   auto handle = newContext->handle;
   activeContexts[handle] = (std::move(newContext));
   return activeContexts[handle].get();
 }
 
-ApiContext *ApiManagerInternal::newBootstrapPreConnObjContext() {
+ApiContext *ApiManagerInternal::newBootstrapPreConduitContext() {
   auto newContext =
-      std::make_unique<BootstrapPreConnObjContext>(*this, bootstrapPreConnObjEngine);
+      std::make_unique<BootstrapPreConduitContext>(*this, bootstrapPreConduitEngine);
   auto handle = newContext->handle;
   activeContexts[handle] = (std::move(newContext));
   return activeContexts[handle].get();

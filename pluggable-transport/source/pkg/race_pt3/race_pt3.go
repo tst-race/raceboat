@@ -123,7 +123,7 @@ func DestroyRaceClient(raceClient *RaceClient) {
 }
 
 type RaceConn struct {
-	conn  core.SwigConnectionObject
+	conn  core.SwigConduit
 	race  core.RaceSwig
 }
 
@@ -142,7 +142,7 @@ func (client RaceClient) Dial() (RaceConn, error) {
 	sendOpts.SetRecv_role(client.recvChannelRole)
 	sendOpts.SetTimeout_ms(client.timeoutMs)
 
-	// Dial_strSwig() returns wrapped std::pair<ApiStatus, SwigConnectionObject>
+	// Dial_strSwig() returns wrapped std::pair<ApiStatus, SwigConduit>
 	pair := client.race.Dial_strSwig(sendOpts, client.introduction)
 	if pair.GetFirst() != core.ApiStatus_OK {
 		golog.Println("Dial error")
@@ -329,7 +329,7 @@ func (server *RaceServer) Listen() (RaceListener, error) {
 func (listener RaceListener) Accept() (RaceConn, error) {
 	golog.Println("Calling Accept")
 
-	// AcceptSwig() returns std::pair<ApiStatus, SwigConnectionObject>
+	// AcceptSwig() returns std::pair<ApiStatus, SwigConduit>
 	if listener.listener != nil {
 		result := listener.listener.AcceptSwig(0)
 		if result.GetFirst() != core.ApiStatus_OK {
