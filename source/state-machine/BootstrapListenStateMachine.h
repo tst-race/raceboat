@@ -23,9 +23,17 @@ namespace Raceboat {
 class ApiBootstrapListenContext : public ApiContext {
 public:
   ApiBootstrapListenContext(ApiManagerInternal &manager, StateEngine &engine)
-      : ApiContext(manager, engine) {}
+    : ApiContext(manager, engine),
+      initSendConnSMHandle(NULL_RACE_HANDLE),
+      initRecvConnSMHandle(NULL_RACE_HANDLE),
+      finalSendConnSMHandle(NULL_RACE_HANDLE),
+      finalRecvConnSMHandle(NULL_RACE_HANDLE) {}
   ApiBootstrapListenContext(const ApiContext &context)
-      : ApiContext(context.manager, context.engine) {}
+    : ApiContext(context.manager, context.engine),
+      initSendConnSMHandle(NULL_RACE_HANDLE),
+      initRecvConnSMHandle(NULL_RACE_HANDLE),
+      finalSendConnSMHandle(NULL_RACE_HANDLE),
+      finalRecvConnSMHandle(NULL_RACE_HANDLE) {}
   virtual void updateBootstrapListen(
       const BootstrapConnectionOptions &options,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> cb) override;

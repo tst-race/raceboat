@@ -46,6 +46,7 @@ void ApiBootstrapDialContext::updateReceiveEncPkg(
 void ApiBootstrapDialContext::updateConnStateMachineConnected(RaceHandle contextHandle,
                                                      ConnectionID connId,
                                                      std::string linkAddress) {
+  helper::logInfo(" Received ConnStateMachineConnected for handle " + std::to_string(contextHandle) + " and ConnID: " + connId);
   if (this->initRecvConnSMHandle == contextHandle) {
     this->initRecvConnId = connId;
     this->initRecvLinkAddress = linkAddress;
@@ -89,13 +90,14 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
     }
     // Normal case: we are provided an address from out-of-band to load
     else {
+      helper::logInfo(logPrefix + " Loading initial-send link on " + ctx.opts.init_send_channel);
       if (ctx.opts.init_send_address.empty()) {
         // Need an address to load
-      helper::logError(logPrefix +
-                       "Invalid options: initial send address is required");
-      ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {});
-      ctx.dialCallback = {};
-      return EventResult::NOT_SUPPORTED;
+        helper::logError(logPrefix +
+                         "Invalid options: initial send address is required");
+        ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {});
+        ctx.dialCallback = {};
+        return EventResult::NOT_SUPPORTED;
       }
       bool sending = true;
       ctx.initSendConnSMHandle = ctx.manager.
@@ -123,6 +125,19 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
       // Handle initial server->client aka init_recv
       create = ctx.shouldCreateReceiver(ctx.opts.init_recv_channel);
       // No special cases here: if we are loading we should have a recv_address, if we are creating we will send the address in the hello message
+      if (create) {
+        helper::logInfo(logPrefix + " Creating init-recv link on " + ctx.opts.init_recv_channel);
+      } else {
+        helper::logInfo(logPrefix + " Loading init-recv link on " + ctx.opts.init_recv_channel);
+        if (ctx.opts.init_recv_address.empty()) {
+          // Need an address to load
+          helper::logError(logPrefix +
+                           "Invalid options: initial recv address is required");
+          ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {});
+          ctx.dialCallback = {};
+          return EventResult::NOT_SUPPORTED;
+        }
+      }
       bool sending = false;
       ctx.initRecvConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
@@ -147,6 +162,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
 
     // If we are NOT creating then we have to wait for the server to create and send us the address as a hello-response
     if (create) {
+      helper::logInfo(logPrefix + " Creating final-send link on " + ctx.opts.final_send_channel);
       bool sending = true;
       ctx.finalSendConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
@@ -161,6 +177,10 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
         return EventResult::NOT_SUPPORTED;
       }
       ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
+    } else {
+      // Explicitly do not expect this connection until the server response
+      helper::logInfo(logPrefix + " waiting on server to provide final-send link");
+      // ctx.finalSendConnSMHandle = NULL_RACE_HANDLE;
     }
   
     // Skip final recv channel if it is empty
@@ -174,6 +194,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
 
       // If we are NOT creating then we are waiting for the server to create and send the address as a hello-response
       if (create) {
+        helper::logInfo(logPrefix + " Creating final-recv link on " + ctx.opts.final_recv_channel);
         bool sending = false;
         ctx.finalRecvConnSMHandle = ctx.manager.
           startConnStateMachine(ctx.handle,
@@ -189,6 +210,10 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
           return EventResult::NOT_SUPPORTED;
         }
         ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
+      } else {
+        // Explicitly do not expect this connection until the server response
+        helper::logInfo(logPrefix + " waiting on server to provide final-recv link");
+        // ctx.finalRecvConnSMHandle = NULL_RACE_HANDLE;
       }
     }
     ctx.pendingEvents.push(EVENT_ALWAYS);

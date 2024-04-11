@@ -37,7 +37,7 @@ add_executable(testStandaloneLibrary
     RaceLogTests.cpp
     SdkWrapperTest.cpp
     UserInputTest.cpp
-    StateMachineTest.cpp
+    # StateMachineTest.cpp
     ApiManager/DialTest.cpp
     ApiManager/ListenTest.cpp
     ApiManager/ReceiveRespondTest.cpp

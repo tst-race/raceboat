@@ -25,7 +25,11 @@ namespace Raceboat {
 class BootstrapPreConduitContext : public ApiContext {
 public:
   BootstrapPreConduitContext(ApiManagerInternal &manager, StateEngine &engine)
-      : ApiContext(manager, engine) {}
+    : ApiContext(manager, engine),
+      initSendConnSMHandle(NULL_RACE_HANDLE),
+      initRecvConnSMHandle(NULL_RACE_HANDLE),
+      finalSendConnSMHandle(NULL_RACE_HANDLE),
+      finalRecvConnSMHandle(NULL_RACE_HANDLE) {}
 
   virtual void updateBootstrapPreConduitStateMachineStart(
       RaceHandle contextHandle,

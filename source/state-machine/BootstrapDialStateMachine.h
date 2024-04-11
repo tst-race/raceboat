@@ -23,8 +23,11 @@ namespace Raceboat {
 class ApiBootstrapDialContext : public ApiContext {
 public:
   ApiBootstrapDialContext(ApiManagerInternal &manager, StateEngine &engine)
-      : ApiContext(manager, engine) {}
-
+    : ApiContext(manager, engine),
+      initSendConnSMHandle(NULL_RACE_HANDLE),
+      initRecvConnSMHandle(NULL_RACE_HANDLE),
+      finalSendConnSMHandle(NULL_RACE_HANDLE),
+      finalRecvConnSMHandle(NULL_RACE_HANDLE) {}
   virtual void
   updateBootstrapDial(const BootstrapConnectionOptions &options, std::vector<uint8_t> &&data,
              std::function<void(ApiStatus, RaceHandle)> cb) override;

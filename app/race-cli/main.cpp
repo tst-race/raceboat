@@ -24,6 +24,33 @@
 #include "race/Race.h"
 #include "race/common/RaceLog.h"
 
+// #include <boost/asio.hpp>
+// #include <boost/bind.hpp>
+// #include <boost/shared_ptr.hpp>
+// #include <boost/enable_shared_from_this.hpp>
+
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <libgen.h>
+#include <netdb.h>
+#include <resolv.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <syslog.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#define READ  0
+#define WRITE 1
+
+#define BUF_SIZE 16384
 using namespace Raceboat;
 
 enum class Mode : int {
@@ -611,6 +638,221 @@ int handle_server_connect(const CmdOptions &opts) {
   return (status == ApiStatus::OK);
 }
 
+/* Forward data between sockets */
+void forward_local_to_conduit(int local_sock, Conduit conduit) {
+  printf("In local_to_conduit\n");
+    ssize_t n;
+
+    std::vector<uint8_t> buffer(BUF_SIZE);
+
+    while ((n = recv(local_sock, buffer.data(), BUF_SIZE, 0)) > 0) { // read data from input socket
+      printf("Writing to conduit\n");
+       auto status = conduit.write(buffer); // send data to output socket
+      if (status != ApiStatus::OK) {
+        printf("write failed with status: %i\n", status);
+        break;
+      }
+    }
+    printf("Exited local_to_conduit loop\n");
+
+    if (n < 0) {
+        printf("read error");
+        exit(1);
+    }
+
+    conduit.close();
+
+    shutdown(local_sock, SHUT_RDWR); // stop other processes from using socket
+    close(local_sock);
+}
+
+void forward_conduit_to_local(Conduit conduit, int local_sock) {
+  printf("In conduit_to_local\n");
+    while (true) {
+      auto [status, buffer] = conduit.read();
+      if (status != ApiStatus::OK) {
+        printf("read failed with status: %i\n", status);
+        break;
+      }
+      printf("Writing to local socket\n");
+      send(local_sock, buffer.data(), buffer.size(), 0);
+    }
+    printf("Exited conduit_to_local loop\n");
+
+    conduit.close();
+
+    shutdown(local_sock, SHUT_RDWR); // stop other processes from using socket
+    close(local_sock);
+}
+
+/* Create server socket */
+int create_socket(int port) {
+    int local_sock, optval = 1;
+    // int validfamily=0;
+    struct addrinfo hints, *res=NULL;
+    char portstr[12];
+
+    memset(&hints, 0x00, sizeof(hints));
+
+    hints.ai_flags    = AI_NUMERICSERV;   /* numeric service number, not resolve */
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    /* prepare to bind on specified numeric address */
+    // std::string bind_addr;
+    // if (!bind_addr.empty()) {
+    //     /* check for numeric IP to specify IPv6 or IPv4 socket */
+    //     if (validfamily = check_ipversion(bind_addr)) {
+    //          hints.ai_family = validfamily;
+    //          hints.ai_flags |= AI_NUMERICHOST; /* bind_addr is a valid numeric ip, skip resolve */
+    //     }
+    // } else {
+    //     /* if bind_address is NULL, will bind to IPv6 wildcard */
+    //     hints.ai_family = AF_INET6; /* Specify IPv6 socket, also allow ipv4 clients */
+    //     hints.ai_flags |= AI_PASSIVE; /* Wildcard address */
+    // }
+    std::string bind_addr = "localhost";
+
+    sprintf(portstr, "%d", port);
+
+    /* Check if specified socket is valid. Try to resolve address if bind_address is a hostname */
+    if (getaddrinfo(bind_addr.c_str(), portstr, &hints, &res) != 0) {
+        return -1;
+    }
+
+    if ((local_sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0) {
+        return -1;
+    }
+
+
+    if (setsockopt(local_sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
+        return -1;
+    }
+
+    if (bind(local_sock, res->ai_addr, res->ai_addrlen) == -1) {
+            close(local_sock);
+        return -1;
+    }
+
+    if (listen(local_sock, 20) < 0) {
+        return -1;
+    }
+
+    if (res != NULL) {
+        freeaddrinfo(res);
+    }
+
+    return local_sock;
+}
+
+// /* Create client connection */
+// int create_connection() {
+//     struct addrinfo hints, *res=NULL;
+//     int sock;
+//     int validfamily=0;
+//     char portstr[12];
+
+//     memset(&hints, 0x00, sizeof(hints));
+
+//     hints.ai_flags    = AI_NUMERICSERV; /* numeric service number, not resolve */
+//     hints.ai_family   = AF_UNSPEC;
+//     hints.ai_socktype = SOCK_STREAM;
+
+//     sprintf(portstr, "%d", remote_port);
+
+//     /* check for numeric IP to specify IPv6 or IPv4 socket */
+//     if (validfamily = check_ipversion(remote_host)) {
+//          hints.ai_family = validfamily;
+//          hints.ai_flags |= AI_NUMERICHOST;  /* remote_host is a valid numeric ip, skip resolve */
+//     }
+
+//     /* Check if specified host is valid. Try to resolve address if remote_host is a hostname */
+//     if (getaddrinfo(remote_host,portstr , &hints, &res) != 0) {
+//         errno = EFAULT;
+//         return CLIENT_RESOLVE_ERROR;
+//     }
+
+//     if ((sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0) {
+//         return CLIENT_SOCKET_ERROR;
+//     }
+
+//     if (connect(sock, res->ai_addr, res->ai_addrlen) < 0) {
+//         return CLIENT_CONNECT_ERROR;
+//     }
+
+//     if (res != NULL) {
+//         freeaddrinfo(res);
+//     }
+
+//     return sock;
+// }
+
+void handle_client(int client_sock,
+                   const BootstrapConnectionOptions &conn_opt,
+                   Race &race,
+                   const std::string &introductionMsg)
+{
+
+  printf("calling bootstrap_dial_str\n");
+  auto [status, connection] = race.bootstrap_dial_str(conn_opt, introductionMsg);
+  if (status != ApiStatus::OK) {
+    printf("dial failed with status: %i\n", status);
+    return;
+  }
+  printf("dial success\n");
+  
+    // if ((remote_sock = create_connection()) < 0) {
+    //     printf("Cannot connect to host");
+    //     goto cleanup;
+    // }
+
+  // printf("forking for local_to_conduct");
+  //   if (fork() == 0) { // a process forwarding data from client to remote socket
+  //     forward_conduit_to_local(connection, client_sock);
+  //     // forward_local_to_conduit(client_sock, connection);
+  //     exit(0);
+  //   }
+
+  printf("forking for conduit_to_local");
+    // if (fork() == 0) { // a process forwarding data from remote socket to client
+      forward_local_to_conduit(client_sock, connection);
+      // forward_conduit_to_local(connection, client_sock);
+      // exit(0);
+    // }
+
+    // connection.close();
+    // close(client_sock);
+}
+
+void client_connection_loop(int local_sock,
+                            const BootstrapConnectionOptions &conn_opt,
+                            Race &race,
+                            const std::string &introductionMsg) {
+    // struct sockaddr_storage client_addr;
+    // socklen_t addrlen = sizeof(client_addr);
+  int client_sock;
+    // int client_sock = local_sock;
+
+    // handle_client(client_sock, conn_opt, race, introductionMsg);
+            
+    while (true) {
+        // update_connection_count();
+      client_sock = accept(local_sock, NULL, 0);
+       // if (fork() == 0) { // handle client connection in a separate process
+      close(local_sock);
+      handle_client(client_sock, conn_opt, race, introductionMsg);
+        //     exit(0);
+        // }
+        // if (fork() == 0) { // handle client connection in a separate process
+        //     close(local_sock);
+        //     handle_client(client_sock, conn_opt, race, introductionMsg);
+        //     exit(0);
+        // }
+        // close(client_sock);
+    }
+
+}
+
 int handle_client_bootstrap_connect(const CmdOptions &opts) {
   ChannelParamStore params = getParams(opts);
 
@@ -634,44 +876,45 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
   conn_opt.final_recv_role = opts.final_recv_role;
 
   std::string introductionMsg = "hello";
-  auto [status, connection] = race.bootstrap_dial_str(conn_opt, introductionMsg);
-  if (status != ApiStatus::OK) {
-    printf("dial failed with status: %i\n", status);
+
+  // auto [status, connection] = race.bootstrap_dial_str(conn_opt, introductionMsg);
+  // if (status != ApiStatus::OK) {
+  //   printf("dial failed with status: %i\n", status);
+  // }
+  // auto message = readStdin();
+  // std::string msgStr(message.begin(), message.end());
+  // // int packages_remaining = opts.num_packages;
+  // status = connection.write_str(msgStr);
+  // while (opts.num_packages == -1 || packages_remaining > 0) {
+  //   status = connection.write_str(msgStr);
+  //   if (status != ApiStatus::OK) {
+  //     printf("write failed with status: %i\n", status);
+  //     break;
+  //   } else {
+  //     printf("wrote message: %s\n", msgStr.c_str());
+  //   }
+  // }
+ 
+  int local_port = 9999;
+  int local_sock;
+  printf("CREATING LOCAL SOCKET\n");
+  if ((local_sock = create_socket(local_port)) < 0) { // start server
+    printf("Failed to create local socket\n");
     return -1;
   }
-  printf("dial success\n");
 
-  printf("\ntype message to send followed by <ctrl+d>\n");
-  auto message = readStdin();
-  std::string msgStr(message.begin(), message.end());
+  //   // signal(SIGCHLD, sigchld_handler); // prevent ended children from becoming zombies
+  // // signal(SIGTERM, sigterm_handler); // handle KILL signal
+  client_connection_loop(local_sock, conn_opt, race, introductionMsg);
 
-  int packages_remaining = opts.num_packages;
-  while (opts.num_packages == -1 || packages_remaining > 0) {
-    status = connection.write_str(msgStr);
-    if (status != ApiStatus::OK) {
-      printf("write failed with status: %i\n", status);
-      break;
-    } else {
-      printf("wrote message: %s\n", msgStr.c_str());
-    }
 
-    auto [status2, received_message] = connection.read_str();
-    if (status2 != ApiStatus::OK) {
-      printf("read_str failed with status: %i\n", status2);
-      status = status2;
-      break;
-    } else {
-      printf("received message: %s\n", received_message.c_str());
-    }
-    packages_remaining--;
-  }
-  auto status2 = connection.close();
-  if (status2 != ApiStatus::OK) {
-    printf("close failed with status: %i\n", status2);
-    status = status2;
-  }
+  // auto status2 = connection.close();
+  // if (status2 != ApiStatus::OK) {
+  //   printf("close failed with status: %i\n", status2);
+  //   status = status2;
+  // }
 
-  return (status == ApiStatus::OK);
+  return 0;
 }
 
 int handle_server_bootstrap_connect(const CmdOptions &opts) {
@@ -682,8 +925,10 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
   BootstrapConnectionOptions conn_opt;
   conn_opt.init_recv_channel = opts.init_recv_channel;
   conn_opt.init_recv_role = opts.init_recv_role;
+  conn_opt.init_recv_address = opts.init_recv_address;
   conn_opt.init_send_channel = opts.init_send_channel;
   conn_opt.init_send_role = opts.init_send_role;
+  conn_opt.init_send_address = opts.init_send_address; 
   conn_opt.final_recv_channel = opts.final_recv_channel;
   conn_opt.final_recv_role = opts.final_recv_role;
   conn_opt.final_send_channel = opts.final_send_channel;
@@ -708,10 +953,6 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
   }
   printf("accept success\n");
 
-  printf("\ntype message to send followed by <ctrl+d>\n");
-  auto message = readStdin();
-  std::string msgStr(message.begin(), message.end());
-
   auto [status5, received_message2] = connection.read_str();
   if (status5 != ApiStatus::OK) {
     printf("read failed with status: %i\n", status5);
@@ -720,16 +961,25 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
     printf("received message: %s\n", received_message2.c_str());
   }
 
+  printf("\ntype message to send followed by <ctrl+d>\n");
   int packages_remaining = opts.num_packages;
   while (opts.num_packages == -1 || packages_remaining > 0) {
-    auto status3 = connection.write_str(msgStr);
-    if (status3 != ApiStatus::OK) {
-      printf("write failed with status: %i\n", status3);
-      status = status3;
-      break;
-    } else {
-      printf("wrote message: %s\n", msgStr.c_str());
-    }
+    // auto message = readStdin();
+    // std::string msgStr(message.begin(), message.end());
+    // if (msgStr == "quit") {
+    //   break;
+    // }
+
+    // if (!msgStr.empty()) {
+    //   auto status3 = connection.write_str(msgStr);
+    //   if (status3 != ApiStatus::OK) {
+    //     printf("write failed with status: %i\n", status3);
+    //     status = status3;
+    //     break;
+    //   } else {
+    //     printf("wrote message: %s\n", msgStr.c_str());
+    //   }
+    // }
 
     auto [status4, received_message] = connection.read_str();
     if (status4 != ApiStatus::OK) {
@@ -737,7 +987,9 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
       status = status4;
       break;
     } else {
-      printf("received message: %s\n", received_message.c_str());
+      if (!received_message.empty()) {
+        printf("received message: %s\n", received_message.c_str());
+      }
     }
     packages_remaining--;
   }
