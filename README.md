@@ -104,3 +104,60 @@ raceboat:latest bash
 echo "Hi, I'm the client!" | race-cli --dir /kits -m --send-recv --send-channel twoSixDirectCpp --recv-channel twoSixDirectCpp --param hostname="10.11.1.3" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26264 --send-address="{\"hostname\":\"10.11.1.2\",\"port\":26262}"
 
 ```
+
+## TCP Socket Connection Testing
+The thing that is currently broken.
+
+### Server:
+```bash
+
+#!/bin/bash
+
+docker run --rm -it --name=rbserver --network=rib-overlay-network --ip=10.11.1.2 \
+       -v /path/to/plugin-comms-twosix-cpp/kit/artifacts/linux-arm64-v8a-server/PluginCommsTwoSixStub:/server-kits/PluginCommsTwoSixStub \
+       -v /path/to/raceboat/:/code -w /code \
+       -v /path/to/raceboat/scripts/:/scripts/ \
+       raceboat:latest bash
+
+race-cli --dir /server-kits \
+    --server-bootstrap-connect \
+    --recv-channel=twoSixDirectCpp \
+    --send-channel=twoSixDirectCpp \
+    --final-send-channel=twoSixDirectCpp \
+    --final-recv-channel=twoSixDirectCpp \
+    --param hostname="10.11.1.2" \
+    --param PluginCommsTwoSixStub.startPort=26262 \
+    --param PluginCommsTwoSixStub.endPort=26264 \
+    --debug | tee rrlog | grep ERROR
+
+```
+
+
+### Client:
+```bash
+
+#!/bin/bash
+
+docker run --rm -it --name=rbclient --network=rib-overlay-network --ip=10.11.1.3 \
+       -v /path/to/plugin-comms-twosix-cpp/kit/artifacts/linux-arm64-v8a-server/PluginCommsTwoSixStub:/client-kits/PluginCommsTwoSixStub \
+       -v /path/to/raceboat/:/code -w /code \
+       -v /path/to/raceboat/scripts/:/scripts/ \
+       raceboat:latest bash
+
+race-cli --dir /client-kits \
+    --client-bootstrap-connect \
+    --send-channel=twoSixDirectCpp \
+    --send-address="{\"hostname\":\"10.11.1.2\",\"port\":26262}" \
+    --recv-channel=twoSixDirectCpp \
+    --final-send-channel=twoSixDirectCpp \
+    --final-recv-channel=twoSixDirectCpp \
+    --param hostname="10.11.1.3" \
+    --param PluginCommsTwoSixStub.startPort=26262 \
+    --param PluginCommsTwoSixStub.endPort=26264 \
+    --debug | tee srlog | grep ERROR &
+
+nc localhost 9999
+
+```
+
+Should be able to send messages repeatedly using netcat as the "app" that is connecting to the local TCP proxy.
