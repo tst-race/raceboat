@@ -647,9 +647,10 @@ void forward_local_to_conduit(int local_sock, Conduit conduit) {
     std::vector<uint8_t> buffer(BUF_SIZE);
 
     // local_sock is a listen() socket fd on client end (netcat)
-    while ((n = recv(local_sock, buffer.data(), BUF_SIZE, 0)) > 0) { // read data from input socket
-      printf("Relaying data from local socket to conduit\n");
-       auto status = conduit.write(buffer); // send data to output socket
+    while ((n = ::recv(local_sock, buffer.data(), BUF_SIZE, 0)) > 0) { // read data from input socket
+      // printf("Relaying data \"%s\"from local socket to conduit\n", std::string(buffer.begin(), buffer.end()).c_str());
+      std::vector<uint8_t> result(buffer.begin(), buffer.begin()+n);
+      auto status = conduit.write(result); // send data to output socket
       if (status != ApiStatus::OK) {
         printf("write failed with status: %i\n", status);
         break;
@@ -671,8 +672,8 @@ void forward_conduit_to_local(Conduit conduit, int local_sock) {
         printf("read failed with status: %i\n", status);
         break;
       }
-      printf("Relaying data from conduit to local socket\n");
-      send(local_sock, buffer.data(), buffer.size(), 0);
+      // printf("Relaying data \"%s\" from conduit to local socket\n", std::string(buffer.begin(), buffer.end()).c_str());
+      ::send(local_sock, buffer.data(), buffer.size(), 0);
     }
     printf("Exited conduit_to_local loop\n");
 }
@@ -766,6 +767,7 @@ void relay_data_loop(int client_sock, Raceboat::Conduit &connection) {
     });
     local_to_conduit_thread.join();
     conduit_to_local_thread.join();
+    printf("exiting relay data loop\n");
 }
 
 void handle_client(int client_sock,
@@ -783,6 +785,7 @@ void handle_client(int client_sock,
   }
   printf("dial success\n");
   relay_data_loop(client_sock, connection);
+  printf("closing race connection\n");
   connection.close();
 }
 
@@ -799,6 +802,7 @@ void client_connection_loop(int local_sock,
     // close(local_sock);
     handle_client(client_sock, conn_opt, race, introductionMsg);
 
+    printf("closing local socket\n");
     ::shutdown(client_sock, SHUT_RDWR); // prevent further socket IO
     ::close(client_sock);
     // }
@@ -834,24 +838,6 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
 
   std::string introductionMsg = "hello";
 
-  // auto [status, connection] = race.bootstrap_dial_str(conn_opt, introductionMsg);
-  // if (status != ApiStatus::OK) {
-  //   printf("dial failed with status: %i\n", status);
-  // }
-  // auto message = readStdin();
-  // std::string msgStr(message.begin(), message.end());
-  // // int packages_remaining = opts.num_packages;
-  // status = connection.write_str(msgStr);
-  // while (opts.num_packages == -1 || packages_remaining > 0) {
-  //   status = connection.write_str(msgStr);
-  //   if (status != ApiStatus::OK) {
-  //     printf("write failed with status: %i\n", status);
-  //     break;
-  //   } else {
-  //     printf("wrote message: %s\n", msgStr.c_str());
-  //   }
-  // }
- 
   int local_port = 9999;
   int local_sock;
   printf("CREATING LOCAL SOCKET\n");
@@ -860,25 +846,18 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
     return -1;
   }
 
-  //   // signal(SIGCHLD, sigchld_handler); // prevent ended children from becoming zombies
-  // // signal(SIGTERM, sigterm_handler); // handle KILL signal
   client_connection_loop(local_sock, conn_opt, race, introductionMsg);
 
+  printf("closing local socket\n");
   ::shutdown(local_sock, SHUT_RDWR); // prevent further socket IO
   ::close(local_sock);
-
-  // auto status2 = connection.close();
-  // if (status2 != ApiStatus::OK) {
-  //   printf("close failed with status: %i\n", status2);
-  //   status = status2;
-  // }
 
   return 0;
 }
 
 // server entrypoint
 int handle_server_bootstrap_connect(const CmdOptions &opts) {
-  // connect to localhost 
+  // connect to localhost
   // listen for race connections
   // relay data from race conduit to localhost
   // relay data from localhost to race conduit
@@ -921,12 +900,10 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
 
   // assume the link address is passed in out of band
   // start client with this link address
-  // listening on link address: '{"initSendChannel":"twoSixDirectCpp","initSendLinkAddress":"{\"hostname\":\"\\\"10.11.1.2\\\"\",\"port\":26262}"}'
   printf("\nlistening on link address: '%s'\nbe sure to escape quotes for "
          "client\n\n",
          link_addr.c_str());
 
-  // accept connection on race side
   auto [status2, connection] = listener.accept();
   if (status2 != ApiStatus::OK) {
       printf("accept failed with status: %i\n", status2);
@@ -934,51 +911,12 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
   }
   printf("accept success\n");
 
-  // read message on race side
   relay_data_loop(local_sock, connection);
+  printf("closing local socket\n");
   ::shutdown(local_sock, SHUT_RDWR); // stop other processes from using socket
   ::close(local_sock);
-  // auto [status5, received_message2] = connection.read_str();
-  // if (status5 != ApiStatus::OK) {
-  //   printf("read failed with status: %i\n", status5);
-  //   status = status5;
-  // } else {
-  //   printf("bootstrap server -- received message: %s\n", received_message2.c_str());
-  // }
 
-  // // printf("\ntype message to send followed by <ctrl+d>\n");
-  // int packages_remaining = opts.num_packages;
-  // while (opts.num_packages == -1 || packages_remaining > 0) {
-  //   // auto message = readStdin();
-  //   // std::string msgStr(message.begin(), message.end());
-  //   // if (msgStr == "quit") {
-  //   //   break;
-  //   // }
-
-  //   // if (!msgStr.empty()) {
-  //   //   auto status3 = connection.write_str(msgStr);
-  //   //   if (status3 != ApiStatus::OK) {
-  //   //     printf("write failed with status: %i\n", status3);
-  //   //     status = status3;
-  //   //     break;
-  //   //   } else {
-  //   //     printf("wrote message: %s\n", msgStr.c_str());
-  //   //   }
-  //   // }
-
-  //   auto [status4, received_message] = connection.read_str();
-  //   if (status4 != ApiStatus::OK) {
-  //     printf("read failed with status: %i\n", status4);
-  //     status = status4;
-  //     break;
-  //   } else {
-  //     if (!received_message.empty()) {
-  //       printf("bootstrap server -- received message2: %s\n", received_message.c_str());
-  //     }
-  //   }
-  //   packages_remaining--;
-  // }
-
+  printf("closing connection\n");
   auto status6 = connection.close();
   if (status6 != ApiStatus::OK) {
     printf("close failed with status: %i\n", status6);
