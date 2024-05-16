@@ -18,9 +18,9 @@
 
 #include <iostream>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
-#include <thread>
 
 #include "race/Race.h"
 #include "race/common/RaceLog.h"
@@ -30,13 +30,12 @@
 // #include <boost/shared_ptr.hpp>
 // #include <boost/enable_shared_from_this.hpp>
 
-
 #include <arpa/inet.h>
-#include <netinet/in.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <libgen.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <resolv.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -44,11 +43,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <syslog.h>
 #include <unistd.h>
-#include <sys/wait.h>
-#include <sys/socket.h>
-#define READ  0
+#define READ 0
 #define WRITE 1
 
 #define BUF_SIZE 16384
@@ -128,7 +126,7 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       {"final-recv-role", required_argument, nullptr, 'k'},
       {"final-send-channel", required_argument, nullptr, 'L'},
       {"final-send-role", required_argument, nullptr, 'l'},
-      
+
       // destination selection
       {"send-address", required_argument, nullptr, 'a'},
       {"recv-address", required_argument, nullptr, 'e'},
@@ -642,142 +640,144 @@ int handle_server_connect(const CmdOptions &opts) {
 /* Forward data between sockets */
 void forward_local_to_conduit(int local_sock, Conduit conduit) {
   printf("In local_to_conduit\n");
-    ssize_t n;
+  ssize_t n;
 
-    std::vector<uint8_t> buffer(BUF_SIZE);
+  std::vector<uint8_t> buffer(BUF_SIZE);
 
-    // local_sock is a listen() socket fd on client end (netcat)
-    while ((n = ::recv(local_sock, buffer.data(), BUF_SIZE, 0)) > 0) { // read data from input socket
-      // printf("Relaying data \"%s\"from local socket to conduit\n", std::string(buffer.begin(), buffer.end()).c_str());
-      std::vector<uint8_t> result(buffer.begin(), buffer.begin()+n);
-      auto status = conduit.write(result); // send data to output socket
-      if (status != ApiStatus::OK) {
-        printf("write failed with status: %i\n", status);
-        break;
-      }
+  // local_sock is a listen() socket fd on client end (netcat)
+  while ((n = ::recv(local_sock, buffer.data(), BUF_SIZE, 0)) >
+         0) { // read data from input socket
+    // printf("Relaying data \"%s\"from local socket to conduit\n",
+    // std::string(buffer.begin(), buffer.end()).c_str());
+    std::vector<uint8_t> result(buffer.begin(), buffer.begin() + n);
+    auto status = conduit.write(result); // send data to output socket
+    if (status != ApiStatus::OK) {
+      printf("write failed with status: %i\n", status);
+      break;
     }
-    printf("Exited local_to_conduit loop\n");
+  }
+  printf("Exited local_to_conduit loop\n");
 
-    if (n < 0) {
-        printf("read error");
-        exit(1);
-    }
+  if (n < 0) {
+    printf("read error");
+    exit(1);
+  }
 }
 
 void forward_conduit_to_local(Conduit conduit, int local_sock) {
   printf("In conduit_to_local\n");
-    while (true) {
-      auto [status, buffer] = conduit.read();
-      if (status != ApiStatus::OK) {
-        printf("read failed with status: %i\n", status);
-        break;
-      }
-      // printf("Relaying data \"%s\" from conduit to local socket\n", std::string(buffer.begin(), buffer.end()).c_str());
-      ::send(local_sock, buffer.data(), buffer.size(), 0);
+  while (true) {
+    auto [status, buffer] = conduit.read();
+    if (status != ApiStatus::OK) {
+      printf("read failed with status: %i\n", status);
+      break;
     }
-    printf("Exited conduit_to_local loop\n");
+    // printf("Relaying data \"%s\" from conduit to local socket\n",
+    // std::string(buffer.begin(), buffer.end()).c_str());
+    ::send(local_sock, buffer.data(), buffer.size(), 0);
+  }
+  printf("Exited conduit_to_local loop\n");
 }
 
 int create_server_socket(int port) {
-    int local_sock, optval = 1;
-    // int validfamily=0;
-    struct addrinfo hints, *res=NULL;
-    char portstr[12];
+  int local_sock, optval = 1;
+  // int validfamily=0;
+  struct addrinfo hints, *res = NULL;
+  char portstr[12];
 
-    memset(&hints, 0x00, sizeof(hints));
+  memset(&hints, 0x00, sizeof(hints));
 
-    hints.ai_flags    = AI_NUMERICSERV;   /* numeric service number, not resolve */
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_NUMERICSERV; // numeric service number, not resolve
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
 
-    std::string bind_addr = "localhost";
-    sprintf(portstr, "%d", port);
+  std::string bind_addr = "localhost";
+  sprintf(portstr, "%d", port);
 
-    /* Check if specified socket is valid. Try to resolve address if bind_address is a hostname */
-    if (::getaddrinfo(bind_addr.c_str(), portstr, &hints, &res) != 0) {
-        printf("getadddrinfo failed\n");
-        return -1;
-    }
+  // Try to resolve address if bind_address is a hostname
+  if (::getaddrinfo(bind_addr.c_str(), portstr, &hints, &res) != 0) {
+    printf("getadddrinfo failed\n");
+    return -1;
+  }
 
-    local_sock = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  local_sock = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
-    if (local_sock >= 0 && ::setsockopt(local_sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
-        printf("setsockopt failed\n");
-        ::close(local_sock);
-        local_sock = -1;
-    }
+  if (local_sock >= 0 && ::setsockopt(local_sock, SOL_SOCKET, SO_REUSEADDR,
+                                      &optval, sizeof(optval)) < 0) {
+    printf("setsockopt failed\n");
+    ::close(local_sock);
+    local_sock = -1;
+  }
 
-    if (local_sock >= 0 && ::bind(local_sock, res->ai_addr, res->ai_addrlen) == -1) {
-        printf("bind failed\n");
-        ::close(local_sock);
-        local_sock = -1;
-    }
+  if (local_sock >= 0 &&
+      ::bind(local_sock, res->ai_addr, res->ai_addrlen) == -1) {
+    printf("bind failed\n");
+    ::close(local_sock);
+    local_sock = -1;
+  }
 
-    if (local_sock >= 0 && ::listen(local_sock, 20) < 0) {
-        printf("listen failed\n");
-        ::close(local_sock);
-        local_sock = -1;
-    }
+  if (local_sock >= 0 && ::listen(local_sock, 20) < 0) {
+    printf("listen failed\n");
+    ::close(local_sock);
+    local_sock = -1;
+  }
 
-    if (res != nullptr) {
-        ::freeaddrinfo(res);
-    }
-    return local_sock;
+  if (res != nullptr) {
+    ::freeaddrinfo(res);
+  }
+  return local_sock;
 }
 
 int create_client_connection(std::string &hostaddr, uint16_t port) {
-    struct addrinfo hints, *res=NULL;
-    int sock;
-    char portstr[12];
+  struct addrinfo hints, *res = NULL;
+  int sock;
+  char portstr[12];
 
-    memset(&hints, 0x00, sizeof(hints));
+  memset(&hints, 0x00, sizeof(hints));
 
-    hints.ai_flags    = AI_NUMERICSERV; /* numeric service number, not resolve */
-    hints.ai_family   = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    sprintf(portstr, "%d", port);
+  hints.ai_flags = AI_NUMERICSERV; // numeric service number, not resolve
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  sprintf(portstr, "%d", port);
 
-   
-    /* Check if specified host is valid. Try to resolve address if remote_host is a hostname */
-    if (::getaddrinfo(hostaddr.c_str(), portstr , &hints, &res) != 0) {
-        printf("getadddrinfo failed\n");
-        return -1;
-    }
+  // Try to resolve address if remote_host is a hostname
+  if (::getaddrinfo(hostaddr.c_str(), portstr, &hints, &res) != 0) {
+    printf("getadddrinfo failed\n");
+    return -1;
+  }
 
-    sock = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (sock >= 0 && ::connect(sock, res->ai_addr, res->ai_addrlen) < 0) {
-        printf("connect failed\n");
-        ::close(sock);
-        sock = -1;
-    }
+  sock = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  if (sock >= 0 && ::connect(sock, res->ai_addr, res->ai_addrlen) < 0) {
+    printf("connect failed\n");
+    ::close(sock);
+    sock = -1;
+  }
 
-    if (res != nullptr) {
-      ::freeaddrinfo(res);
-    }
-    return sock;
+  if (res != nullptr) {
+    ::freeaddrinfo(res);
+  }
+  return sock;
 }
 
 void relay_data_loop(int client_sock, Raceboat::Conduit &connection) {
-    std::thread local_to_conduit_thread([&client_sock, &connection](){
-      forward_local_to_conduit(client_sock, connection);
-    });
+  std::thread local_to_conduit_thread([&client_sock, &connection]() {
+    forward_local_to_conduit(client_sock, connection);
+  });
 
-    std::thread conduit_to_local_thread([&client_sock, &connection](){
-      forward_conduit_to_local(connection, client_sock);
-    });
-    local_to_conduit_thread.join();
-    conduit_to_local_thread.join();
-    printf("exiting relay data loop\n");
+  std::thread conduit_to_local_thread([&client_sock, &connection]() {
+    forward_conduit_to_local(connection, client_sock);
+  });
+  local_to_conduit_thread.join();
+  conduit_to_local_thread.join();
+  printf("exiting relay data loop\n");
 }
 
-void handle_client(int client_sock,
-                   const BootstrapConnectionOptions &conn_opt,
-                   Race &race,
-                   const std::string &introductionMsg)
-{
+void handle_client(int client_sock, const BootstrapConnectionOptions &conn_opt,
+                   Race &race, const std::string &introductionMsg) {
 
   printf("calling bootstrap_dial_str\n");
-  auto [status, connection] = race.bootstrap_dial_str(conn_opt, introductionMsg);
+  auto [status, connection] =
+      race.bootstrap_dial_str(conn_opt, introductionMsg);
   if (status != ApiStatus::OK) {
     printf("dial failed with status: %i\n", status);
     connection.close();
@@ -791,27 +791,25 @@ void handle_client(int client_sock,
 
 void client_connection_loop(int local_sock,
                             const BootstrapConnectionOptions &conn_opt,
-                            Race &race,
-                            const std::string &introductionMsg) {
-    int client_sock;
+                            Race &race, const std::string &introductionMsg) {
+  int client_sock;
 
-    // TODO @Paul - is there a reason to accept() over and over (e.g. support multiple localhost connections)?
-    // while (true) {
-    client_sock = accept(local_sock, NULL, 0);
-    printf("client accept returned %i\n", client_sock);
-    // close(local_sock);
-    handle_client(client_sock, conn_opt, race, introductionMsg);
+  // TODO @Paul - is there a reason to accept() over and over (e.g. support
+  // multiple localhost connections)? while (true) {
+  client_sock = accept(local_sock, NULL, 0);
+  printf("client accept returned %i\n", client_sock);
+  // close(local_sock);
+  handle_client(client_sock, conn_opt, race, introductionMsg);
 
-    printf("closing local socket\n");
-    ::shutdown(client_sock, SHUT_RDWR); // prevent further socket IO
-    ::close(client_sock);
-    // }
+  printf("closing local socket\n");
+  ::shutdown(client_sock, SHUT_RDWR); // prevent further socket IO
+  ::close(client_sock);
+  // }
 }
 
-// client entrypoint
 int handle_client_bootstrap_connect(const CmdOptions &opts) {
   // listen for localhost connection
-  // dial into / connect to race connection 
+  // dial into / connect to race connection
   // connect to race conduit connections
   // relay data to race conduit side
   // relay data from race conduit to localhost
@@ -828,7 +826,8 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
   BootstrapConnectionOptions conn_opt;
   conn_opt.init_send_channel = opts.init_send_channel;
   conn_opt.init_send_role = opts.init_send_role;
-  conn_opt.init_send_address = opts.init_send_address; // generated in handle_server_connect
+  conn_opt.init_send_address =
+      opts.init_send_address; // generated in handle_server_connect
   conn_opt.init_recv_channel = opts.init_recv_channel;
   conn_opt.init_recv_role = opts.init_recv_role;
   conn_opt.final_send_channel = opts.final_send_channel;
@@ -855,13 +854,12 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
   return 0;
 }
 
-// server entrypoint
 int handle_server_bootstrap_connect(const CmdOptions &opts) {
   // connect to localhost
   // listen for race connections
   // relay data from race conduit to localhost
   // relay data from localhost to race conduit
-  
+
   ChannelParamStore params = getParams(opts);
 
   Race race(opts.plugin_path, params);
@@ -872,7 +870,7 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
   conn_opt.init_recv_address = opts.init_recv_address;
   conn_opt.init_send_channel = opts.init_send_channel;
   conn_opt.init_send_role = opts.init_send_role;
-  conn_opt.init_send_address = opts.init_send_address; 
+  conn_opt.init_send_address = opts.init_send_address;
   conn_opt.final_recv_channel = opts.final_recv_channel;
   conn_opt.final_recv_role = opts.final_recv_role;
   conn_opt.final_send_channel = opts.final_send_channel;
@@ -884,18 +882,19 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
   std::string host = "localhost";
   printf("AWAITING LOCAL CLIENT\n");
   while (local_sock < 0) {
-      if ((local_sock = create_client_connection(host, local_port)) < 0) { // start server
-          printf("Awaiting 'listening client' \n");
-          sleep(5);
-      }
+    if ((local_sock = create_client_connection(host, local_port)) <
+        0) { // start server
+      printf("Awaiting 'listening client' \n");
+      sleep(5);
+    }
   }
 
   printf("CREATING RACE SERVER SOCKET\n");
   // listen on race side
   auto [status, link_addr, listener] = race.bootstrap_listen(conn_opt);
   if (status != ApiStatus::OK) {
-      printf("listen failed with status: %i\n", status);
-      return -1;
+    printf("listen failed with status: %i\n", status);
+    return -1;
   }
 
   // assume the link address is passed in out of band
@@ -906,8 +905,8 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
 
   auto [status2, connection] = listener.accept();
   if (status2 != ApiStatus::OK) {
-      printf("accept failed with status: %i\n", status2);
-      return -2;
+    printf("accept failed with status: %i\n", status2);
+    return -2;
   }
   printf("accept success\n");
 
