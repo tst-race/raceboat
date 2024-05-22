@@ -66,8 +66,10 @@ void ConduitContext::updatePackageStatusChanged(RaceHandle pkgHandle,
 void ConduitContext::updateRead(
     RaceHandle /* handle */,
     std::function<void(ApiStatus, std::vector<uint8_t>)> cb) {
+      TRACE_METHOD();
   if (this->readCallback) {
     // Call old callback
+    helper::logError(logPrefix + "read callback not null for context handle " + std::to_string(handle));
     this->readCallback(ApiStatus::INTERNAL_ERROR, {});
   }
   this->readCallback = cb;
@@ -131,6 +133,8 @@ struct StateConduitConnected : public ConduitState {
       ctx.readCallback(ApiStatus::OK, ctx.recvQueue.front());
       ctx.readCallback = {};
       ctx.recvQueue.pop();
+    } else if(!ctx.recvQueue.empty()) {
+      helper::logWarning(logPrefix + "null read callback and non-empty queue!");
     }
 
     for (auto &[cb, bytes] : ctx.sendQueue) {
@@ -147,6 +151,7 @@ struct StateConduitConnected : public ConduitState {
           plugin.sendPackage(pkgHandle, ctx.sendConnId, pkg, 0, 0);
 
       if (response.status != SdkStatus::SDK_OK) {
+        helper::logError(logPrefix + "sendPackage returned " + std::to_string(response.status));
         cb(ApiStatus::INTERNAL_ERROR);
       } else {
         ctx.manager.registerHandle(ctx, pkgHandle);
@@ -173,7 +178,7 @@ struct StateConduitConnected : public ConduitState {
       if (it == ctx.sentQueue.end()) {
         continue;
       }
-
+      helper::logInfo(logPrefix + "failed list notify");
       it->second(ApiStatus::INTERNAL_ERROR);
       ctx.sentQueue.erase(it);
     }
@@ -198,11 +203,13 @@ struct StateConduitFinished : public ConduitState {
     }
 
     for (auto &[cb, bytes] : ctx.sendQueue) {
+      helper::logWarning(logPrefix + "send queue not empty");
       cb(ApiStatus::INTERNAL_ERROR);
     }
     ctx.sendQueue.clear();
 
     for (auto &[handle, cb] : ctx.sentQueue) {
+      helper::logWarning(logPrefix + "sent queue not empty");
       cb(ApiStatus::INTERNAL_ERROR);
     }
     ctx.sentQueue.clear();
@@ -224,26 +231,31 @@ struct StateConduitFailed : public ConduitState {
     auto &ctx = getContext(context);
 
     if (ctx.dialCallback) {
+      helper::logDebug(logPrefix + "dial callback not null");
       ctx.dialCallback(ApiStatus::INTERNAL_ERROR, {});
       ctx.dialCallback = {};
     }
 
     for (auto &[cb, bytes] : ctx.sendQueue) {
+      helper::logDebug(logPrefix + "send queue not empty");
       cb(ApiStatus::INTERNAL_ERROR);
     }
     ctx.sendQueue.clear();
 
     for (auto &[handle, cb] : ctx.sentQueue) {
+      helper::logDebug(logPrefix + "sent queue not empty");
       cb(ApiStatus::INTERNAL_ERROR);
     }
     ctx.sentQueue.clear();
 
     if (ctx.readCallback) {
       ctx.readCallback(ApiStatus::INTERNAL_ERROR, {});
+      helper::logDebug(logPrefix + "clearing read callback");
       ctx.readCallback = {};
     }
 
     if (ctx.closeCallback) {
+      helper::logDebug(logPrefix + "close callback not null");
       ctx.closeCallback(ApiStatus::INTERNAL_ERROR);
       ctx.closeCallback = {};
     }

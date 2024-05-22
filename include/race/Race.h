@@ -86,9 +86,11 @@ std::string bootstrapConnectionOptionsToString(const BootstrapConnectionOptions 
 class Conduit {
 public:
   Conduit(std::shared_ptr<Core> core, OpHandle handle);
-  Conduit() {}
+  Conduit() : handle(NULL_RACE_HANDLE) {}
   Conduit(const Conduit &that);
   virtual ~Conduit() {}
+
+  OpHandle getHandle();  // debug
 
   std::pair<ApiStatus, std::vector<uint8_t>> read();
   std::pair<ApiStatus, std::string> read_str();

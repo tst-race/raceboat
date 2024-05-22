@@ -1219,4 +1219,44 @@ EventResult ApiManagerInternal::triggerEvent(ApiContext &context,
   return result;
 }
 
+//--------------------------------------------------------
+// debug
+//--------------------------------------------------------
+void ApiManagerInternal::dumpContexts(std::string context){
+  TRACE_METHOD();
+
+  if(context.size()) {
+    printf("%s\n", context.c_str());
+  }
+  printf("dumping activeContexts handles ---\n");
+  for(std::unordered_map<RaceHandle, std::unique_ptr<Raceboat::ApiContext>>::iterator it = activeContexts.begin(); it != activeContexts.end(); ++it) { 
+    printf("  %lu --  ", it->first);
+    it->second->dumpContext();
+  }
+
+  printf("dumping handleContextMap ---\n");
+  for (auto pair: handleContextMap) {
+    // second is Contexts = std::unordered_set<ApiContext *>;
+    printf("  %lu: \n", pair.first);
+    for (auto ctx: pair.second)  {
+      ctx->dumpContext();
+    }
+  }
+
+  printf("dumping idContextMap ---\n");
+  for (auto pair: idContextMap) {
+    printf("  %s: \n", pair.first.c_str());
+    for (auto ctx: pair.second)  {
+      ctx->dumpContext();
+    }
+  }
+
+  printf("dumping packageIdContextMap ---\n");
+  for (auto pair: packageIdContextMap) {
+    printf("  %s: \n", pair.first.c_str());
+    for (auto ctx: pair.second)  {
+      ctx->dumpContext();
+    }
+  }
+}
 } // namespace Raceboat

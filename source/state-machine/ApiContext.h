@@ -146,6 +146,11 @@ public:
   virtual void
   updateListenAccept(std::function<void(ApiStatus, RaceHandle)> /* cb */) {}
 
+  void dumpContext(std::string context="") {  // debug
+    void* thisPtr = this;
+    printf("   %s %p: %lu\n", context.c_str(), thisPtr, handle);
+  }
+
 public:
   ApiManagerInternal &manager;
   StateEngine &engine;

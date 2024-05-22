@@ -470,6 +470,7 @@ struct StateBootstrapDialFailed : public BootstrapDialState {
     auto &ctx = getContext(context);
 
     if (ctx.dialCallback) {
+      helper::logDebug(logPrefix + "dial callback not null");
       ctx.dialCallback(ApiStatus::INTERNAL_ERROR, {});
       ctx.dialCallback = {};
     }

@@ -368,6 +368,7 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
       RaceHandle preBootstrapConnSMHandle = std::move(ctx.preBootstrapConduitSM.front());
       ctx.preBootstrapConduitSM.pop();
       if (!ctx.manager.onBootstrapListenAccept(preBootstrapConnSMHandle, cb)) {
+        helper::logError(logPrefix + "bootstrap listen accept failed");
         cb(ApiStatus::INTERNAL_ERROR, {});
       };
     }
@@ -405,16 +406,19 @@ struct StateBootstrapListenFailed : public BootstrapListenState {
     auto &ctx = getContext(context);
 
     if (ctx.listenCb) {
+      helper::logDebug(logPrefix + "listen callback not null");
       ctx.listenCb(ApiStatus::INTERNAL_ERROR, {}, {});
       ctx.listenCb = {};
     }
 
     for (auto &cb : ctx.acceptCb) {
+      helper::logDebug(logPrefix + "accept callback not null");
       cb(ApiStatus::INTERNAL_ERROR, {});
     }
     ctx.acceptCb = {};
 
     if (ctx.closeCb) {
+      helper::logDebug(logPrefix + "close callback not null");
       ctx.closeCb(ApiStatus::INTERNAL_ERROR);
       ctx.closeCb = {};
     }

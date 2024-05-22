@@ -206,6 +206,7 @@ public:
                                  const std::string &id);
   virtual void unregisterHandle(ApiContext &context, RaceHandle handle);
 
+  void dumpContexts(std::string context="");  // debug
   using Contexts = std::unordered_set<ApiContext *>;
 
 protected:

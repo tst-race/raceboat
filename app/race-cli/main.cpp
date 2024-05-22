@@ -747,20 +747,27 @@ int create_client_connection(std::string &hostaddr, uint16_t port) {
 }
 
 void forward_local_to_conduit(int local_sock, Conduit &conduit) {
-  printf("local_to_conduit with socket fd %d\n", local_sock);
+  local_sock = dup(local_sock);
   std::vector<uint8_t> buffer(BUF_SIZE);
   ssize_t received_bytes = ::recv(local_sock, buffer.data(), BUF_SIZE, 0);
+  Raceboat::OpHandle handle = conduit.getHandle();
+  printf("local_to_conduit with socket fd %d, with conduit handle %lu\n", local_sock, handle);
 
   while (received_bytes > 0) { // read data from input socket
     std::vector<uint8_t> result(buffer.begin(),
                                 buffer.begin() + received_bytes);
-    printf("Relaying data %s from local socket to conduit\n",
-      std::string(buffer.begin(), buffer.begin() + received_bytes).c_str());
+    printf("Relaying data %s from local socket to conduit -- %lu\n",
+      std::string(buffer.begin(), buffer.begin() + received_bytes).c_str(), conduit.getHandle());
     auto status = conduit.write(result); // send data to output socket
     if (status != ApiStatus::OK) {
       printf("conduit write failed with status: %i on socket\n", status);
       break;
     }
+
+    if (handle != conduit.getHandle()) {
+      printf("    HANDLE CHANGED!  Was %lu, now %lu\n", handle, conduit.getHandle());
+    }
+
     received_bytes = ::recv(local_sock, buffer.data(), BUF_SIZE, 0);
   }
 
@@ -775,11 +782,16 @@ void forward_local_to_conduit(int local_sock, Conduit &conduit) {
 }
 
 void forward_conduit_to_local(Conduit &conduit, int local_sock) {
-  printf("conduit_to_local with socket fd %d\n", local_sock);
+  local_sock = dup(local_sock);
+  printf("conduit_to_local with socket fd %d, with conduit handle %lu\n", local_sock, conduit.getHandle());
   ssize_t send_status;
+  Raceboat::OpHandle handle = conduit.getHandle();
 
   while (true) {
     auto [status, buffer] = conduit.read();
+    if (handle != conduit.getHandle()) {
+      printf("    HANDLE CHANGED!  Was %lu, now %lu\n", handle, conduit.getHandle());
+    }
     if (status != ApiStatus::OK) {
       printf("conduit read failed with status: %i\n", status);
       break;
@@ -800,14 +812,14 @@ void forward_conduit_to_local(Conduit &conduit, int local_sock) {
   printf("Exiting conduit_to_local loop\n");
 }
 
-void relay_data_loop(int client_sock, Raceboat::Conduit &connection, bool blocking=false) {
-  printf("relay_data_loop socket: %d\n", client_sock);
-  std::thread local_to_conduit_thread([client_sock, &connection]() {
-    forward_local_to_conduit(client_sock, connection);
+void relay_data_loop(int client_sock, Raceboat::Conduit &conduit, bool blocking=false) {
+  printf("relay_data_loop socket: %d with conduit handle %lu\n", client_sock, conduit.getHandle());
+  std::thread local_to_conduit_thread([client_sock, &conduit]() {
+    forward_local_to_conduit(client_sock, conduit);
   });
 
-  std::thread conduit_to_local_thread([client_sock, &connection]() {
-    forward_conduit_to_local(connection, client_sock);
+  std::thread conduit_to_local_thread([client_sock, &conduit]() {
+    forward_conduit_to_local(conduit, client_sock);
   });
   if (blocking) {
     local_to_conduit_thread.join();
@@ -830,7 +842,6 @@ void client_connection_loop(int server_sock,
 
   // allow re-connect, but only 1 active connection
   std::vector<int> sockets;
-  std::vector<Raceboat::Conduit*> connections;
   do {
     poll_result = ::poll(&poll_fd, 1, timeout);
     if (poll_result < 0) {
@@ -860,9 +871,9 @@ void client_connection_loop(int server_sock,
           connection.close();
         } else {
           printf("dial success\n");
-          connections.push_back(&connection);
           // block so accept() isn't called until after socket error
           relay_data_loop(client_sock, connection, /* blocking */ true);
+          connection.close();
         }
       }
     } else if (poll_result == 0) {
@@ -875,9 +886,6 @@ void client_connection_loop(int server_sock,
 
   for (auto sock: sockets) {
     close_socket(sock);
-  }
-  for (auto conn: connections) {
-    conn->close();
   }
   printf("exiting client loop\n");
 }
@@ -939,7 +947,7 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
   return 0;
 }
 
-ApiStatus run_server(Race &race, BootstrapConnectionOptions &conn_opt, int client_sock) {
+ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_opt, int client_sock) {
   ApiStatus status = ApiStatus::OK;
   
   printf("CREATING RACE SERVER SOCKET\n");
@@ -951,7 +959,7 @@ ApiStatus run_server(Race &race, BootstrapConnectionOptions &conn_opt, int clien
   }
   printf("\nlistening on link address: '%s'", link_addr.c_str());
 
-  std::vector<Raceboat::Conduit> connections;
+  std::unordered_map<OpHandle, Raceboat::Conduit> connections;
   while (1) {
     printf("server calling accept\n");
     auto [status2, connection] = listener.accept();
@@ -961,13 +969,21 @@ ApiStatus run_server(Race &race, BootstrapConnectionOptions &conn_opt, int clien
       break;
     }
     printf("accept success\n");
-    connections.push_back(connection);
-    relay_data_loop(client_sock, connection);
+    connections[connection.getHandle()] = connection;
+    relay_data_loop(client_sock, connections[connection.getHandle()]);
+
+    for (auto handleConnPair: connections) {
+      void* ptr = &handleConnPair.second;
+      printf(" -- %lu:%lu - %p\n", handleConnPair.first, handleConnPair.second.getHandle(), ptr);
+      if (handleConnPair.first != handleConnPair.second.getHandle()) {
+        printf("CONDUIT HANDLE CHANGED! Was %lu, now %lu\n", handleConnPair.first, handleConnPair.second.getHandle());
+      }
+    }
   }
 
   printf("closing race sockets\n");
   for (auto conn: connections) {
-    auto close_status = conn.close();
+    auto close_status = conn.second.close();
     if (ApiStatus::OK != close_status) {
       printf("close failed with status: %i\n", close_status);
     }
@@ -1015,7 +1031,7 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
     }
   }
 
-  ApiStatus status = run_server(race, conn_opt, client_sock);
+  ApiStatus status = server_connections_loop(race, conn_opt, client_sock);
   close_socket(client_sock);
 
   return (status == ApiStatus::OK);

@@ -18,6 +18,7 @@
 
 #include <atomic>
 #include <future>
+#include <sstream>
 
 #include "Core.h"
 #include "helper.h"
@@ -76,7 +77,12 @@ Conduit::Conduit(const Conduit &that) {
   handle = that.handle;
 }
 
+OpHandle Conduit::getHandle() { 
+  return handle; 
+}
+
 std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read() {
+  TRACE_METHOD();
   std::promise<std::pair<ApiStatus, std::vector<uint8_t>>> promise;
   auto future = promise.get_future();
 
@@ -99,12 +105,14 @@ std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read() {
 }
 
 std::pair<ApiStatus, std::string> Conduit::read_str() {
+  TRACE_METHOD();
   auto [status, bytes] = read();
   std::string str{bytes.begin(), bytes.end()};
   return {status, str};
 }
 
 ApiStatus Conduit::write(std::vector<uint8_t> bytes) {
+  TRACE_METHOD();
   std::promise<ApiStatus> promise;
   auto future = promise.get_future();
 
@@ -126,11 +134,13 @@ ApiStatus Conduit::write(std::vector<uint8_t> bytes) {
 }
 
 ApiStatus Conduit::write_str(const std::string &message) {
+  TRACE_METHOD();
   std::vector<uint8_t> bytes{message.begin(), message.end()};
   return write(bytes);
 }
 
 ApiStatus Conduit::close() {
+  TRACE_METHOD();
   std::promise<ApiStatus> promise;
   auto future = promise.get_future();
   if (core == nullptr) {

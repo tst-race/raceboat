@@ -156,6 +156,7 @@ struct StatePreConduitFailed : public PreConduitState {
     auto &ctx = getContext(context);
 
     if (ctx.acceptCb) {
+      helper::logWarning(logPrefix + "accept callback not null");
       ctx.acceptCb(ApiStatus::INTERNAL_ERROR, {});
       ctx.acceptCb = {};
     }

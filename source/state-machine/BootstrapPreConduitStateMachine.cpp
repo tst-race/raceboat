@@ -387,6 +387,7 @@ struct StateBootstrapPreConduitFailed : public BootstrapPreConduitState {
     auto &ctx = getContext(context);
 
     if (ctx.acceptCb) {
+      helper::logDebug(logPrefix + "accept callback not null");
       ctx.acceptCb(ApiStatus::INTERNAL_ERROR, {});
       ctx.acceptCb = {};
     }
