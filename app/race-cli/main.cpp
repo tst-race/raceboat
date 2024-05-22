@@ -841,7 +841,6 @@ void client_connection_loop(int server_sock,
   int poll_result;
 
   // allow re-connect, but only 1 active connection
-  std::vector<int> sockets;
   do {
     poll_result = ::poll(&poll_fd, 1, timeout);
     if (poll_result < 0) {
@@ -863,7 +862,6 @@ void client_connection_loop(int server_sock,
       if (client_sock < 0) {
         perror("accept() error");
       } else {
-        sockets.push_back(client_sock);
         printf("calling bootstrap_dial_str\n");
         auto [status, connection] = race.bootstrap_dial_str(conn_opt, "");
         if (status != ApiStatus::OK) {
@@ -874,6 +872,7 @@ void client_connection_loop(int server_sock,
           // block so accept() isn't called until after socket error
           relay_data_loop(client_sock, connection, /* blocking */ true);
           connection.close();
+          close_socket(client_sock);
         }
       }
     } else if (poll_result == 0) {
@@ -884,9 +883,6 @@ void client_connection_loop(int server_sock,
   // allow retries (via poll_result == 0)
   } while (poll_result >= 0);
 
-  for (auto sock: sockets) {
-    close_socket(sock);
-  }
   printf("exiting client loop\n");
 }
 
