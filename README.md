@@ -127,7 +127,9 @@ apt-get update && apt-get install ncat && ncat -vvvvvv --broker --listen -p 7777
 
 Back in the first server container terminal
 ```
-race-cli --dir /server-kits --server-bootstrap-connect --recv-channel=twoSixDirectCpp --send-channel=twoSixDirectCpp --final-send-channel=twoSixDirectCpp --final-recv-channel=twoSixDirectCpp --param hostname="10.11.1.2" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26269 --debug | tee rrlog | grep ERROR
+ncat --broker --listen -p 7777 -vv --chat
+
+race-cli --dir /server-kits --server-bootstrap-connect --recv-channel=twoSixDirectCpp --send-channel=twoSixDirectCpp --final-send-channel=twoSixDirectCpp --final-recv-channel=twoSixDirectCpp --param hostname="10.11.1.2" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26269 --debug | tee rrlog | grep SOCKET
 ```
 
 Start another server terminal, and start a `nc` session to read/write from stdio.
@@ -148,7 +150,7 @@ docker run --rm -it --name=rbclient --network=rib-overlay-network --ip=10.11.1.3
        -v $(pwd)/scripts/:/scripts/ \
        raceboat:latest bash
 
-race-cli --dir /client-kits --client-bootstrap-connect --send-channel=twoSixDirectCpp --send-address="{\"hostname\":\"10.11.1.2\",\"port\":26262}" --recv-channel=twoSixDirectCpp --final-send-channel=twoSixDirectCpp --final-recv-channel=twoSixDirectCpp --param hostname="10.11.1.3" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26265 --param localPort=9999 --debug | tee srlog | grep ERROR &
+race-cli --dir /client-kits --client-bootstrap-connect --send-channel=twoSixDirectCpp --send-address="{\"hostname\":\"10.11.1.2\",\"port\":26262}" --recv-channel=twoSixDirectCpp --final-send-channel=twoSixDirectCpp --final-recv-channel=twoSixDirectCpp --param hostname="10.11.1.3" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26265 --param localPort=9999 --debug | tee srlog | grep ERROR
 
 nc localhost 9999
 
@@ -164,7 +166,7 @@ docker run --rm -it --name=rbclient2 --network=rib-overlay-network --ip=10.11.1.
        -v $(pwd)/scripts/:/scripts/ \
        raceboat:latest bash
 
-race-cli --dir /client-kits --client-bootstrap-connect --send-channel=twoSixDirectCpp --send-address="{\"hostname\":\"10.11.1.2\",\"port\":26262}" --recv-channel=twoSixDirectCpp --final-send-channel=twoSixDirectCpp --final-recv-channel=twoSixDirectCpp --param hostname="10.11.1.4" --param PluginCommsTwoSixStub.startPort=26266 --param PluginCommsTwoSixStub.endPort=26269 --param localPort=9998 --debug  | tee srlog | grep ERROR &
+race-cli --dir /client-kits --client-bootstrap-connect --send-channel=twoSixDirectCpp --send-address="{\"hostname\":\"10.11.1.2\",\"port\":26262}" --recv-channel=twoSixDirectCpp --final-send-channel=twoSixDirectCpp --final-recv-channel=twoSixDirectCpp --param hostname="10.11.1.4" --param PluginCommsTwoSixStub.startPort=26266 --param PluginCommsTwoSixStub.endPort=26269 --param localPort=9998 --debug  | tee srlog | grep ERROR
 
 nc localhost 9998
 ```

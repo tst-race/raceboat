@@ -730,11 +730,11 @@ int create_client_connection(std::string &hostaddr, uint16_t port) {
     return -1;
   }
 
-  printf("new client socket family:%d, type:%d, protocol:%d\n", res->ai_family, res->ai_socktype, res->ai_protocol);
+  printf("SOCKET new client socket family:%d, type:%d, protocol:%d\n", res->ai_family, res->ai_socktype, res->ai_protocol);
   client_sock = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
   if (client_sock >= 0 &&
       ::connect(client_sock, res->ai_addr, res->ai_addrlen) < 0) {
-    printf("connect() failed\n");
+    printf("SOCKET connect() failed\n");
     close_socket(client_sock);
     client_sock = -1;
   }
@@ -742,7 +742,7 @@ int create_client_connection(std::string &hostaddr, uint16_t port) {
   if (res != nullptr) {
     ::freeaddrinfo(res);
   }
-  printf("connected socket %d\n", client_sock);
+  printf("SOCKET connected socket %d\n", client_sock);
   return client_sock;
 }
 
@@ -943,7 +943,7 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
   return 0;
 }
 
-ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_opt, int client_sock) {
+ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_opt, int local_port) {
   ApiStatus status = ApiStatus::OK;
   
   printf("CREATING RACE SERVER SOCKET\n");
@@ -955,6 +955,7 @@ ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_o
   }
   printf("\nlistening on link address: '%s'", link_addr.c_str());
 
+  std::string host = "localhost";
   std::unordered_map<OpHandle, Raceboat::Conduit> connections;
   while (1) {
     printf("server calling accept\n");
@@ -964,8 +965,23 @@ ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_o
       status = status2;
       break;
     }
+  
+    
+    printf("AWAITING LOCAL CLIENT\n");
+    
+    // create client connection for listening socket to connect on
+    // assume listening process is or will be running
+    int client_sock = -1;
+    while (client_sock < 0) {
+      if ((client_sock = create_client_connection(host, local_port)) < 0) {
+        printf("Awaiting listening socket \n");
+        sleep(5);
+      }
+    }
+
     printf("accept success\n");
     connections[connection.getHandle()] = connection;
+    printf("SOCKET client_sock: %d\n", client_sock);
     relay_data_loop(client_sock, connections[connection.getHandle()]);
 
     for (auto handleConnPair: connections) {
@@ -1011,24 +1027,9 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
   
   printf("handle_server_bootstrap_connect\n");
   
-  int client_sock = -1;
-  std::string host = "localhost";
   int local_port = 7777;
   check_for_local_port_override(opts, local_port);
-
-  printf("AWAITING LOCAL CLIENT\n");
-
-  // create client connection for listening socket to connect on
-  // assume listening process is or will be running
-  while (client_sock < 0) {
-    if ((client_sock = create_client_connection(host, local_port)) < 0) {
-      printf("Awaiting listening socket \n");
-      sleep(5);
-    }
-  }
-
-  ApiStatus status = server_connections_loop(race, conn_opt, client_sock);
-  close_socket(client_sock);
+  ApiStatus status = server_connections_loop(race, conn_opt, local_port);
 
   return (status == ApiStatus::OK);
 }
