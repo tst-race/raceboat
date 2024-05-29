@@ -781,45 +781,45 @@ void forward_local_to_conduit(int local_sock, Conduit &conduit) {
   printf("Exiting local_to_conduit loop\n");
 }
 
-void forward_conduit_to_local(Conduit &conduit, int local_sock) {
+void forward_conduit_to_local(Conduit &conduit, int local_sock, const long timeoutSeconds) {
   local_sock = dup(local_sock);
-  printf("conduit_to_local with socket fd %d, with conduit handle %lu\n", local_sock, conduit.getHandle());
+  printf("conduit_to_local with socket fd %d, with conduit handle %lu, and timeout %ld\n", local_sock, conduit.getHandle(), timeoutSeconds);
   ssize_t send_status;
-  Raceboat::OpHandle handle = conduit.getHandle();
 
   while (true) {
-    auto [status, buffer] = conduit.read();
-    if (handle != conduit.getHandle()) {
-      printf("    HANDLE CHANGED!  Was %lu, now %lu\n", handle, conduit.getHandle());
-    }
-    if (status != ApiStatus::OK) {
+    auto [status, buffer] = conduit.read(timeoutSeconds);
+    
+    if (status == ApiStatus::TIMEOUT) {
+      printf("conduit read timed out with status: %i\n", status);
+    } else if (status != ApiStatus::OK) {
       printf("conduit read failed with status: %i\n", status);
       break;
-    }
-    printf("Relaying data %s from conduit to local socket\n",
-      std::string(buffer.begin(), buffer.end()).c_str());
-    send_status = ::send(local_sock, buffer.data(), buffer.size(), 0);
-    if (send_status < 0) {
-      char buf[64];
-      snprintf(buf, sizeof(buf) -1, "send() failed on fd %d", local_sock);
-      perror(buf);
-      break;
-    } else if (send_status < static_cast<ssize_t>(buffer.size())) {
-      // this "shouldn't" happen, but visibility provided just in case
-      printf("WARNING: sent %zd of %lu bytes\n", send_status, buffer.size());
+    } else {
+      printf("Relaying data %s from conduit to local socket\n",
+        std::string(buffer.begin(), buffer.end()).c_str());
+      send_status = ::send(local_sock, buffer.data(), buffer.size(), 0);
+      if (send_status < 0) {
+        char buf[64];
+        snprintf(buf, sizeof(buf) -1, "send() failed on fd %d", local_sock);
+        perror(buf);
+        break;
+      } else if (send_status < static_cast<ssize_t>(buffer.size())) {
+        // this "shouldn't" happen, but visibility provided just in case
+        printf("WARNING: sent %zd of %lu bytes\n", send_status, buffer.size());
+      }
     }
   }
   printf("Exiting conduit_to_local loop\n");
 }
 
-void relay_data_loop(int client_sock, Raceboat::Conduit &conduit, bool blocking=false) {
-  printf("relay_data_loop socket: %d with conduit handle %lu\n", client_sock, conduit.getHandle());
+void relay_data_loop(int client_sock, Raceboat::Conduit &conduit, long timeoutSeconds, bool blocking) {
+  printf("relay_data_loop socket: %d with race read timeout %ld\n", client_sock, timeoutSeconds);
   std::thread local_to_conduit_thread([client_sock, &conduit]() {
     forward_local_to_conduit(client_sock, conduit);
   });
 
-  std::thread conduit_to_local_thread([client_sock, &conduit]() {
-    forward_conduit_to_local(conduit, client_sock);
+  std::thread conduit_to_local_thread([client_sock, &conduit, timeoutSeconds]() {
+    forward_conduit_to_local(conduit, client_sock, timeoutSeconds);
   });
   if (blocking) {
     local_to_conduit_thread.join();
@@ -837,8 +837,12 @@ void client_connection_loop(int server_sock,
   memset(&poll_fd, 0, sizeof(poll_fd));
   poll_fd.fd = server_sock;
   poll_fd.events = POLLIN;
-  int timeout = (5 * 60 * 1000); // 5 minute timeout
+  int timeout = (5 * 60 * 1000); // 5 minute timeout default
   int poll_result;
+
+  if (conn_opt.timeout_ms > 0) {
+    timeout = conn_opt.timeout_ms;
+  }
 
   // allow re-connect, but only 1 active connection
   do {
@@ -870,7 +874,7 @@ void client_connection_loop(int server_sock,
         } else {
           printf("dial success\n");
           // block so accept() isn't called until after socket error
-          relay_data_loop(client_sock, connection, /* blocking */ true);
+          relay_data_loop(client_sock, connection, Conduit::BLOCKING_READ, /* blocking threads */ true);
           connection.close();
           close_socket(client_sock);
         }
@@ -946,6 +950,11 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
 ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_opt, int client_sock) {
   ApiStatus status = ApiStatus::OK;
   
+  long timeoutSeconds = 300;  // 5 minute read timeout default
+  if(conn_opt.timeout_ms > 0) {
+    timeoutSeconds = conn_opt.timeout_ms / 1000;
+  }
+
   printf("CREATING RACE SERVER SOCKET\n");
   // listen on race side
   auto [status1, link_addr, listener] = race.bootstrap_listen(conn_opt);
@@ -955,7 +964,7 @@ ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_o
   }
   printf("\nlistening on link address: '%s'", link_addr.c_str());
 
-  std::unordered_map<OpHandle, Raceboat::Conduit> connections;
+    std::unordered_map<OpHandle, Raceboat::Conduit> connections;
   while (1) {
     printf("server calling accept\n");
     auto [status2, connection] = listener.accept();
@@ -966,7 +975,7 @@ ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_o
     }
     printf("accept success\n");
     connections[connection.getHandle()] = connection;
-    relay_data_loop(client_sock, connections[connection.getHandle()]);
+    relay_data_loop(client_sock, connections[connection.getHandle()], timeoutSeconds, false);
 
     for (auto handleConnPair: connections) {
       void* ptr = &handleConnPair.second;
@@ -1008,6 +1017,7 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
   conn_opt.final_recv_role = opts.final_recv_role;
   conn_opt.final_send_channel = opts.final_send_channel;
   conn_opt.final_send_role = opts.final_send_role;
+  conn_opt.timeout_ms = opts.timeout_ms;
   
   printf("handle_server_bootstrap_connect\n");
   

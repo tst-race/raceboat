@@ -27,6 +27,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "helper.h"
 #include "race/common/constants.h"
 
 namespace Raceboat {
@@ -64,7 +65,7 @@ private:
     WorkQueueIter workIter; // the iterator to this work in the work queue
     TimeoutIter timeoutIter;
     TimedOutIter timedOutIter;
-    bool runningCallback;
+    std::atomic<bool> runningCallback;
 
     template <typename T, typename T2>
     Work(T &&_callback, T2 _timeoutCallback, size_t _size,
@@ -143,7 +144,7 @@ private:
   // work thread
   std::map<int, PriorityLevel, std::greater<int>> priority_levels;
 
-  // The current priority the work thread is processesing work from. This may be
+  // The current priority the work thread is processing work from. This may be
   // higher than the priority of the highest priority work currently, but will
   // not be lower.
   PriorityIter current_priority;
@@ -481,6 +482,7 @@ auto Handler::post(std::string queue_name, size_t postedWorkSize, int timeout,
       return true;
     };
 
+    // wait until work can be queued
     if (timeout == RACE_BLOCKING) {
       post_signaler.wait(lock, cond);
     } else {
@@ -506,7 +508,7 @@ auto Handler::post(std::string queue_name, size_t postedWorkSize, int timeout,
         },
         timeoutCallback, postedWorkSize, timeoutTimestamp);
 
-    // notify the work thread if there's a shorter timeout
+    // notify the timeout thread if there's a shorter timeout
     if (timeoutTimestamp != std::numeric_limits<double>::infinity() &&
         (timeoutQueue.empty() ||
          timeoutTimestamp < (*timeoutQueue.begin())->timeoutTimestamp)) {

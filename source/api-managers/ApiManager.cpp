@@ -67,6 +67,7 @@ SdkResponse ApiManager::post(const std::string &logPrefix, T &&function,
 
       return std::make_optional(true);
     };
+
     auto [success, queueSize, future] = handler.post(
         "", 0, -1, std::bind(std::move(workFunc), std::forward<Args>(args)...));
 
@@ -223,7 +224,9 @@ SdkResponse ApiManager::read(
     return SDK_INVALID_ARGUMENT;
   }
 
-  return post(logPrefix, &ApiManagerInternal::read, handle, callback);
+  auto response = post(logPrefix, &ApiManagerInternal::read, handle, callback);
+  handler.unblock_queue("");  // in case of timeout
+  return response;
 }
 
 SdkResponse ApiManager::write(OpHandle handle, std::vector<uint8_t> bytes,
@@ -329,7 +332,7 @@ SdkResponse ApiManager::onPackageStatusChanged(PluginContainer & /* plugin */,
 ApiManagerInternal::ApiManagerInternal(Core &_core, ApiManager &manager)
     : core(_core), manager(manager), connEngine(), sendEngine(), recvEngine() {}
 
-  void ApiManagerInternal::send(uint64_t postId, SendOptions sendOptions,
+void ApiManagerInternal::send(uint64_t postId, SendOptions sendOptions,
                               std::vector<uint8_t> data,
                               std::function<void(ApiStatus)> cb) {
   TRACE_METHOD(postId, sendOptionsToString(sendOptions), data);
@@ -368,6 +371,7 @@ void ApiManagerInternal::bootstrapDial(
   context->updateBootstrapDial(options, std::move(data), callback);
   bootstrapDialEngine.start(*context);
 }
+
 void ApiManagerInternal::getReceiveObject(
     uint64_t postId, ReceiveOptions recvOptions,
     std::function<void(ApiStatus, LinkAddress, RaceHandle)> cb) {
@@ -498,7 +502,7 @@ void ApiManagerInternal::accept(
 
   auto contexts = getContexts(handle);
   if (contexts.size() != 1) {
-    helper::logError(logPrefix + "Invalid handle passed to read");
+    helper::logError(logPrefix + "Invalid handle passed to accept");
     callback(ApiStatus::INTERNAL_ERROR, {});
     callback = {};
   }
@@ -1211,7 +1215,7 @@ void ApiManagerInternal::removeContext(ApiContext &context) {
 EventResult ApiManagerInternal::triggerEvent(ApiContext &context,
                                              EventType event) {
   EventResult result = context.engine.handleEvent(context, event);
-
+  
   if (result != EventResult::SUCCESS) {
     helper::logDebug("triggerEvent " + eventToString(event) + " failed");
   }

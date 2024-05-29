@@ -81,8 +81,8 @@ OpHandle Conduit::getHandle() {
   return handle; 
 }
 
-std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read() {
-  TRACE_METHOD();
+std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read(long timeoutSeconds) {
+  TRACE_METHOD(timeoutSeconds);
   std::promise<std::pair<ApiStatus, std::vector<uint8_t>>> promise;
   auto future = promise.get_future();
 
@@ -90,9 +90,6 @@ std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read() {
     return {ApiStatus::INVALID, {}};
   }
 
-  // Taking promise by reference is fine because we block waiting for the
-  // return. If this function gets changed to timeout, this should be changed as
-  // well.
   auto response = core->getApiManager().read(
       handle, [&promise](ApiStatus status, std::vector<uint8_t> bytes) {
         promise.set_value({status, std::move(bytes)});
@@ -101,7 +98,16 @@ std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read() {
     return {ApiStatus::INVALID_ARGUMENT, {}};
   }
 
-  return future.get();
+  if (timeoutSeconds != BLOCKING_READ) { 
+    if(std::future_status::ready != future.wait_for(std::chrono::seconds(timeoutSeconds))) {
+      helper::logDebug(logPrefix + "timed out");
+      return {ApiStatus::TIMEOUT, {}};
+    } else {
+      return future.get();  
+    }
+  } else {
+    return future.get();
+  }
 }
 
 std::pair<ApiStatus, std::string> Conduit::read_str() {

@@ -125,7 +125,7 @@ docker exec -it rbserver bash
 apt-get update && apt-get install ncat && ncat -vvvvvv --broker --listen -p 7777
 ```
 
-Back in the first server container terminal
+Back in the first server container terminal.  Consider using faster read timeouts with the -w <milliseconds> flag.
 ```
 race-cli --dir /server-kits --server-bootstrap-connect --recv-channel=twoSixDirectCpp --send-channel=twoSixDirectCpp --final-send-channel=twoSixDirectCpp --final-recv-channel=twoSixDirectCpp --param hostname="10.11.1.2" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26269 --debug | tee rrlog | grep ERROR
 ```

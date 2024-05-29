@@ -68,9 +68,7 @@ void ConduitContext::updateRead(
     std::function<void(ApiStatus, std::vector<uint8_t>)> cb) {
       TRACE_METHOD();
   if (this->readCallback) {
-    // Call old callback
-    helper::logError(logPrefix + "read callback not null for context handle " + std::to_string(handle));
-    this->readCallback(ApiStatus::INTERNAL_ERROR, {});
+    helper::logInfo(logPrefix + "read callback not null.  This may happen if there was a read timeout.  Otherwise this should be considered an error");
   }
   this->readCallback = cb;
 }
@@ -128,13 +126,15 @@ struct StateConduitConnected : public ConduitState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
     PluginWrapper &plugin = getPlugin(ctx, ctx.sendChannel);
-
+    
     if (ctx.readCallback && !ctx.recvQueue.empty()) {
       ctx.readCallback(ApiStatus::OK, ctx.recvQueue.front());
       ctx.readCallback = {};
       ctx.recvQueue.pop();
     } else if(!ctx.recvQueue.empty()) {
       helper::logWarning(logPrefix + "null read callback and non-empty queue!");
+    } else {
+      helper::logWarning(logPrefix + "nothing to read");
     }
 
     for (auto &[cb, bytes] : ctx.sendQueue) {
@@ -178,7 +178,7 @@ struct StateConduitConnected : public ConduitState {
       if (it == ctx.sentQueue.end()) {
         continue;
       }
-      helper::logInfo(logPrefix + "failed list notify");
+      helper::logInfo(logPrefix + "failed list callback");
       it->second(ApiStatus::INTERNAL_ERROR);
       ctx.sentQueue.erase(it);
     }
@@ -199,6 +199,7 @@ struct StateConduitFinished : public ConduitState {
 
     if (ctx.readCallback) {
       ctx.readCallback(ApiStatus::CLOSING, {});
+      helper::logDebug(logPrefix + "clearing read callback");
       ctx.readCallback = {};
     }
 
@@ -255,8 +256,8 @@ struct StateConduitFailed : public ConduitState {
     }
 
     if (ctx.closeCallback) {
-      helper::logDebug(logPrefix + "close callback not null");
       ctx.closeCallback(ApiStatus::INTERNAL_ERROR);
+      helper::logDebug(logPrefix + "clearing close callback");
       ctx.closeCallback = {};
     }
 

@@ -39,7 +39,8 @@ enum class ApiStatus {
   CHANNEL_INVALID,
   INVALID_ARGUMENT,
   PLUGIN_ERROR,
-  INTERNAL_ERROR
+  INTERNAL_ERROR,
+  TIMEOUT
 };
 
 struct ReceiveOptions {
@@ -92,11 +93,13 @@ public:
 
   OpHandle getHandle();  // debug
 
-  std::pair<ApiStatus, std::vector<uint8_t>> read();
+  std::pair<ApiStatus, std::vector<uint8_t>> read(long timeoutTimestamp = BLOCKING_READ);
   std::pair<ApiStatus, std::string> read_str();
   ApiStatus write(std::vector<uint8_t> message);
   ApiStatus write_str(const std::string &message);
   ApiStatus close();
+
+  static const long BLOCKING_READ = 0;
 
 private:
   std::shared_ptr<Core> core;

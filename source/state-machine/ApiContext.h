@@ -19,6 +19,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #include "PluginContainer.h"
 #include "StateMachine.h"
@@ -146,9 +147,15 @@ public:
   virtual void
   updateListenAccept(std::function<void(ApiStatus, RaceHandle)> /* cb */) {}
 
-  void dumpContext(std::string context="") {  // debug
+  std::string toString() {
+    std::stringstream s;
     void* thisPtr = this;
-    printf("   %s %p: %lu\n", context.c_str(), thisPtr, handle);
+    s << thisPtr << ": " << handle;
+    return s.str();
+  }
+
+  void dumpContext(std::string context="") {  // debug
+    printf("   %s %s\n", context.c_str(), toString().c_str());
   }
 
 public:
