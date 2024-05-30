@@ -171,4 +171,7 @@ race-cli --dir /client-kits --client-bootstrap-connect --send-channel=twoSixDire
 nc localhost 9998
 ```
 
-Confirm that both clients can send messages to the server via nc.  Note that the server will only send messages to one of the clients.  
+Confirm that both clients can send messages to the server via nc.  Note that the server will only send messages to one of the clients.
+
+## Bridge Distro Mode
+bridge-distro  --passphrase gimme --responses-file /scripts/example-responses.txt --dir /server-kits --recv-channel=twoSixDirectCpp --send-channel=twoSixDirectCpp --param hostname="10.11.1.2" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26269 --debug | tee rrlog
