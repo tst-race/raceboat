@@ -171,4 +171,20 @@ race-cli --dir /client-kits --client-bootstrap-connect --send-channel=twoSixDire
 nc localhost 9998
 ```
 
-Confirm that both clients can send messages to the server via nc.  Note that the server will only send messages to one of the clients.  
+Confirm that both clients can send messages to the server via nc.  Note that the server will only send messages to one of the clients.
+
+## Bridge Distro Mode
+docker run --rm -it --name=rbserver --network=rib-overlay-network --ip=10.11.1.2 \               ─╯
+       -v $(pwd)/../kits/:/server-kits/ \
+       -v $(pwd):/code -w /code \
+       -v $(pwd)/scripts/:/scripts/ \
+       raceboat:latest bash -c "bridge-distro  --passphrase gimme --responses-file /scripts/example-responses.txt --dir /server-kits --recv-channel=twoSixDirectCpp --send-channel=twoSixDirectCpp --param hostname="10.11.1.2" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26269 | tee rrlog"
+
+## Requester
+ docker run --rm -it --name=rbclient1 --network=rib-overlay-network --ip=10.11.1.3 \                ─╯
+       -v $(pwd)/../kits/:/client-kits/ \
+       -v $(pwd):/code -w /code \
+       -v $(pwd)/scripts/:/scripts/ \
+       raceboat:latest bash
+       
+race-cli --dir /client-kits --send-recv --send-channel=twoSixDirectCpp --send-address="{\"hostname\":\"10.11.1.2\",\"port\":26262}" --recv-channel=twoSixDirectCpp --param hostname="10.11.1.3" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26265 --param localPort=9999 --debug | tee srlog

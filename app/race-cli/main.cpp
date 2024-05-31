@@ -350,6 +350,7 @@ std::vector<uint8_t> readStdin() {
   while ((c = getchar()) != EOF) {
     buffer.push_back(c);
   }
+  buffer.pop_back(); // pop trailing newline
   return buffer;
 }
 
