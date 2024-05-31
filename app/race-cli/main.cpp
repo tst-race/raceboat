@@ -345,11 +345,13 @@ ChannelParamStore getParams(const CmdOptions &opts) {
 std::vector<uint8_t> readStdin() {
   std::vector<uint8_t> buffer;
   int c;
+  printf("READING\n");
 
   // efficiency isn't a huge concern, so just read one character at a time
   while ((c = getchar()) != EOF) {
     buffer.push_back(c);
   }
+  buffer.pop_back(); // pop trailing newline
   return buffer;
 }
 

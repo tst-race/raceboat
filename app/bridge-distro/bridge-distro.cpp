@@ -326,9 +326,13 @@ int handle_recv_respond(const CmdOptions &opts) {
     }
     
     printf("RECEIVED REQUEST: %s\n", received_message.c_str());
+    printf("PASSPHRASE: $%s$\n", passphrase.c_str());
+    printf("RECEIVED: $%s$\n", received_message.c_str());
+    
     if (received_message == passphrase) {
       auto response = responses[resp_idx];
       resp_idx = (resp_idx + 1) % responses.size();
+      printf("RESPONDING WITH: %s\n", response.data());
       auto status3 = responder.respond(response);
       if (status3 != ApiStatus::OK) {
         RaceLog::logError("RaceCli", "Response failed\n", "");
@@ -336,7 +340,7 @@ int handle_recv_respond(const CmdOptions &opts) {
       }
     }
     else {
-      printf("Client did not authenticate");
+      printf("Client did not authenticate\n");
     }
   }
 

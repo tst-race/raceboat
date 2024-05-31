@@ -175,3 +175,4 @@ Confirm that both clients can send messages to the server via nc.  Note that the
 
 ## Bridge Distro Mode
 bridge-distro  --passphrase gimme --responses-file /scripts/example-responses.txt --dir /server-kits --recv-channel=twoSixDirectCpp --send-channel=twoSixDirectCpp --param hostname="10.11.1.2" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26269 --debug | tee rrlog
+race-cli --dir /client-kits --send-recv --send-channel=twoSixDirectCpp --send-address="{\"hostname\":\"10.11.1.2\",\"port\":26262}" --recv-channel=twoSixDirectCpp --param hostname="10.11.1.3" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26265 --param localPort=9999 --debug | tee srlog
