@@ -40,7 +40,7 @@ enum class ApiStatus {
   INVALID_ARGUMENT,
   PLUGIN_ERROR,
   INTERNAL_ERROR,
-  TIMEOUT
+  CANCELLED
 };
 
 struct ReceiveOptions {
@@ -78,7 +78,7 @@ public:
   std::string init_recv_role;
   std::string final_send_role;
   std::string final_recv_role;
-  int timeout_seconds = 0;
+  int timeout_ms = 0;
 };
 std::string recvOptionsToString(const ReceiveOptions &sendOptions);
 std::string sendOptionsToString(const SendOptions &sendOptions);
@@ -91,7 +91,7 @@ public:
   Conduit(std::shared_ptr<Core> core, OpHandle handle);
   Conduit() : handle(NULL_RACE_HANDLE) {}
   Conduit(const Conduit &that);
-  virtual ~Conduit() {}
+  virtual ~Conduit();
 
   OpHandle getHandle();  // debug
 

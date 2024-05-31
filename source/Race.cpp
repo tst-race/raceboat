@@ -86,8 +86,8 @@ std::string apiStatusToString(const ApiStatus status) {
       return "PLUGIN_ERROR";
     case ApiStatus::INTERNAL_ERROR:
       return "INTERNAL_ERROR";
-    case ApiStatus::TIMEOUT:
-      return "TIMEOUT";
+    case ApiStatus::CANCELLED:
+      return "CANCELLED";
     default:
     return "UNKNOWN";
   }
@@ -99,6 +99,9 @@ Conduit::Conduit(std::shared_ptr<Core> core, OpHandle handle)
 Conduit::Conduit(const Conduit &that) {
   core = that.core;
   handle = that.handle;
+}
+Conduit::~Conduit() {
+  TRACE_METHOD();
 }
 
 OpHandle Conduit::getHandle() { 
@@ -116,22 +119,14 @@ std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read(int timeoutSeconds) {
 
   auto response = core->getApiManager().read(
       handle, [&promise](ApiStatus status, std::vector<uint8_t> bytes) {
-        promise.set_value({status, std::move(bytes)});
-      });
+        // if(promise.get_future().valid()){
+          promise.set_value({status, std::move(bytes)});
+        // }
+      }, timeoutSeconds);
   if (response.status != SDK_OK) {
     return {ApiStatus::INVALID_ARGUMENT, {}};
   }
-
-  if (timeoutSeconds != BLOCKING_READ) { 
-    if(std::future_status::ready != future.wait_for(std::chrono::seconds(timeoutSeconds))) {
-      helper::logDebug(logPrefix + "timed out");
-      return {ApiStatus::TIMEOUT, {}};
-    } else {
-      return future.get();  
-    }
-  } else {
-    return future.get();
-  }
+  return future.get();
 }
 
 std::pair<ApiStatus, std::string> Conduit::read_str() {
