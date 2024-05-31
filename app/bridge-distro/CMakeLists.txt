@@ -15,25 +15,19 @@
 # 
 
 
-add_executable(race-cli main.cpp)
+add_executable(bridge-distro bridge-distro.cpp)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-target_include_directories(race-cli PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    $<INSTALL_INTERFACE:include>
-)
-
-target_include_directories(race-cli PUBLIC
+target_include_directories(bridge-distro PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
 )
 
 
-target_link_libraries(race-cli
+target_link_libraries(bridge-distro
     raceboat
     stdc++fs
     Threads::Threads
@@ -41,10 +35,10 @@ target_link_libraries(race-cli
 )
 
 # TODO enable performance-* and readability-* checks (needs fixes)
-setup_clang_tidy_for_target(TARGET race-cli)
+setup_clang_tidy_for_target(TARGET bridge-distro)
 # setup_cppcheck_for_target(
-#     TARGET race-cli
+#     TARGET bridge-distro
 #     CHECKS all
 #     SUPPRESS unmatchedSuppression unusedFunction missingIncludeSystem useStlAlgorithm
 # )
-setup_clang_format_for_target(race-cli PARENT raceboat)
+setup_clang_format_for_target(bridge-distro PARENT raceboat)
