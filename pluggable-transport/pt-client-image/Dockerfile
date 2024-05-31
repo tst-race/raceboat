@@ -18,7 +18,7 @@
 FROM raceboat:latest
 
 # ENV VERSION=11.0.9
-ENV VERSION=13.5a1
+ENV VERSION=13.0.15
 RUN useradd -m -d /home/anon anon
 
 WORKDIR /home/anon

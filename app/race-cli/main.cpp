@@ -968,7 +968,7 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
   conn_opt.final_send_role = opts.final_send_role;
   conn_opt.final_recv_channel = opts.final_recv_channel;
   conn_opt.final_recv_role = opts.final_recv_role;
-  conn_opt.timeout_ms = opts.timeout_ms;
+  conn_opt.timeout_seconds = opts.timeout_ms;
 
   int local_port = 9999;
   check_for_local_port_override(opts, local_port);

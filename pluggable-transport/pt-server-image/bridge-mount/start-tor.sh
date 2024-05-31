@@ -63,7 +63,8 @@ ORPort ${OR_PORT}
 
 # # Turns into TOR_PT_SERVER_BINDADDR?
 ServerTransportListenAddr race_pt3 0.0.0.0:${PT_PORT} 
-ServerTransportOptions race_pt3 recvLinkAddress={"hostname":"172.17.0.2","port":26262} send=twoSixDirectCpp recv=twoSixDirectCpp
+ServerTransportOptions race_pt3 recvLinkAddress={"hostname":"10.11.1.2","port":26262} send=twoSixDirectCpp recv=twoSixDirectCpp
+# ServerTransportOptions race_pt3 recvLinkAddress={"hostname":"172.17.0.2","port":26262} send=twoSixDirectCpp recv=twoSixDirectCpp
 # ServerTransportOptions raceproxy address={"service":{"host_address":"race.email.str","use_ssl":true,"out_port":465,"in_port":993},"account":{"login_user":"race-server-2@racemail.com","login_pass":"Password12345!"},"user":{"to_user":[],"user_type":"moderate","poll_time":5.0,"image_limit":1,"send_timeout":5.0,"disable_network_flow":true},"encoding":{"model":"Waterfall128_Glow_Spread_NoECC_MB1","qsize":100,"image_out":{"height":128,"width":128,"pixel_depth":8}}} send=twoSixDirectCpp recv=strEmail
 # # ServerTransportOptions raceproxy address={"service":{"host_address":"race.email.str","use_ssl":true,"out_port":465,"in_port":993},"account":{"login_user":"race-server-2@racemail.com","login_pass":"Password12345!"},"user":{"to_user":[],"user_type":"moderate","poll_time":5.0,"image_limit":1,"send_timeout":5.0,"disable_network_flow":true},"encoding":{"model":"Waterfall128_Glow_Spread_NoECC_MB1","qsize":100,"image_out":{"height":128,"width":128,"pixel_depth":8}}} send=strEmail recv=strEmail
   

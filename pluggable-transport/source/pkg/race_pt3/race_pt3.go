@@ -336,6 +336,7 @@ func (listener RaceListener) Accept() (RaceConn, error) {
 			golog.Println("Accept error")
 			return RaceConn{}, errors.New("race_pt3 Accept error")
 		}
+		golog.Println("AcceptSwig Returned")
 		listener.conns.Add(result.GetSecond())
 		return RaceConn{conn: result.GetSecond(), race: listener.race}, nil
 	} 

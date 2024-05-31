@@ -20,11 +20,12 @@ RACEBOAT_HOME=$(dirname $(dirname $(pwd)))
 PLUGIN_PATH=$1 # e.g. /path/to/private-race-core/plugin-comms-twosix-cpp/kit/artifacts/linux-x86_64-server/
 
 docker run --rm --name=pt-server -it \
+       --network=rib-overlay-network --ip=10.11.1.2 \
        -e OR_PORT=2345 -p 2345:2345 \
        -e PT_PORT=5432 \
        -v $RACEBOAT_HOME:/code \
        -v $RACEBOAT_HOME/pluggable-transport/pt-server-image/bridge-mount/:/bridge-mount \
-       -v $RACEBOAT_HOME/pluggable-transport/log/:/log \
+       -v $RACEBOAT_HOME/pluggable-transport/log/bridge/:/log \
        -v $RACEBOAT_HOME/pluggable-transport/pt-server-image/etc-race/:/etc/race/ \
        -v $RACEBOAT_HOME/racesdk/package/LINUX_x86_64/:/usr/local/bin/race/ \
        -v $PLUGIN_PATH/:/etc/race/plugins/unix/x86_64/ \

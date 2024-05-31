@@ -360,7 +360,7 @@ func serverAcceptLoop(ln *race_pt3.RaceListener, info *pt.ServerInfo, wg *sync.W
 				if e, ok := err.(net.Error); ok && !e.Temporary() {
 					return err
 				}
-				continue
+				// continue
 			}
 			go serverHandler(&conn, info)
 			wg.Done()

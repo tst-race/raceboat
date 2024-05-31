@@ -20,10 +20,10 @@ docker run -it --rm --name=build-pt \
        -e MAKEFLAGS="-j" \
        -v $(pwd)/../../:/code/ \
        -w /code \
-       race-compile:main \
+       ghcr.io/tst-race/race-images/race-compile:main \
        bash -c "./build_it_all.sh; ./create-package.sh -L"
 
-../../docker-image/build_raceboat_image.sh --platform-x86_64
+../../docker-image/build_image.sh --platform-x86_64
 
 # -p arg is based on a line output by build_it_all, above
 docker run -it --rm \
