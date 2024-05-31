@@ -70,6 +70,30 @@ std::string bootstrapConnectionOptionsToString(const BootstrapConnectionOptions 
   return ss.str();
 }
 
+std::string apiStatusToString(const ApiStatus status) {
+  switch(status) {
+    case ApiStatus::INVALID:
+      return "INVALID";
+    case ApiStatus::OK:
+      return "OK";
+    case ApiStatus::CLOSING:
+      return "CLOSING";
+    case ApiStatus::CHANNEL_INVALID:
+      return "CHANNEL_INVALID";
+    case ApiStatus::INVALID_ARGUMENT:
+      return "INVALID_ARGUMENT";
+    case ApiStatus::PLUGIN_ERROR:
+      return "PLUGIN_ERROR";
+    case ApiStatus::INTERNAL_ERROR:
+      return "INTERNAL_ERROR";
+    case ApiStatus::TIMEOUT:
+      return "TIMEOUT";
+    default:
+    return "UNKNOWN";
+  }
+}
+
+
 Conduit::Conduit(std::shared_ptr<Core> core, OpHandle handle)
     : core(core), handle(handle) {}
 Conduit::Conduit(const Conduit &that) {
@@ -81,7 +105,7 @@ OpHandle Conduit::getHandle() {
   return handle; 
 }
 
-std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read(long timeoutSeconds) {
+std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read(int timeoutSeconds) {
   TRACE_METHOD(timeoutSeconds);
   std::promise<std::pair<ApiStatus, std::vector<uint8_t>>> promise;
   auto future = promise.get_future();
