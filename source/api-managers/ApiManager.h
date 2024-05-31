@@ -120,6 +120,9 @@ public:
                      std::function<void(ApiStatus)> callback);
   virtual void close(uint64_t postId, OpHandle handle,
                      std::function<void(ApiStatus)> callback);
+  virtual void
+  cancelEvent(uint64_t postId, OpHandle handle,
+             std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
 
   // state machine callbacks
   virtual ActivateChannelStatusCode activateChannel(ApiContext &context,
@@ -311,7 +314,8 @@ public:
 
   virtual SdkResponse
   read(OpHandle handle,
-       std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
+       std::function<void(ApiStatus, std::vector<uint8_t>)> callback,
+       int timeoutSeconds=BLOCKING_READ);
   virtual SdkResponse write(OpHandle handle, std::vector<uint8_t> bytes,
                             std::function<void(ApiStatus)> callback);
   virtual SdkResponse close(OpHandle handle,
@@ -358,6 +362,8 @@ public:
 
   // For testing
   void waitForCallbacks();
+
+  static const int BLOCKING_READ = -1;
 
 protected:
   template <typename T, typename... Args>

@@ -230,15 +230,28 @@ ApiManager::accept(OpHandle handle,
 
 SdkResponse ApiManager::read(
     OpHandle handle,
-    std::function<void(ApiStatus, std::vector<uint8_t>)> callback) {
+    std::function<void(ApiStatus, std::vector<uint8_t>)> callback,
+    int timeoutSeconds) {
   TRACE_METHOD();
 
   if (!callback) {
     return SDK_INVALID_ARGUMENT;
   }
 
+  if (timeoutSeconds != BLOCKING_READ) { 
+    std::thread timeout_thread([this, handle, callback, logPrefix, timeoutSeconds]() {
+      std::promise<std::pair<ApiStatus, std::vector<uint8_t>>> promise;
+      auto future = promise.get_future();
+      if(std::future_status::ready != future.wait_for(std::chrono::seconds(timeoutSeconds))) {
+            post(logPrefix, &ApiManagerInternal::cancelEvent, handle, nullptr);
+          }
+    });
+    timeout_thread.detach();
+  }
+
   auto response = post(logPrefix, &ApiManagerInternal::read, handle, callback);
   handler.unblock_queue("");  // in case of timeout
+
   return response;
 }
 
@@ -601,6 +614,22 @@ void ApiManagerInternal::close(uint64_t postId, OpHandle handle,
   for (auto context : contexts) {
     context->updateClose(handle, callback);
     triggerEvent(*context, EVENT_CLOSE);
+  }
+}
+
+void ApiManagerInternal::cancelEvent(
+  uint64_t postId, OpHandle handle,
+  std::function<void(ApiStatus, std::vector<uint8_t>)>) {
+    TRACE_METHOD(postId, handle);
+
+  auto contexts = getContexts(handle);
+  if (contexts.size() != 1) {
+    helper::logError(logPrefix + "Invalid handle - " + std::to_string(contexts.size()) + " contexts");
+  }
+
+  for (auto context : contexts) {
+    // state machine should call the previously set callback with ApiStatus::CANCELLED
+    triggerEvent(*context, EVENT_CANCELLED);
   }
 }
 

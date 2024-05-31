@@ -18,6 +18,7 @@
 
 #include <deque>
 #include <queue>
+#include <mutex>
 
 #include "ApiContext.h"
 
@@ -74,6 +75,15 @@ public:
   std::function<void(ApiStatus, std::vector<uint8_t>)> readCallback;
   std::function<void(ApiStatus)> closeCallback;
 
+protected:
+  // ensure readCallback is mutex'ed since its subject to being called on another thread due to timeout
+  std::function<void(ApiStatus, std::vector<uint8_t>)> readCallback;
+  std::mutex readCallbackMutex;
+
+public:
+  bool callReadCallback(const ApiStatus &status, const std::vector<uint8_t>& bytes);
+
+public:
   RaceHandle sendConnSMHandle;
   ConnectionID sendConnId;
 

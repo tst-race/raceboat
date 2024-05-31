@@ -67,9 +67,10 @@ void ConduitContext::updateRead(
     RaceHandle /* handle */,
     std::function<void(ApiStatus, std::vector<uint8_t>)> cb) {
       TRACE_METHOD();
-  if (this->readCallback) {
-    helper::logInfo(logPrefix + "read callback not null.  This may happen if there was a read timeout.  Otherwise this should be considered an error");
+  if (this->readCallback && cb) {
+    helper::logInfo(logPrefix + "overwriting read callback.  This may happen if there was a timeout.  Otherwise this should be considered an error");
   }
+  std::unique_lock<std::mutex> lock(readCallbackMutex);
   this->readCallback = cb;
 }
 
@@ -82,6 +83,20 @@ void ConduitContext::updateWrite(RaceHandle /* handle */,
 void ConduitContext::updateClose(RaceHandle /* handle */,
                                           std::function<void(ApiStatus)> cb) {
   this->closeCallback = cb;
+}
+
+bool ConduitContext::callReadCallback(const ApiStatus &status, const std::vector<uint8_t>& bytes) {
+  TRACE_METHOD();
+  if(readCallback) {
+    helper::logDebug(logPrefix + "calling read callback");
+    std::unique_lock<std::mutex> lock(readCallbackMutex);
+    readCallback(status, bytes);
+    readCallback = {};
+    return true;
+  } else {
+    helper::logDebug(logPrefix + "null read callback");
+  }
+  return false;
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -127,13 +142,12 @@ struct StateConduitConnected : public ConduitState {
     auto &ctx = getContext(context);
     PluginWrapper &plugin = getPlugin(ctx, ctx.sendChannel);
     
-    if (ctx.readCallback && !ctx.recvQueue.empty()) {
-      ctx.readCallback(ApiStatus::OK, ctx.recvQueue.front());
-      ctx.readCallback = {};
-      ctx.recvQueue.pop();
-    } else if(!ctx.recvQueue.empty()) {
-      helper::logWarning(logPrefix + "null read callback and non-empty queue!");
-    } else {
+    if (!ctx.recvQueue.empty()) {
+      if(ctx.callReadCallback(ApiStatus::OK, ctx.recvQueue.front())){
+        ctx.recvQueue.pop();
+      } else {
+        helper::logWarning(logPrefix + "null read callback and non-empty queue!");
+      }
       helper::logWarning(logPrefix + "nothing to read");
     }
 
@@ -197,11 +211,7 @@ struct StateConduitFinished : public ConduitState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
-    if (ctx.readCallback) {
-      ctx.readCallback(ApiStatus::CLOSING, {});
-      helper::logDebug(logPrefix + "clearing read callback");
-      ctx.readCallback = {};
-    }
+    ctx.callReadCallback(ApiStatus::CLOSING, {});
 
     for (auto &[cb, bytes] : ctx.sendQueue) {
       helper::logWarning(logPrefix + "send queue not empty");
@@ -219,6 +229,17 @@ struct StateConduitFinished : public ConduitState {
 
     ctx.closeCallback(ApiStatus::OK);
     ctx.closeCallback = {};
+    return EventResult::SUCCESS;
+  }
+};
+
+struct StateConduitReadCancelled : public ConduitState {
+  explicit StateConduitReadCancelled(
+      StateType id = STATE_CONNECTION_OBJECT_FAILED)
+      : ConduitState(id, "STATE_CONNECTION_OBJECT_FAILED") {}
+  virtual EventResult enter(Context &context) {
+    TRACE_METHOD();
+    getContext(context).callReadCallback(ApiStatus::CANCELLED, {});
     return EventResult::SUCCESS;
   }
 };
@@ -255,11 +276,7 @@ struct StateConduitFailed : public ConduitState {
     }
     ctx.sentQueue.clear();
 
-    if (ctx.readCallback) {
-      ctx.readCallback(ApiStatus::INTERNAL_ERROR, {});
-      helper::logDebug(logPrefix + "clearing read callback");
-      ctx.readCallback = {};
-    }
+    ctx.callReadCallback(ApiStatus::INTERNAL_ERROR, {});
 
     if (ctx.closeCallback) {
       ctx.closeCallback(ApiStatus::INTERNAL_ERROR);
@@ -284,12 +301,16 @@ ConduitStateEngine::ConduitStateEngine() {
   addState<StateConduitConnected>(STATE_CONNECTION_OBJECT_CONNECTED);
   // calls state machine finished on manager, final state
   addState<StateConduitFinished>(STATE_CONNECTION_OBJECT_FINISHED);
+  addState<StateConduitReadCancelled>(STATE_CONNECTION_OBJECT_CANCELLED);
+  
   // call state machine failed
   addFailedState<StateConduitFailed>(STATE_CONNECTION_OBJECT_FAILED);
 
   // clang-format off
     declareStateTransition(STATE_CONNECTION_OBJECT_INITIAL,   EVENT_ALWAYS, STATE_CONNECTION_OBJECT_CONNECTED);
     declareStateTransition(STATE_CONNECTION_OBJECT_CONNECTED, EVENT_CLOSE,  STATE_CONNECTION_OBJECT_FINISHED);
+    declareStateTransition(STATE_CONNECTION_OBJECT_CONNECTED, EVENT_CANCELLED,  STATE_CONNECTION_OBJECT_CANCELLED);
+    declareStateTransition(STATE_CONNECTION_OBJECT_CANCELLED, EVENT_ALWAYS,  STATE_CONNECTION_OBJECT_CONNECTED);
 
     // The following events just cause the state to loop back to itself. re-entering the state will
     // send queued packages and receive any received packages if there's a receive callback
