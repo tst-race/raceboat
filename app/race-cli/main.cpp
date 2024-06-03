@@ -21,6 +21,7 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <atomic>
 
 #include "race/Race.h"
 #include "race/common/RaceLog.h"
@@ -753,6 +754,7 @@ int await_socket_input(const int socket_fd, int timeout_ms) {
   poll_fd.fd = socket_fd;
   poll_fd.events = POLLIN;
   
+  printf("polling for %d ms\n", timeout_ms);
   int poll_result = ::poll(&poll_fd, 1, timeout_ms);
 
   if (poll_result < 0) {
@@ -770,32 +772,29 @@ int await_socket_input(const int socket_fd, int timeout_ms) {
   return poll_result;
 }
 
-// struct ForwardRecord {
-//   int local_sock;
-//   Conduit &conduit;
-//   long timeoutSeconds;
-//   std::atomic<long> currentConduitTimeoutSinceEpoch;  // shared amongst threads
-//   bool closeSocketsUponExit;  // relinquish ownership / close upon exit of forward_*() functions
-// };
+int now() {
+  const auto p1 = std::chrono::system_clock::now();
+  return std::chrono::duration_cast<std::chrono::seconds>(p1.time_since_epoch()).count();
+}
 
-void forward_local_to_conduit(int local_sock, std::shared_ptr<Raceboat::Conduit> conduit, const int timeoutSeconds) {
+void forward_local_to_conduit(int local_sock, std::shared_ptr<Raceboat::Conduit> conduit, 
+                              std::shared_ptr<std::atomic_int> activityTimeoutTs, const int timeoutSeconds) {
   local_sock = dup(local_sock);
   std::vector<uint8_t> buffer(BUF_SIZE);
-  // TODO -- client (only) local read timeout, if timeout occurs, close local socket and conduit
-  // 2 cases to fail, user closes local app, or server times out connection
-  // TODO -- make sure timeout flag supports forever case
   printf("local_to_conduit with socket fd %d, and %d second timeout\n", local_sock, timeoutSeconds);
   int poll_status = 1;
   
-  // TODO this needs to consider the remaining conduit_to_local timeout duration to timeout about the same time
   if(timeoutSeconds != Conduit::BLOCKING_READ) {
-    poll_status = await_socket_input(local_sock, timeoutSeconds*1000);
+    poll_status = await_socket_input(local_sock, (timeoutSeconds*1000));
   }
 
   while (poll_status > 0) {
     ssize_t received_bytes = ::recv(local_sock, buffer.data(), BUF_SIZE, 0);
 
     if (received_bytes > 0) {
+      auto newTimeout = now() + timeoutSeconds;
+      printf("updating new activity timeout: %d\n", newTimeout);
+      activityTimeoutTs->store(newTimeout);
       std::vector<uint8_t> result(buffer.begin(),
                                 buffer.begin() + received_bytes);
       printf("Relaying data %s from local socket to conduit\n",
@@ -803,7 +802,7 @@ void forward_local_to_conduit(int local_sock, std::shared_ptr<Raceboat::Conduit>
 
       auto status = conduit->write(result); // send data to output socket
       if (status != ApiStatus::OK) {
-        printf("conduit write failed with status: %d on socket\n", status);
+        printf("conduit write failed with status: %d\n", status);
         break;
       }
     } else if (received_bytes < 0) {
@@ -818,7 +817,11 @@ void forward_local_to_conduit(int local_sock, std::shared_ptr<Raceboat::Conduit>
     }
 
     if(timeoutSeconds != Conduit::BLOCKING_READ) {
-      poll_status = await_socket_input(local_sock, timeoutSeconds*1000);
+      const auto nowTs = now();
+      auto timeoutShared = activityTimeoutTs->load();
+      printf("now: %d, activity timeout: %d, timeout seconds: %d\n", nowTs, timeoutShared, timeoutSeconds);
+      int timeout = std::min(timeoutSeconds, std::max(timeoutShared - nowTs, 0));
+      poll_status = await_socket_input(local_sock, (timeout*1000));
     }
   }
 
@@ -826,20 +829,33 @@ void forward_local_to_conduit(int local_sock, std::shared_ptr<Raceboat::Conduit>
   printf("Exiting local_to_conduit loop\n");
 }
 
-void forward_conduit_to_local(std::shared_ptr<Raceboat::Conduit> conduit, int local_sock, const int timeoutSeconds) {
+void forward_conduit_to_local(std::shared_ptr<Raceboat::Conduit> conduit, int local_sock, 
+                              std::shared_ptr<std::atomic_int> activityTimeoutTs, const int timeoutSeconds) {
   local_sock = dup(local_sock);
   printf("conduit_to_local with socket fd %d, with %d second timeout\n", local_sock, timeoutSeconds);
   ssize_t send_status;
 
   while (true) {
     auto [status, buffer] = conduit->read(timeoutSeconds);
-    
-    if (status != ApiStatus::OK) {
+
+    if (status == ApiStatus::CANCELLED) {
+      printf("conduit write timed out\n");
+      if (now() >= activityTimeoutTs->load()) {
+        printf("no activity for %d seconds\n", timeoutSeconds);
+        break;
+      } else {
+        printf("timeout increased, continuing\n");
+      }
+    } else if (status != ApiStatus::OK) {
       printf("conduit read failed with status: %s\n", apiStatusToString(status).c_str());
       break;
     } else {
+      auto newTimeout = now() + timeoutSeconds;
+      printf("updating new activity timeout: %d\n", newTimeout);
+      activityTimeoutTs->store(newTimeout);
       printf("Relaying data %s from conduit to local socket\n",
-        std::string(buffer.begin(), buffer.end()).c_str());
+              std::string(buffer.begin(), buffer.end()).c_str());
+
       send_status = ::send(local_sock, buffer.data(), buffer.size(), 0);
       if (send_status < 0) {
         char buf[64];
@@ -859,12 +875,14 @@ void forward_conduit_to_local(std::shared_ptr<Raceboat::Conduit> conduit, int lo
 
 void relay_data_loop(const int client_sock, std::shared_ptr<Raceboat::Conduit> conduit, const int timeoutSeconds, const bool blocking) {
   printf("relay_data_loop socket: %d with race read timeout %d seconds\n", client_sock, timeoutSeconds);
-  std::thread local_to_conduit_thread([client_sock, &conduit, timeoutSeconds]() {
-    forward_local_to_conduit(client_sock, conduit, timeoutSeconds);
+  std::shared_ptr<std::atomic_int> activityTimeoutTs = std::make_shared<std::atomic_int>(now() + timeoutSeconds);
+
+  std::thread local_to_conduit_thread([client_sock, conduit, activityTimeoutTs, timeoutSeconds]() {
+    forward_local_to_conduit(client_sock, conduit, activityTimeoutTs, timeoutSeconds);
   });
 
-  std::thread conduit_to_local_thread([client_sock, &conduit, timeoutSeconds]() {
-    forward_conduit_to_local(conduit, client_sock, timeoutSeconds);
+  std::thread conduit_to_local_thread([client_sock, conduit, activityTimeoutTs, timeoutSeconds]() {
+    forward_conduit_to_local(conduit, client_sock, activityTimeoutTs, timeoutSeconds);
   });
   if (blocking) {
     local_to_conduit_thread.join();
@@ -914,8 +932,6 @@ void client_connection_loop(int server_sock,
           printf("dial success\n");
           // block so accept() isn't called until after socket error
           relay_data_loop(client_sock, std::make_shared<Conduit>(connection), timeoutSeconds, true);
-          // connection.close();
-          // ::close_socket(client_sock);
         }
       }
     } else if (poll_result == 0) {
@@ -1010,7 +1026,6 @@ ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_o
   printf("\nlistening on link address: '%s'\n", link_addr.c_str());
 
   std::string host = "localhost";
-  // std::unordered_map<OpHandle, Raceboat::Conduit> connections;
   while (1) {
     printf("server calling accept\n");
     auto [status2, connection] = listener.accept();
@@ -1033,27 +1048,11 @@ ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_o
       }
     }
 
-    // connections[connection.getHandle()] = connection;
     printf("SOCKET client_sock: %d\n", client_sock);
-    // TODO - relinquish ownership of socket / conduit to relay_data_loop
     relay_data_loop(client_sock, std::make_shared<Conduit>(connection), timeoutSeconds, false);
-
-    // for (auto handleConnPair: connections) {
-    //   void* ptr = &handleConnPair.second;
-    //   printf(" -- %lu:%lu - %p\n", handleConnPair.first, handleConnPair.second.getHandle(), ptr);
-    //   if (handleConnPair.first != handleConnPair.second.getHandle()) {
-    //     printf("CONDUIT HANDLE CHANGED! Was %lu, now %lu\n", handleConnPair.first, handleConnPair.second.getHandle());
-    //   }
-    // }
   }
 
   printf("closing race sockets\n");
-  // for (auto conn: connections) {
-  //   auto close_status = conn.second.close();
-  //   if (ApiStatus::OK != close_status) {
-  //     printf("close failed with status: %i\n", close_status);
-  //   }
-  // }
   return status;
 }
 
