@@ -222,25 +222,25 @@ func copyLoop(socks, race io.ReadWriter) {
 	copyWg.Add(2)
 
 	go func() {
-		golog.Println("Copy1")
+		golog.Println("Copy Socks to Conduit")
 		written, err := io.Copy(race, socks)
 		if err != nil {
 			golog.Println("io.Copy error " + err.Error())
 		} else {
-			golog.Println("copied " + strconv.FormatInt(written, 10) + " bytes")
+			golog.Println("copied " + strconv.FormatInt(written, 10) + " bytes from Socks to Conduit")
 		}
-		golog.Println("Copy1.1")
+		golog.Println("Done with Socks to Conduit Loop")
 		copyWg.Done()
 	}()
 	go func() {
-		golog.Println("Copy2")
+		golog.Println("Copy Conduit to Socks")
 		written, err := io.Copy(socks, race)
 		if err != nil {
 			golog.Println("io.Copy error " + err.Error())
 		} else {
-			golog.Println("copied " + strconv.FormatInt(written, 10) + " bytes")
+			golog.Println("copied " + strconv.FormatInt(written, 10) + " bytes from Conduit to Socks")
 		}
-		golog.Println("Copy2.1")
+		golog.Println("Done with Conduit to Socks Loop")
 		copyWg.Done()
 	}()
 

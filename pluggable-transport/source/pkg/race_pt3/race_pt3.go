@@ -74,7 +74,7 @@ func NewRaceClient(
 	core.RaceLogSetLogLevelStdout(core.RaceLogLL_NONE)  // PT API uses stdout
 
 	if len(pluginPath) == 0 {
-		pluginPath = "/etc/race"
+		pluginPath = "/etc/race/plugins"
 		golog.Println("using default plugin path " + pluginPath)
 	}
 
@@ -246,7 +246,7 @@ func NewRaceServer(
 	core.RaceLogSetLogLevelStdout(core.RaceLogLL_NONE)   // PT API uses stdout
 	
 	if len(pluginPath) == 0 {
-		pluginPath = "/etc/race"
+		pluginPath = "/etc/race/plugins"
 		golog.Println("using default plugin path " + pluginPath)
 	}
 

@@ -1203,6 +1203,7 @@ void ApiManagerInternal::removeContext(ApiContext &context) {
        pairIt != packageIdContextMap.end();) {
     pairIt->second.erase(&context);
     if (pairIt->second.size() == 0) {
+      helper::logDebug("removeContext: Removing packageId=" + json(pairIt->first).dump());
       pairIt = packageIdContextMap.erase(pairIt);
     } else {
       ++pairIt;

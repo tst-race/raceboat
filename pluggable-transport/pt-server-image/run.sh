@@ -28,6 +28,6 @@ docker run --rm --name=pt-server -it \
        -v $RACEBOAT_HOME/pluggable-transport/log/bridge/:/log \
        -v $RACEBOAT_HOME/pluggable-transport/pt-server-image/etc-race/:/etc/race/ \
        -v $RACEBOAT_HOME/racesdk/package/LINUX_x86_64/:/usr/local/bin/race/ \
-       -v $PLUGIN_PATH/:/etc/race/plugins/unix/x86_64/ \
+       -v $PLUGIN_PATH/:/etc/race/plugins \
        -u root pt-server bash -c "/bridge-mount/start-tor.sh"
 
