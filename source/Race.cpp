@@ -118,9 +118,7 @@ Conduit::Conduit(const Conduit &that) {
   handle = that.handle;
   properties = that.properties;
 }
-Conduit::~Conduit() {
-  TRACE_METHOD();
-}
+Conduit::~Conduit() {}
 
 OpHandle Conduit::getHandle() { 
   return handle; 
@@ -141,9 +139,9 @@ std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read(int timeoutSeconds) {
 
   auto response = core->getApiManager().read(
       handle, [&promise](ApiStatus status, std::vector<uint8_t> bytes) {
-        // if(promise.get_future().valid()){
+        if(promise.get_future().valid()) {
           promise.set_value({status, std::move(bytes)});
-        // }
+        }
       }, timeoutSeconds);
   if (response.status != SDK_OK) {
     return {ApiStatus::INVALID_ARGUMENT, {}};

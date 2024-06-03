@@ -624,11 +624,11 @@ void ApiManagerInternal::cancelEvent(
 
   auto contexts = getContexts(handle);
   if (contexts.size() != 1) {
-    helper::logError(logPrefix + "Invalid handle - " + std::to_string(contexts.size()) + " contexts");
+    helper::logDebug(logPrefix + "Invalid handle - has " + std::to_string(contexts.size()) + " contexts");
   }
 
   for (auto context : contexts) {
-    // state machine should call the previously set callback with ApiStatus::CANCELLED
+    // allow state machine to call the previously set callback to unblock futures, etc.
     triggerEvent(*context, EVENT_CANCELLED);
   }
 }
