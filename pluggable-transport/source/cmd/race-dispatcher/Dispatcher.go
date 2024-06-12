@@ -174,6 +174,12 @@ func clientSocksAcceptLoop(ln *pt.SocksListener, clients []*race_pt3.RaceClient,
 					golog.Println("Receive address:", recvLinkAddress)
 				}
 
+				introMessage := ""
+				if arg, ok := conn.Req.Args.Get("introMessage"); ok {
+					introMessage = arg
+					golog.Println("introMessage:", introMessage)
+				}
+
 				golog.Println("Calling NewRaceClient")
 				client := race_pt3.NewRaceClient(
 					sendChannel,
@@ -187,7 +193,7 @@ func clientSocksAcceptLoop(ln *pt.SocksListener, clients []*race_pt3.RaceClient,
 					"",
 					0,
 					race_pt3.DEBUG, // TODO: Should be INFO in release
-					"",
+					introMessage,
 					redirectPath,
 					userParams,
 				)
