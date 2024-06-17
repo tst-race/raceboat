@@ -33,4 +33,4 @@ target_include_directories(unified-test-stub PUBLIC
 #     CHECKS all
 #     SUPPRESS unmatchedSuppression unusedFunction missingIncludeSystem useStlAlgorithm
 # )
-setup_clang_format_for_target(unified-test-stub PARENT raceboat)
+setup_clang_format_for_target(unified-test-stub PARENT raceSdkCommon)

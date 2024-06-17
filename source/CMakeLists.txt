@@ -15,7 +15,7 @@
 # 
 
 #Add the source to the shared library
-add_library(raceboat SHARED
+add_library(raceSdkCommon SHARED
     api-managers/ChannelManager.cpp
     api-managers/ApiManager.cpp
     common/ChannelProperties.cpp
@@ -93,10 +93,10 @@ file(GLOB_RECURSE COMM_LIB_PUBLIC_HEADERS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
 )
 
-set_target_properties(raceboat PROPERTIES
+set_target_properties(raceSdkCommon PROPERTIES
     PUBLIC_HEADER "${COMM_LIB_PUBLIC_HEADERS}"
 )
-target_include_directories(raceboat PUBLIC
+target_include_directories(raceSdkCommon PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
@@ -106,26 +106,26 @@ file(GLOB_RECURSE COMM_LIB_PRIVATE_HEADERS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.h
 )
 
-set_target_properties(raceboat PROPERTIES
+set_target_properties(raceSdkCommon PROPERTIES
     PRIVATE_HEADER "${COMM_LIB_PRIVATE_HEADERS}"
 )
 
-target_compile_definitions(raceboat PUBLIC SWIG_TYPE_TABLE=RaceSdk)
-find_package(PythonLibs 3.7 EXACT REQUIRED)
-target_compile_definitions(raceboat PRIVATE PYTHON_PLUGIN_SUPPORT=1)
+target_compile_definitions(raceSdkCommon PUBLIC SWIG_TYPE_TABLE=RaceSdk)
+find_package(PythonLibs 3 REQUIRED)
+target_compile_definitions(raceSdkCommon PRIVATE PYTHON_PLUGIN_SUPPORT=1)
 
 if(ANDROID)
-    target_link_libraries(raceboat
+    target_link_libraries(raceSdkCommon
         PRIVATE
             language-shims-headers
             ${PYTHON_LIBRARIES}
             ${CMAKE_DL_LIBS} # Contains dlopen and dlclose for dynamically loading plugins.
     )
-    target_include_directories(raceboat SYSTEM PRIVATE ${PYTHON_INCLUDE_PATH})
+    target_include_directories(raceSdkCommon SYSTEM PRIVATE ${PYTHON_INCLUDE_PATH})
 
 else()
     # Default to Linux
-    target_link_libraries(raceboat
+    target_link_libraries(raceSdkCommon
         PRIVATE
             language-shims-headers
             ${PYTHON_LIBRARIES}
@@ -133,14 +133,14 @@ else()
         PUBLIC
             stdc++fs
     )
-    target_include_directories(raceboat SYSTEM PRIVATE ${PYTHON_INCLUDE_PATH})
+    target_include_directories(raceSdkCommon SYSTEM PRIVATE ${PYTHON_INCLUDE_PATH})
 endif()
 
 # TODO enable performance-* and readability-* checks (needs fixes)
-# setup_clang_tidy_for_target(TARGET raceboat)
+# setup_clang_tidy_for_target(TARGET raceSdkCommon)
 # setup_cppcheck_for_target(
-#     TARGET raceboat
+#     TARGET raceSdkCommon
 #     CHECKS all
 #     SUPPRESS unmatchedSuppression unusedFunction missingIncludeSystem useStlAlgorithm
 # )
-setup_clang_format_for_target(raceboat)
+setup_clang_format_for_target(raceSdkCommon)

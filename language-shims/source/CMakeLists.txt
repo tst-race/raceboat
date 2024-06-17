@@ -82,7 +82,7 @@ swig_add_library(commsPluginBindings TYPE SHARED
   SOURCES commsPluginBindings.i
   OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/"
 )
-add_dependencies(commsPluginBindings raceboat)
+add_dependencies(commsPluginBindings raceSdkCommon)
 target_compile_definitions(commsPluginBindings PUBLIC "SWIG_TYPE_TABLE=RaceSdk")
 set_target_properties(commsPluginBindings PROPERTIES
   SWIG_USE_TARGET_INCLUDE_DIRECTORIES TRUE
@@ -90,7 +90,7 @@ set_target_properties(commsPluginBindings PROPERTIES
 )
 target_include_directories(commsPluginBindings PUBLIC ${PYTHON_INCLUDE_PATH})
 target_link_options(commsPluginBindings PUBLIC -Wl,--no-undefined)
-swig_link_libraries(commsPluginBindings ${PYTHON_LIBRARIES} language-shims-headers raceboat)
+swig_link_libraries(commsPluginBindings ${PYTHON_LIBRARIES} language-shims-headers raceSdkCommon)
 
 
 # ################################################################################
@@ -107,13 +107,13 @@ swig_add_library(commsPluginBindingsGolang TYPE SHARED
   SOURCES commsPluginBindings.golang.i
   OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/include/src/shims"
 )
-add_dependencies(commsPluginBindingsGolang raceboat)
+add_dependencies(commsPluginBindingsGolang raceSdkCommon)
 set_target_properties(commsPluginBindingsGolang PROPERTIES
   SWIG_USE_TARGET_INCLUDE_DIRECTORIES TRUE
   COMPILE_OPTIONS "-Wno-error" # Clear warnings set globally via add_compile_options
 )
 
-swig_link_libraries(commsPluginBindingsGolang language-shims-headers raceboat)
+swig_link_libraries(commsPluginBindingsGolang language-shims-headers raceSdkCommon)
 
 # ################################################################################
 # # Golang Core
@@ -129,13 +129,13 @@ swig_add_library(corePluginBindingsGolang TYPE SHARED
   SOURCES corePluginBindings.golang.i
   OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/include/src/core"
 )
-add_dependencies(corePluginBindingsGolang raceboat)
+add_dependencies(corePluginBindingsGolang raceSdkCommon)
 set_target_properties(corePluginBindingsGolang PROPERTIES
   SWIG_USE_TARGET_INCLUDE_DIRECTORIES TRUE
   COMPILE_OPTIONS "-Wno-error" # Clear warnings set globally via add_compile_options
 )
 
-swig_link_libraries(corePluginBindingsGolang raceboat)
+swig_link_libraries(corePluginBindingsGolang raceSdkCommon)
 
 
 # ################################################################################

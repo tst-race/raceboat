@@ -28,7 +28,7 @@ target_include_directories(bridge-distro PUBLIC
 
 
 target_link_libraries(bridge-distro
-    raceboat
+    raceSdkCommon
     stdc++fs
     Threads::Threads
     ${CMAKE_DL_LIBS} # Contains dlopen and dlcose for dynamically loading plugins.
@@ -41,4 +41,4 @@ setup_clang_tidy_for_target(TARGET bridge-distro)
 #     CHECKS all
 #     SUPPRESS unmatchedSuppression unusedFunction missingIncludeSystem useStlAlgorithm
 # )
-setup_clang_format_for_target(bridge-distro PARENT raceboat)
+setup_clang_format_for_target(bridge-distro PARENT raceSdkCommon)

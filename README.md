@@ -199,3 +199,14 @@ race-cli --dir /etc/race/plugins --client-connect --send-channel=twoSixDirectCpp
 
 race-cli --dir /etc/race/plugins --server-connect --send-channel=twoSixDirectCpp --recv-channel=twoSixDirectCpp --final-send-channel=twoSixDirectCpp --final-recv-channel=twoSixDirectCpp --param hostname="10.11.1.2" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26265 --param localPort=9999 --debug | tee rrlog | grep ERROR
 
+## Raven Testing
+
+### Server
+docker run --rm -it --name=rbserver --network=rib-overlay-network --ip=10.11.1.2        -v $(pwd)/../kits:/server-kits        -v $(pwd):/code -w /code        -v $(pwd)/scripts/:/scripts/        raceboat:latest bash -c "
+
+
+
+### Client
+docker run --rm -it --name=rbclient --network=rib-overlay-network --ip=10.11.1.3        -v $(pwd)/../kits:/client-kits        -v $(pwd):/code -w /code        -v $(pwd)/scripts/:/scripts/        raceboat:latest bash -c "\
+    race-cli --dir /client-kits --send-recv --send-channel=twoSixDirectCpp --send-address="{\"hostname\":\"10.11.1.2\",\"port\":26262}" --recv-channel=twoSixDirectCpp --param hostname="10.11.1.3" --param PluginCommsTwoSixStub.startPort=26262 --param PluginCommsTwoSixStub.endPort=26265 --param localPort=9999 --debug | tee srlog\
+    "

@@ -28,5 +28,5 @@ docker run --rm --name=pt-client -it \
        -v $RACEBOAT_HOME/pluggable-transport/log/client/:/log \
        -v $RACEBOAT_HOME/racesdk/package/LINUX_x86_64/:/usr/local/bin/race/ \
        -v $PLUGIN_PATH:/etc/race/plugins/ \
-       -e DISPLAY=192.168.64.1:0 \
+       -e DISPLAY=:0 \
        pt-client bash tor-browser/Browser/start-tor-browser

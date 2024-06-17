@@ -32,6 +32,6 @@ endif()
 set(ENV{RACE_COMM_LIBS_PATH} "$ENV{RACE_COMM_LIB_INSTALL_PATH}/lib")
 set(ENV{RACE_COMM_INCLUDE_PATH} "$ENV{RACE_COMM_LIB_INSTALL_PATH}/include")
 
-add_subdirectory(cmd/race-dispatcher)
 add_subdirectory(pkg/race_pt3)
+add_subdirectory(cmd/race-dispatcher)
 add_subdirectory(tests)

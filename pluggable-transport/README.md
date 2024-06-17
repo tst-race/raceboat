@@ -11,7 +11,7 @@ docker run  -it --rm  -v $(pwd):/code/ raceboat:latest bash
 export MAKEFLAGS="-j"
 ./build_it_all.sh
 cd pluggable-transport
-./build.sh -p=/code/build/LINUX_arm64-v8a/language-shims/source/include/src/core
+/build.sh -p=/code/build/LINUX_arm64-v8a/language-shims/source/include/src/core
 ```
 
 The core shims install path is where corePluginBindingsGolang.go and go.mod reside after building raceboat.  This path may differ depending on host architecture, and will be reported in stdout during the install phase of `raceboat/build_it_all.sh`.

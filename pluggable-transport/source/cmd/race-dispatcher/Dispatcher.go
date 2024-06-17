@@ -29,7 +29,8 @@ import (
 	"syscall"
 	"net"
 	"path"
-	pt "git.torproject.org/pluggable-transports/goptlib.git"
+	/* pt "git.torproject.org/pluggable-transports/goptlib.git" */
+	pt "goptlib/goptlib"
 	race_pt3 "race_pt3/race_pt3"
 	"sync"
 	"errors"
@@ -65,6 +66,7 @@ func clientSetup(redirectPath string, wg *sync.WaitGroup, stop <-chan int) (laun
 	wg.Add(1)
 	defer wg.Done()
 	go clientSocksAcceptLoop(ln, clients, redirectPath, wg, stop)
+	golog.Println("After go clientSocksAcceptLoop")
 
 	// when using ptadapter: use the "transport" in the config file
 	pt.Cmethod("race_pt3", ln.Version(), ln.Addr()) 
@@ -97,17 +99,22 @@ func clientSocksAcceptLoop(ln *pt.SocksListener, clients []*race_pt3.RaceClient,
 	// go ACCEPT SOCKS
 	defer ln.Close()
 
+	golog.Println("clientSocksAcceptLoop: Entered")
 	for {
 		wg.Add(1)
+		golog.Println("clientSocksAcceptLoop: select")
 		select {
 		case <-stop:
 			defer wg.Done()
 			golog.Println("clientSocksAcceptLoop return")
 			return
 		default:
+			golog.Println("clientSocksAcceptLoop: calling AcceptSocks")
 			conn, err := ln.AcceptSocks()
 			if err != nil {
+				golog.Println("clientSocksAcceptLoop: some error")
 				if err, ok := err.(net.Error); ok && err.Temporary() {
+					golog.Println("clientSocksAcceptLoop: temporary error")
 					continue
 				}
 				golog.Println("SOCKS accept error: %s", err)
