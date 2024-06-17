@@ -63,6 +63,7 @@ add_library(raceSdkCommon SHARED
     state-machine/ConduitStateMachine.cpp
     state-machine/ConnectionStateMachine.cpp
     state-machine/DialStateMachine.cpp
+    state-machine/ResumeStateMachine.cpp
     state-machine/BootstrapDialStateMachine.cpp
     state-machine/Events.cpp
     state-machine/ListenStateMachine.cpp

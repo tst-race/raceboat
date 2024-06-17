@@ -66,6 +66,19 @@ public:
   int timeout_ms = 0;
 };
 
+struct ResumeOptions {
+public:
+  ChannelId recv_channel;
+  ChannelId send_channel;
+  ChannelId alt_channel;
+  LinkAddress send_address;
+  std::string send_role;
+  LinkAddress recv_address;
+  std::string recv_role;
+  std::string package_id;
+  int timeout_ms = 0;
+};
+
 struct BootstrapConnectionOptions {
 public:
   ChannelId init_send_channel;
@@ -80,8 +93,9 @@ public:
   std::string final_recv_role;
   int timeout_seconds = 0;
 };
-std::string recvOptionsToString(const ReceiveOptions &sendOptions);
+std::string recvOptionsToString(const ReceiveOptions &recvOptions);
 std::string sendOptionsToString(const SendOptions &sendOptions);
+std::string resumeOptionsToString(const ResumeOptions &resumeOptions);
 std::string bootstrapConnectionOptionsToString(const BootstrapConnectionOptions &bootstrapConnectionOptions);
 std::string apiStatusToString(const ApiStatus status);
 
@@ -348,6 +362,15 @@ public:
                                               std::vector<uint8_t> bytes);
 
   /**
+   * @brief Resume a connection to a server
+   *
+   * @param options The options to use to resume the conduit
+   * @param bytes A message to send along with the introduction
+   * @return Conduit an object to use to communicate with the server
+   */
+  std::pair<ApiStatus, Conduit> resume(ResumeOptions options);
+
+   /**
    * @brief Create a connection to a server
    *
    * @param options The options to use when sending. The send_channel,

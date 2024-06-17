@@ -31,6 +31,7 @@
 #include "../state-machine/ConduitStateMachine.h"
 #include "../state-machine/ConnectionStateMachine.h"
 #include "../state-machine/DialStateMachine.h"
+#include "../state-machine/ResumeStateMachine.h"
 #include "../state-machine/ListenStateMachine.h"
 #include "../state-machine/PreConduitStateMachine.h"
 #include "../state-machine/BootstrapDialStateMachine.h"
@@ -85,6 +86,8 @@ public:
               std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
   virtual void dial(uint64_t postId, SendOptions sendOptions,
                     std::vector<uint8_t> data,
+                    std::function<void(ApiStatus, RaceHandle)> callback);
+  virtual void resume(uint64_t postId, ResumeOptions resumeOptions,
                     std::function<void(ApiStatus, RaceHandle)> callback);
   virtual void bootstrapDial(uint64_t postId, BootstrapConnectionOptions options,
                     std::vector<uint8_t> data,
@@ -221,6 +224,7 @@ protected:
   virtual ApiContext *newBootstrapDialContext();
   virtual ApiContext *newBootstrapListenContext();
   virtual ApiContext *newBootstrapPreConduitContext();
+  virtual ApiContext *newResumeContext();
 
   virtual Contexts getContexts(RaceHandle handle);
   virtual Contexts getContexts(const std::string &id);
@@ -247,6 +251,7 @@ public:
   BootstrapDialStateEngine bootstrapDialEngine;
   BootstrapListenStateEngine bootstrapListenEngine;
   BootstrapPreConduitStateEngine bootstrapPreConduitEngine;
+  ResumeStateEngine resumeEngine;
 
   // channel, link, and connection IDs are strings, and will never conflict
   // map IDs and system event handles to the appropriate context
@@ -273,6 +278,8 @@ public:
               std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
   virtual SdkResponse dial(SendOptions sendOptions, std::vector<uint8_t> data,
                            std::function<void(ApiStatus, RaceHandle)> callback);
+  virtual SdkResponse resume(ResumeOptions resumeOptions,
+                             std::function<void(ApiStatus, RaceHandle)> callback);
   virtual SdkResponse bootstrapDial(BootstrapConnectionOptions options, std::vector<uint8_t> data,
                            std::function<void(ApiStatus, RaceHandle)> callback);
   virtual SdkResponse getReceiveObject(

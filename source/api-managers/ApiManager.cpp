@@ -129,6 +129,19 @@ ApiManager::dial(SendOptions sendOptions, std::vector<uint8_t> data,
 }
 
 SdkResponse
+ApiManager::resume(ResumeOptions resumeOptions, 
+                 std::function<void(ApiStatus, RaceHandle)> callback) {
+  TRACE_METHOD();
+
+  if (!callback) {
+    return SDK_INVALID_ARGUMENT;
+  }
+
+  return post(logPrefix, &ApiManagerInternal::resume, resumeOptions,
+              callback);
+}
+
+SdkResponse
 ApiManager::bootstrapDial(BootstrapConnectionOptions options, std::vector<uint8_t> data,
                  std::function<void(ApiStatus, RaceHandle)> callback) {
   TRACE_METHOD();
@@ -360,6 +373,16 @@ void ApiManagerInternal::dial(
   auto context = newDialContext();
   context->updateDial(sendOptions, std::move(data), callback);
   dialEngine.start(*context);
+}
+
+void ApiManagerInternal::resume(
+    uint64_t postId, ResumeOptions resumeOptions,
+    std::function<void(ApiStatus, RaceHandle)> callback) {
+  TRACE_METHOD(postId, resumeOptionsToString(resumeOptions));
+
+  auto context = newResumeContext();
+  context->updateResume(resumeOptions, callback);
+  resumeEngine.start(*context);
 }
 
 void ApiManagerInternal::bootstrapDial(
@@ -1112,6 +1135,13 @@ ApiContext *ApiManagerInternal::newRecvContext() {
 
 ApiContext *ApiManagerInternal::newDialContext() {
   auto newContext = std::make_unique<ApiDialContext>(*this, dialEngine);
+  auto handle = newContext->handle;
+  activeContexts[handle] = (std::move(newContext));
+  return activeContexts[handle].get();
+}
+
+ApiContext *ApiManagerInternal::newResumeContext() {
+  auto newContext = std::make_unique<ApiResumeContext>(*this, resumeEngine);
   auto handle = newContext->handle;
   activeContexts[handle] = (std::move(newContext));
   return activeContexts[handle].get();

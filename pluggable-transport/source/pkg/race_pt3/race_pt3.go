@@ -146,6 +146,37 @@ func (client RaceClient) Dial(sendAddress string) (RaceConn, error) {
 		nil
 }
 
+func (client RaceClient) Resume(sendAddress string, recvAddress string, packageId string) (RaceConn, error) {
+	golog.Println("Calling Resume")
+	// Create/load
+	// Open connection
+	// Return net.Conn mapping itself to this particular connectionId
+	resumeOpts := core.NewResumeOptions()
+	defer core.DeleteResumeOptions(resumeOpts)
+	resumeOpts.SetRecv_channel(client.recvChannelId)
+	resumeOpts.SetSend_channel(client.sendChannelId)
+	resumeOpts.SetAlt_channel(client.altChannelId)
+	resumeOpts.SetSend_address(sendAddress)
+	resumeOpts.SetRecv_address(recvAddress)
+	resumeOpts.SetSend_role(client.sendChannelRole)
+	resumeOpts.SetRecv_role(client.recvChannelRole)
+	resumeOpts.SetTimeout_ms(client.timeoutMs)
+	resumeOpts.SetPackage_id(packageId)
+
+	// ResumeSwig() returns wrapped std::pair<ApiStatus, SwigConduit>
+	pair := client.race.ResumeSwig(resumeOpts)
+	if pair.GetFirst() != core.ApiStatus_OK {
+		golog.Println("Resume error")
+		return RaceConn{ conn: nil, race: nil, }, errors.New("race_pt3 Resume error")
+	}
+
+	return RaceConn{
+			conn: pair.GetSecond(),
+			race: client.race,
+		}, 
+		nil
+}
+
 func (conn RaceConn) Read(buffer []byte) (n int, err error) {
 	golog.Println("Calling Read")
 	

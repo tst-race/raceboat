@@ -59,6 +59,9 @@ public:
                           std::vector<uint8_t> && /* data */,
                           std::function<void(ApiStatus, RaceHandle)> /* cb */) {
   }
+  virtual void updateResume(const ResumeOptions & /* resumeOptions */,
+                          std::function<void(ApiStatus, RaceHandle)> /* cb */) {
+  }
   virtual void updateBootstrapDial(const BootstrapConnectionOptions & /* options */,
                           std::vector<uint8_t> && /* data */,
                           std::function<void(ApiStatus, RaceHandle)> /* cb */) {

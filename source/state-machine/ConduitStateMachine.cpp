@@ -237,6 +237,12 @@ struct StateConduitFailed : public ConduitState {
       ctx.dialCallback = {};
     }
 
+    if (ctx.resumeCallback) {
+      helper::logDebug(logPrefix + "resume callback not null");
+      ctx.resumeCallback(ApiStatus::INTERNAL_ERROR, {});
+      ctx.resumeCallback = {};
+    }
+
     for (auto &[cb, bytes] : ctx.sendQueue) {
       helper::logDebug(logPrefix + "send queue not empty");
       cb(ApiStatus::INTERNAL_ERROR);

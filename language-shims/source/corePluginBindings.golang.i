@@ -87,6 +87,11 @@ struct RaceSwig: public Race {
         auto pair = dial_str(options, message);
         return { pair.first, pair.second };
     }
+
+    std::pair<ApiStatus, SwigConduit> resumeSwig(ResumeOptions options) {
+        auto pair = resume(options);
+        return { pair.first, pair.second };
+    }
 };
 }  // namespace Raceboat
 %}

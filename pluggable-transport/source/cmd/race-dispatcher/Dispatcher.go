@@ -186,6 +186,12 @@ func clientSocksAcceptLoop(ln *pt.SocksListener, clients []*race_pt3.RaceClient,
 					introMessage = arg
 					golog.Println("introMessage:", introMessage)
 				}
+				
+				resumeId := ""
+				if arg, ok := conn.Req.Args.Get("resumeId"); ok {
+					resumeId = arg
+					golog.Println("resumeId:", resumeId)
+				}
 
 				var client *race_pt3.RaceClient
 				if len(clients) == 0 {
@@ -214,13 +220,26 @@ func clientSocksAcceptLoop(ln *pt.SocksListener, clients []*race_pt3.RaceClient,
 				}
 				golog.Printf("client address: %p\n", client)  // debug
 
-				golog.Println("Dialing.")
-				rconn, err := client.Dial(sendLinkAddress)
-				if err != nil {
-					golog.Println("ERROR on Dial")
-					return
+				var rconn race_pt3.RaceConn
+				if len(resumeId) == 0 {
+					golog.Println("Dialing.")
+					dialed_conn, err := client.Dial(sendLinkAddress)
+					if err != nil {
+						golog.Println("ERROR on Dial")
+						return
+					}
+					rconn = dialed_conn
+					golog.Println("Dialed.")
+				} else {
+					golog.Println("Resuming.")
+					resumed_conn, err := client.Resume(sendLinkAddress, recvLinkAddress, resumeId)
+					if err != nil {
+						golog.Println("ERROR on Dial")
+						return
+					}
+					rconn = resumed_conn
+					golog.Println("Resumed.")
 				}
-				golog.Println("Dialed.")
 				err = conn.Grant(&net.TCPAddr{IP: net.IPv4zero, Port: 0})
 				// socksReq.Reply(socks5.ReplySucceeded)
 				if err != nil {

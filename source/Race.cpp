@@ -52,6 +52,21 @@ std::string sendOptionsToString(const SendOptions &sendOptions) {
   return ss.str();
 }
 
+std::string resumeOptionsToString(const ResumeOptions &resumeOptions) {
+  std::stringstream ss;
+
+  ss << "ResumeOptions {";
+  ss << "send_channel: '" << resumeOptions.send_channel << "', ";
+  ss << "recv_channel: '" << resumeOptions.recv_channel << "', ";
+  ss << "alt_channel: '" << resumeOptions.alt_channel << "', ";
+  ss << "send_address: '" << resumeOptions.send_address << "', ";
+  ss << "send_role: '" << resumeOptions.send_role << "', ";
+  ss << "recv_address: '" << resumeOptions.recv_address << "', ";
+  ss << "recv_role: '" << resumeOptions.recv_role << "', ";
+  ss << "timeout_ms: '" << resumeOptions.timeout_ms << "'}";
+  return ss.str();
+}
+
 std::string bootstrapConnectionOptionsToString(const BootstrapConnectionOptions &bootstrapConnectionOptions) {
   std::stringstream ss;
 
@@ -481,6 +496,22 @@ std::pair<ApiStatus, Conduit> Race::dial_str(SendOptions options,
   TRACE_METHOD();
   std::vector<uint8_t> bytes{message.begin(), message.end()};
   return dial(options, bytes);
+}
+
+  
+std::pair<ApiStatus, Conduit> Race::resume(ResumeOptions options) {
+  TRACE_METHOD();
+  std::promise<std::tuple<ApiStatus, RaceHandle>> promise;
+  auto future = promise.get_future();
+
+  core->getApiManager().resume(options,
+                             [&promise](ApiStatus status, RaceHandle handle) {
+                               promise.set_value({status, handle});
+                             });
+
+  auto [status, handle] = future.get();
+  Conduit receiver(core, handle);
+  return {status, receiver};
 }
 
 
