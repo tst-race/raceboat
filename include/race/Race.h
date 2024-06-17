@@ -114,12 +114,14 @@ public:
   ApiStatus write(std::vector<uint8_t> message);
   ApiStatus write_str(const std::string &message);
   ApiStatus close();
+  ResumeOptions getResumeAttributes();
 
   static const int BLOCKING_READ = 0;
 
 private:
   std::shared_ptr<Core> core;
   OpHandle handle;
+  ResumeOptions resumeAttributes;
 };
 
 class ReceiveObject {
