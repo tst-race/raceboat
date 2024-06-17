@@ -42,8 +42,6 @@ type RaceClient struct {
 	recvChannelRole    string `default:"default"`
 	altChannelId       string
 	altChannelRole     string `default:"default"`
-	sendLinkAddress    string
-	receiveLinkAddress string
 	timeoutMs          int  // 0 for no timeout
 	introduction       string
 }
@@ -55,8 +53,6 @@ func NewRaceClient(
 	recvChannelRole string,
 	altChannelId string,
 	altChannelRole string,
-	sendLinkAddress string,
-	receiveLinkAddress string,
 	pluginPath string,
 	timeoutMs int,
 	logLevel int,
@@ -78,10 +74,6 @@ func NewRaceClient(
 		golog.Println("using default plugin path " + pluginPath)
 	}
 
-	if len(sendLinkAddress) == 0 && len(receiveLinkAddress) == 0 {
-		golog.Println("empty send and receive link addresses")
-		return nil
-	}
 	if len(sendChannelId) == 0 && len(recvChannelId) == 0 {
 		golog.Println("empty send and receive channel IDs")
 		return nil
@@ -103,8 +95,6 @@ func NewRaceClient(
 		recvChannelRole:    recvChannelRole,
 		altChannelId:       altChannelId,
 		altChannelRole:     altChannelRole,
-		sendLinkAddress:    sendLinkAddress,
-		receiveLinkAddress: receiveLinkAddress,	
 		timeoutMs:          timeoutMs,	
 		introduction:       introduction,
 	}
@@ -127,7 +117,7 @@ type RaceConn struct {
 	race  core.RaceSwig
 }
 
-func (client RaceClient) Dial() (RaceConn, error) {
+func (client RaceClient) Dial(sendAddress string) (RaceConn, error) {
 	golog.Println("Calling Dial")
 	// Create/load
 	// Open connection
@@ -137,7 +127,7 @@ func (client RaceClient) Dial() (RaceConn, error) {
 	sendOpts.SetRecv_channel(client.recvChannelId)
 	sendOpts.SetSend_channel(client.sendChannelId)
 	sendOpts.SetAlt_channel(client.altChannelId)
-	sendOpts.SetSend_address(client.sendLinkAddress)
+	sendOpts.SetSend_address(sendAddress)
 	sendOpts.SetSend_role(client.sendChannelRole)
 	sendOpts.SetRecv_role(client.recvChannelRole)
 	sendOpts.SetTimeout_ms(client.timeoutMs)

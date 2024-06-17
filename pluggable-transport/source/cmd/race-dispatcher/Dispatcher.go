@@ -187,29 +187,35 @@ func clientSocksAcceptLoop(ln *pt.SocksListener, clients []*race_pt3.RaceClient,
 					golog.Println("introMessage:", introMessage)
 				}
 
-				golog.Println("Calling NewRaceClient")
-				client := race_pt3.NewRaceClient(
-					sendChannel,
-					role,
-					recvChannel,
-					role,
-					"",
-					"",
-					sendLinkAddress,
-					recvLinkAddress,
-					"",
-					0,
-					race_pt3.DEBUG, // TODO: Should be INFO in release
-					introMessage,
-					redirectPath,
-					userParams,
-				)
+				var client *race_pt3.RaceClient
+				if len(clients) == 0 {
+					golog.Println("Calling NewRaceClient")
+					client = race_pt3.NewRaceClient(
+						sendChannel,
+						role,
+						recvChannel,
+						role,
+						"",
+						"",
+						// sendLinkAddress,
+						// recvLinkAddress,
+						"",
+						0,
+						race_pt3.DEBUG, // TODO: Should be INFO in release
+						introMessage,
+						redirectPath,
+						userParams,
+					)
 
-				clients = append(clients, client)
+					clients = append(clients, client)
+				} else {
+					golog.Println("Got Existing RaceClient")
+					client = clients[0]
+				}
 				golog.Printf("client address: %p\n", client)  // debug
 
 				golog.Println("Dialing.")
-				rconn, err := client.Dial()
+				rconn, err := client.Dial(sendLinkAddress)
 				if err != nil {
 					golog.Println("ERROR on Dial")
 					return
