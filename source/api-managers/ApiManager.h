@@ -130,7 +130,8 @@ public:
   virtual void stateMachineFinished(ApiContext &context);
   virtual void connStateMachineConnected(RaceHandle contextHandle,
                                          ConnectionID connId,
-                                         std::string linkAddress);
+                                         std::string linkAddress,
+                                         std::string channelId);
 
   virtual void onStateMachineFailed(uint64_t postId, RaceHandle contextHandle);
   virtual void onStateMachineFinished(uint64_t postId,
@@ -138,12 +139,16 @@ public:
   virtual void onConnStateMachineConnected(uint64_t postId,
                                            RaceHandle contextHandle,
                                            ConnectionID connId,
-                                           std::string linkAddress);
+                                           std::string linkAddress,
+                                           std::string channelId);
 
   virtual void onChannelStatusChangedForContext(
       uint64_t postId, RaceHandle contextHandle, RaceHandle callHandle,
       const ChannelId &channelGid, ChannelStatus status,
       const ChannelProperties &properties);
+  virtual void onConnStateMachineConnectedForContext(
+      uint64_t postId, RaceHandle contextHandle, RaceHandle callHandle,
+      RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress);
   // Plugin callbacks
   virtual void onChannelStatusChanged(uint64_t postId, RaceHandle handle,
                                       const ChannelId &channelGid,
@@ -263,6 +268,9 @@ public:
   std::unordered_map<std::string, Contexts> packageIdContextMap;
   std::unordered_map<ChannelId, std::pair<ChannelStatus, ChannelProperties>>
       activatedChannels;
+  std::unordered_map<std::string, std::pair<RaceHandle, ConnectionID>> linkConnMap;
+
+  std::unordered_map<std::string, std::vector<EncPkg>> unassociatedPackages;
 };
 
 class ApiManager {
@@ -315,11 +323,18 @@ public:
   virtual SdkResponse onStateMachineFinished(RaceHandle contextHandle);
   virtual SdkResponse onConnStateMachineConnected(RaceHandle contextHandle,
                                                   ConnectionID connId,
-                                                  std::string linkAddress);
+                                                  std::string linkAddress,
+                                                  std::string channelId);
   virtual SdkResponse onChannelStatusChangedForContext(
       RaceHandle contextHandle, RaceHandle callHandle,
       const ChannelId &channelGid, ChannelStatus status,
       const ChannelProperties &properties);
+
+  virtual SdkResponse onConnStateMachineConnectedForContext(
+      RaceHandle contextHandle,
+      RaceHandle callHandle,
+      RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress);
+
 
   // Plugin callbacks
   virtual SdkResponse

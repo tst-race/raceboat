@@ -163,6 +163,7 @@ struct StateConnLinkEstablished : public ConnState {
 
     ctx.manager.registerId(ctx, ctx.linkId);
 
+    // TODO I don't think this should be only for recv links
     if (!ctx.send && !ctx.linkAddress.empty() &&
         ctx.updatedLinkAddress != ctx.linkAddress) {
       nlohmann::json updatedJson =
@@ -201,7 +202,8 @@ struct StateConnConnectionOpen : public ConnState {
 
     ctx.manager.registerId(ctx, ctx.connId);
     ctx.manager.connStateMachineConnected(ctx.handle, ctx.connId,
-                                          ctx.updatedLinkAddress);
+                                          ctx.updatedLinkAddress,
+                                          ctx.channelId);
 
     ctx.pendingEvents.push(EVENT_ALWAYS);
 

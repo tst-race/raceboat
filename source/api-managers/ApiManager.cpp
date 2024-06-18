@@ -289,10 +289,11 @@ SdkResponse ApiManager::onConnectionStatusChanged(
 
 SdkResponse ApiManager::onConnStateMachineConnected(RaceHandle contextHandle,
                                                     ConnectionID connId,
-                                                    std::string linkAddress) {
+                                                    std::string linkAddress,
+                                                    std::string channelId) {
   TRACE_METHOD();
   return post(logPrefix, &ApiManagerInternal::onConnStateMachineConnected,
-              contextHandle, connId, linkAddress);
+              contextHandle, connId, linkAddress, channelId);
 }
 
 SdkResponse ApiManager::onChannelStatusChangedForContext(
@@ -302,6 +303,14 @@ SdkResponse ApiManager::onChannelStatusChangedForContext(
   TRACE_METHOD();
   return post(logPrefix, &ApiManagerInternal::onChannelStatusChangedForContext,
               contextHandle, callHandle, channelGid, status, properties);
+}
+
+SdkResponse ApiManager::onConnStateMachineConnectedForContext(
+                                                            RaceHandle contextHandle, RaceHandle callHandle,
+                                                            RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress) {
+  TRACE_METHOD();
+  return post(logPrefix, &ApiManagerInternal::onConnStateMachineConnectedForContext,
+              contextHandle, callHandle, connContextHandle, connId, linkAddress);
 }
 
 // Plugin callbacks
@@ -636,9 +645,10 @@ void ApiManagerInternal::stateMachineFinished(ApiContext &context) {
 
 void ApiManagerInternal::connStateMachineConnected(RaceHandle contextHandle,
                                                    ConnectionID connId,
-                                                   std::string linkAddress) {
-  TRACE_METHOD(contextHandle, connId);
-  manager.onConnStateMachineConnected(contextHandle, connId, linkAddress);
+                                                   std::string linkAddress,
+                                                   std::string channelId) {
+  TRACE_METHOD(contextHandle, connId, linkAddress, channelId);
+  manager.onConnStateMachineConnected(contextHandle, connId, linkAddress, channelId);
 }
 
 void ApiManagerInternal::onStateMachineFailed(uint64_t postId,
@@ -682,8 +692,13 @@ void ApiManagerInternal::onStateMachineFinished(uint64_t postId,
 void ApiManagerInternal::onConnStateMachineConnected(uint64_t postId,
                                                      RaceHandle contextHandle,
                                                      ConnectionID connId,
-                                                     std::string linkAddress) {
-  TRACE_METHOD(postId, contextHandle, connId);
+                                                     std::string linkAddress,
+                                                     std::string channelId) {
+  TRACE_METHOD(postId, contextHandle, connId, linkAddress, channelId);
+
+  // Map for when additional SMs want to re-use this link/connection
+  helper::logDebug(logPrefix + "Inserting $" + channelId + "$ + $" + linkAddress + "$ into the linkConnMap with connID " + connId);
+  linkConnMap.insert({channelId+linkAddress, {contextHandle, connId}});
 
   auto contexts = getContexts(contextHandle);
   for (auto context : contexts) {
@@ -717,6 +732,32 @@ void ApiManagerInternal::onChannelStatusChangedForContext(
   context.updateChannelStatusChanged(callHandle, channelGid, status,
                                      properties);
   triggerEvent(context, event);
+}
+
+  // This is triggered by startConnStateMachine if a connection for
+  // the channelId+linkAddress is already ready
+void ApiManagerInternal::onConnStateMachineConnectedForContext(
+    uint64_t postId, RaceHandle contextHandle, RaceHandle callHandle,
+    RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress) {
+  TRACE_METHOD(postId, contextHandle, callHandle, connContextHandle, connId, linkAddress);
+
+  auto contextIt = activeContexts.find(contextHandle);
+  if (contextIt == activeContexts.end()) {
+    helper::logError(logPrefix + " could not find calling context");
+    return;
+  }
+
+  auto connContextIt = activeContexts.find(connContextHandle);
+  if (connContextIt == activeContexts.end()) {
+    helper::logError(logPrefix + " could not connContext");
+    return;
+  }
+
+  contextIt->second->updateConnStateMachineConnected(connContextHandle,
+                                                     connId,
+                                                     linkAddress);
+  connContextIt->second->updateDependent(contextHandle);
+  triggerEvent(*contextIt->second, EVENT_CONN_STATE_MACHINE_CONNECTED);
 }
 
 //--------------------------------------------------------
@@ -825,6 +866,14 @@ void ApiManagerInternal::receiveEncPkg(
       helper::logDebug(logPrefix + " found package id");
 
     } else {
+      // buffer messages that might be for conduits/packageIds we have
+      // not _yet_ resumed
+      auto packagesIt = unassociatedPackages.find(packageId);
+      if (packagesIt != unassociatedPackages.end()) {
+          packagesIt->second.emplace_back(pkg);
+      } else{
+        unassociatedPackages.insert({packageId, {pkg}});
+      }
       contexts = getContexts(connId);
       helper::logDebug(logPrefix + " did not find package id");
     }
@@ -873,6 +922,21 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
                                                      bool sending) {
   TRACE_METHOD(contextHandle);
 
+  auto connContextIt = linkConnMap.find(channelId + linkAddress);
+  // We already made this link/connection
+  // Note: this is _only_ valid when we are specifying the link address
+  // Otherwise the address is being dynamically generated and will be unique
+  if (linkAddress != "" and connContextIt != linkConnMap.end()) {
+    helper::logDebug(logPrefix + "got existing entry for $" + channelId + "$ $" + linkAddress + "$ in the linkConnMap with ConnID=" + connContextIt->second.second);
+    RaceHandle callHandle = getCore().generateHandle();
+    manager.onConnStateMachineConnectedForContext(contextHandle,
+                                                  callHandle,
+                                                  connContextIt->second.first,
+                                                  connContextIt->second.second,
+                                                  linkAddress);
+    return connContextIt->second.first;
+  }
+
   // TODO do validation checks
   
   // create a connection context and copy information from the send/recv context
@@ -905,11 +969,13 @@ RaceHandle ApiManagerInternal::startConduitectStateMachine(
 
   EventResult result = connObjectEngine.start(*context);
   if (result != EventResult::SUCCESS) {
+    helper::logError(logPrefix + "connObjectEngine.start failed");
     return NULL_RACE_HANDLE;
   }
 
   auto recvContextIt = activeContexts.find(recvHandle);
   if (recvContextIt == activeContexts.end()) {
+    helper::logError(logPrefix + "recvContextIt could not be found for recvHandle");
     return NULL_RACE_HANDLE;
   }
 
@@ -918,12 +984,16 @@ RaceHandle ApiManagerInternal::startConduitectStateMachine(
 
   auto sendContextIt = activeContexts.find(sendHandle);
   if (sendContextIt == activeContexts.end()) {
+    helper::logError(logPrefix + "sendContextIt could not be found for sendHandle");
     return NULL_RACE_HANDLE;
   }
 
   sendContextIt->second->updateDependent(context->handle);
   triggerEvent(*sendContextIt->second, EVENT_ADD_DEPENDENT);
 
+  if (context->handle == NULL_RACE_HANDLE) {
+    helper::logError(logPrefix + "context->handle is NULL");
+  }
   return context->handle;
 }
 
