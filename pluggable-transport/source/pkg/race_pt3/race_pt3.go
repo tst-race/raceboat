@@ -138,6 +138,15 @@ func (client RaceClient) Dial(sendAddress string) (RaceConn, error) {
 		golog.Println("Dial error")
 		return RaceConn{ conn: nil, race: nil, }, errors.New("race_pt3 Dial error")
 	}
+	golog.Println("Conduit Properties:")
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetPackage_id())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetRecv_channel())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetRecv_role())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetRecv_address())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetSend_channel())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetSend_role())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetSend_address())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetTimeout_ms())
 
 	return RaceConn{
 			conn: pair.GetSecond(),
@@ -155,7 +164,6 @@ func (client RaceClient) Resume(sendAddress string, recvAddress string, packageI
 	defer core.DeleteResumeOptions(resumeOpts)
 	resumeOpts.SetRecv_channel(client.recvChannelId)
 	resumeOpts.SetSend_channel(client.sendChannelId)
-	resumeOpts.SetAlt_channel(client.altChannelId)
 	resumeOpts.SetSend_address(sendAddress)
 	resumeOpts.SetRecv_address(recvAddress)
 	resumeOpts.SetSend_role(client.sendChannelRole)

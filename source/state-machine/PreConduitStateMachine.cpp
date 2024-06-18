@@ -23,6 +23,7 @@
 #include "PluginWrapper.h"
 #include "States.h"
 #include "api-managers/ApiManager.h"
+#include "base64.h"
 #include "helper.h"
 
 namespace Raceboat {
@@ -60,7 +61,7 @@ void PreConduitContext::updateConnStateMachineConnected(
 }
 
 void PreConduitContext::updateListenAccept(
-    std::function<void(ApiStatus, RaceHandle)> cb) {
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) {
   this->acceptCb = cb;
 }
 
@@ -139,7 +140,17 @@ struct StatePreConduitOpen : public PreConduitState {
       return EventResult::NOT_SUPPORTED;
     }
 
-    ctx.acceptCb(ApiStatus::OK, connObjectApiHandle);
+    ConduitProperties properties;
+    properties.package_id = base64::encode(std::vector<uint8_t>(
+                                                                ctx.packageId.begin(), ctx.packageId.end()));
+    properties.recv_channel = ctx.recvChannel;
+    // properties.recv_role = ctx.opts.recv_role;
+    // properties.recv_address = ctx.recvLinkAddress;
+    properties.send_channel = ctx.sendChannel;
+    // properties.send_role = ctx.opts.send_role;
+    // properties.send_address = ctx.opts.send_address;
+    // properties.timeout_ms = ctx.opts.timeout_ms;
+    ctx.acceptCb(ApiStatus::OK, connObjectApiHandle, properties);
     ctx.acceptCb = {};
 
     ctx.manager.stateMachineFinished(ctx);
@@ -157,7 +168,7 @@ struct StatePreConduitFailed : public PreConduitState {
 
     if (ctx.acceptCb) {
       helper::logWarning(logPrefix + "accept callback not null");
-      ctx.acceptCb(ApiStatus::INTERNAL_ERROR, {});
+      ctx.acceptCb(ApiStatus::INTERNAL_ERROR, {}, {});
       ctx.acceptCb = {};
     }
 

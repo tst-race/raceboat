@@ -27,7 +27,7 @@ public:
 
   virtual void
   updateDial(const SendOptions &sendOptions, std::vector<uint8_t> &&data,
-             std::function<void(ApiStatus, RaceHandle)> cb) override;
+             std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) override;
 
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
@@ -36,7 +36,7 @@ public:
 public:
   SendOptions opts;
   std::vector<uint8_t> data;
-  std::function<void(ApiStatus, RaceHandle)> dialCallback;
+  std::function<void(ApiStatus, RaceHandle, ConduitProperties)> dialCallback;
 
   RaceHandle sendConnSMHandle;
   ConnectionID sendConnId;

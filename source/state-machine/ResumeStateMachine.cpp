@@ -30,7 +30,7 @@ namespace Raceboat {
 //-----------------------------------------------------------------------------------------------
 
 void ApiResumeContext::updateResume(const ResumeOptions &resumeOptions,
-                                std::function<void(ApiStatus, RaceHandle)> cb) {
+                                    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) {
   this->opts = resumeOptions;
   this->resumeCallback = cb;
 }
@@ -66,40 +66,40 @@ struct StateResumeInitial : public ResumeState {
     if (sendChannelId.empty()) {
       helper::logError(logPrefix +
                        "Invalid send channel id passed to resume");
-      ctx.resumeCallback(ApiStatus::CHANNEL_INVALID, {});
+      ctx.resumeCallback(ApiStatus::CHANNEL_INVALID, {}, {});
       ctx.resumeCallback = {};
       return EventResult::NOT_SUPPORTED;
     } else if (recvChannelId.empty()) {
       helper::logError(logPrefix + "Invalid recv channel id passed to resume");
-      ctx.resumeCallback(ApiStatus::CHANNEL_INVALID, {});
+      ctx.resumeCallback(ApiStatus::CHANNEL_INVALID, {}, {});
       ctx.resumeCallback = {};
       return EventResult::NOT_SUPPORTED;
     } else if (sendRole.empty()) {
       helper::logError(logPrefix + "Invalid send role passed to resume");
-      ctx.resumeCallback(ApiStatus::INVALID_ARGUMENT, {});
+      ctx.resumeCallback(ApiStatus::INVALID_ARGUMENT, {}, {});
       ctx.resumeCallback = {};
       return EventResult::NOT_SUPPORTED;
     } else if (recvRole.empty()) {
       helper::logError(logPrefix + "Invalid recv role passed to resume");
-      ctx.resumeCallback(ApiStatus::INVALID_ARGUMENT, {});
+      ctx.resumeCallback(ApiStatus::INVALID_ARGUMENT, {}, {});
       ctx.resumeCallback = {};
       return EventResult::NOT_SUPPORTED;
     } else if (sendLinkAddress.empty()) {
       helper::logError(logPrefix +
                        "Invalid send address passed to resume");
-      ctx.resumeCallback(ApiStatus::INVALID_ARGUMENT, {});
+      ctx.resumeCallback(ApiStatus::INVALID_ARGUMENT, {}, {});
       ctx.resumeCallback = {};
       return EventResult::NOT_SUPPORTED;
     } else if (recvLinkAddress.empty()) {
       helper::logError(logPrefix +
                        "Invalid recv address passed to resume");
-      ctx.resumeCallback(ApiStatus::INVALID_ARGUMENT, {});
+      ctx.resumeCallback(ApiStatus::INVALID_ARGUMENT, {}, {});
       ctx.resumeCallback = {};
       return EventResult::NOT_SUPPORTED;
     } else if (packageId.empty()) {
       helper::logError(logPrefix +
                        "Invalid packageID passed to resume");
-      ctx.resumeCallback(ApiStatus::INVALID_ARGUMENT, {});
+      ctx.resumeCallback(ApiStatus::INVALID_ARGUMENT, {}, {});
       ctx.resumeCallback = {};
       return EventResult::NOT_SUPPORTED;
     }
@@ -110,7 +110,7 @@ struct StateResumeInitial : public ResumeState {
     if (sendContainer == nullptr) {
       helper::logError(logPrefix + "Failed to get channel with id " +
                        sendChannelId);
-      ctx.resumeCallback(ApiStatus::CHANNEL_INVALID, {});
+      ctx.resumeCallback(ApiStatus::CHANNEL_INVALID, {}, {});
       ctx.resumeCallback = {};
       return EventResult::NOT_SUPPORTED;
     }
@@ -120,12 +120,21 @@ struct StateResumeInitial : public ResumeState {
     if (recvContainer == nullptr) {
       helper::logError(logPrefix + "Failed to get channel with id " +
                        recvChannelId);
-      ctx.resumeCallback(ApiStatus::CHANNEL_INVALID, {});
+      ctx.resumeCallback(ApiStatus::CHANNEL_INVALID, {}, {});
       ctx.resumeCallback = {};
       return EventResult::NOT_SUPPORTED;
     }
 
-    ctx.packageId = ctx.opts.package_id;
+
+    std::string decoded_package_id = ctx.opts.package_id;
+    try {
+      std::vector<uint8_t> decoded_id = base64::decode(ctx.opts.package_id);
+      decoded_package_id = std::string(decoded_id.begin(), decoded_id.end());
+    } catch (const std::invalid_argument exception) {
+      helper::logInfo(logPrefix + " could not decode resume package_id argument from base64, assuming raw value is correct");
+    }
+
+    ctx.packageId = decoded_package_id;
     helper::logDebug(logPrefix + "Setting packageId to " +
                        ctx.packageId);
 
@@ -178,7 +187,7 @@ struct StateResumeFinished : public ResumeState {
       return EventResult::NOT_SUPPORTED;
     }
 
-    ctx.resumeCallback(ApiStatus::OK, connObjectApiHandle);
+    ctx.resumeCallback(ApiStatus::OK, connObjectApiHandle, {});
     ctx.resumeCallback = {};
 
     ctx.manager.stateMachineFinished(ctx);
@@ -194,7 +203,7 @@ struct StateResumeFailed : public ResumeState {
     auto &ctx = getContext(context);
 
     if (ctx.resumeCallback) {
-      ctx.resumeCallback(ApiStatus::INTERNAL_ERROR, {});
+      ctx.resumeCallback(ApiStatus::INTERNAL_ERROR, {}, {});
       ctx.resumeCallback = {};
     }
 

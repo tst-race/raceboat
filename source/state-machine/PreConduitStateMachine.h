@@ -41,11 +41,11 @@ public:
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
                                   std::string linkAddress) override;
   virtual void
-  updateListenAccept(std::function<void(ApiStatus, RaceHandle)> cb) override;
+  updateListenAccept(std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) override;
 
 public:
   std::vector<std::vector<uint8_t>> recvQueue;
-  std::function<void(ApiStatus, RaceHandle)> acceptCb;
+  std::function<void(ApiStatus, RaceHandle, ConduitProperties)> acceptCb;
 
   RaceHandle parentHandle;
 

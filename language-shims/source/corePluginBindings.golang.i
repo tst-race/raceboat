@@ -43,8 +43,8 @@ struct SwigConduit: public Conduit {
     SwigConduit() {}
     SwigConduit(const Conduit &that) : Conduit(that) {}
 
-    SwigConduit(std::shared_ptr<Core> core, OpHandle handle) :
-        Conduit(core, handle) {}
+   SwigConduit(std::shared_ptr<Core> core, OpHandle handle, ConduitProperties properties) :
+    Conduit(core, handle, properties) {}
     
     virtual ~SwigConduit() {}
 

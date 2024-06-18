@@ -29,7 +29,7 @@ public:
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> cb) override;
   virtual void
   updateAccept(RaceHandle handle,
-               std::function<void(ApiStatus, RaceHandle)> cb) override;
+               std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) override;
   virtual void updateClose(RaceHandle handle,
                            std::function<void(ApiStatus)> cb) override;
   virtual void
@@ -43,7 +43,7 @@ public:
   ReceiveOptions opts;
   std::queue<std::shared_ptr<std::vector<uint8_t>>> data;
   std::function<void(ApiStatus, LinkAddress, RaceHandle)> listenCb;
-  std::deque<std::function<void(ApiStatus, RaceHandle)>> acceptCb;
+  std::deque<std::function<void(ApiStatus, RaceHandle, ConduitProperties)>> acceptCb;
   std::function<void(ApiStatus)> closeCb;
 
   RaceHandle recvConnSMHandle;

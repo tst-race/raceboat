@@ -30,7 +30,7 @@ public:
       finalRecvConnSMHandle(NULL_RACE_HANDLE) {}
   virtual void
   updateBootstrapDial(const BootstrapConnectionOptions &options, std::vector<uint8_t> &&data,
-             std::function<void(ApiStatus, RaceHandle)> cb) override;
+             std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) override;
 
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
@@ -44,7 +44,7 @@ public:
   BootstrapConnectionOptions opts;
   std::vector<uint8_t> helloData;
   std::queue<std::shared_ptr<std::vector<uint8_t>>> responseData;
-  std::function<void(ApiStatus, RaceHandle)> dialCallback;
+  std::function<void(ApiStatus, RaceHandle, ConduitProperties)> dialCallback;
 
   RaceHandle initSendConnSMHandle;
   ConnectionID initSendConnId;

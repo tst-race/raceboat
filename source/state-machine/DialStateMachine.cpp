@@ -31,7 +31,7 @@ namespace Raceboat {
 
 void ApiDialContext::updateDial(const SendOptions &sendOptions,
                                 std::vector<uint8_t> &&_data,
-                                std::function<void(ApiStatus, RaceHandle)> cb) {
+                                std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) {
   this->opts = sendOptions;
   this->data = _data;
   this->dialCallback = cb;
@@ -66,28 +66,28 @@ struct StateDialInitial : public DialState {
     if (sendChannelId.empty()) {
       helper::logError(logPrefix +
                        "Invalid send channel id passed to sendReceive");
-      ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {});
+      ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {}, {});
       ctx.dialCallback = {};
       return EventResult::NOT_SUPPORTED;
     } else if (recvChannelId.empty()) {
       helper::logError(logPrefix + "Invalid recv channel id passed to recv");
-      ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {});
+      ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {}, {});
       ctx.dialCallback = {};
       return EventResult::NOT_SUPPORTED;
     } else if (sendRole.empty()) {
       helper::logError(logPrefix + "Invalid send role passed to sendReceive");
-      ctx.dialCallback(ApiStatus::INVALID_ARGUMENT, {});
+      ctx.dialCallback(ApiStatus::INVALID_ARGUMENT, {}, {});
       ctx.dialCallback = {};
       return EventResult::NOT_SUPPORTED;
     } else if (recvRole.empty()) {
       helper::logError(logPrefix + "Invalid recv role passed to sendReceive");
-      ctx.dialCallback(ApiStatus::INVALID_ARGUMENT, {});
+      ctx.dialCallback(ApiStatus::INVALID_ARGUMENT, {}, {});
       ctx.dialCallback = {};
       return EventResult::NOT_SUPPORTED;
     } else if (sendLinkAddress.empty()) {
       helper::logError(logPrefix +
                        "Invalid send address passed to sendReceive");
-      ctx.dialCallback(ApiStatus::INVALID_ARGUMENT, {});
+      ctx.dialCallback(ApiStatus::INVALID_ARGUMENT, {}, {});
       ctx.dialCallback = {};
       return EventResult::NOT_SUPPORTED;
     }
@@ -97,7 +97,7 @@ struct StateDialInitial : public DialState {
     if (sendContainer == nullptr) {
       helper::logError(logPrefix + "Failed to get channel with id " +
                        sendChannelId);
-      ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {});
+      ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {}, {});
       ctx.dialCallback = {};
       return EventResult::NOT_SUPPORTED;
     }
@@ -107,7 +107,7 @@ struct StateDialInitial : public DialState {
     if (recvContainer == nullptr) {
       helper::logError(logPrefix + "Failed to get channel with id " +
                        recvChannelId);
-      ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {});
+      ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {}, {});
       ctx.dialCallback = {};
       return EventResult::NOT_SUPPORTED;
     }
@@ -206,7 +206,17 @@ struct StateDialFinished : public DialState {
       return EventResult::NOT_SUPPORTED;
     }
 
-    ctx.dialCallback(ApiStatus::OK, connObjectApiHandle);
+    ConduitProperties properties;
+    properties.package_id = base64::encode(std::vector<uint8_t>(
+                                                                ctx.packageId.begin(), ctx.packageId.end()));
+    properties.recv_channel = ctx.opts.recv_channel;
+    properties.recv_role = ctx.opts.recv_role;
+    properties.recv_address = ctx.recvLinkAddress;
+    properties.send_channel = ctx.opts.send_channel;
+    properties.send_role = ctx.opts.send_role;
+    properties.send_address = ctx.opts.send_address;
+    properties.timeout_ms = ctx.opts.timeout_ms;
+    ctx.dialCallback(ApiStatus::OK, connObjectApiHandle, properties);
     ctx.dialCallback = {};
 
     ctx.manager.stateMachineFinished(ctx);
@@ -222,7 +232,7 @@ struct StateDialFailed : public DialState {
     auto &ctx = getContext(context);
 
     if (ctx.dialCallback) {
-      ctx.dialCallback(ApiStatus::INTERNAL_ERROR, {});
+      ctx.dialCallback(ApiStatus::INTERNAL_ERROR, {}, {});
       ctx.dialCallback = {};
     }
 

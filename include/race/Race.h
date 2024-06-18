@@ -70,7 +70,6 @@ struct ResumeOptions {
 public:
   ChannelId recv_channel;
   ChannelId send_channel;
-  ChannelId alt_channel;
   LinkAddress send_address;
   std::string send_role;
   LinkAddress recv_address;
@@ -100,9 +99,21 @@ std::string bootstrapConnectionOptionsToString(const BootstrapConnectionOptions 
 std::string apiStatusToString(const ApiStatus status);
 
 
+struct ConduitProperties {
+public:
+  std::string package_id;
+  ChannelId recv_channel;
+  std::string recv_role;
+  LinkAddress recv_address;
+  ChannelId send_channel;
+  std::string send_role;
+  LinkAddress send_address;
+  int timeout_ms = 0;
+};
+
 class Conduit {
 public:
-  Conduit(std::shared_ptr<Core> core, OpHandle handle);
+  Conduit(std::shared_ptr<Core> core, OpHandle handle, ConduitProperties properties);
   Conduit() : handle(NULL_RACE_HANDLE) {}
   Conduit(const Conduit &that);
   virtual ~Conduit() {}
@@ -114,14 +125,14 @@ public:
   ApiStatus write(std::vector<uint8_t> message);
   ApiStatus write_str(const std::string &message);
   ApiStatus close();
-  // ResumeOptions getResumeAttributes();
+  ConduitProperties getConduitProperties();
 
   static const int BLOCKING_READ = 0;
 
 private:
   std::shared_ptr<Core> core;
   OpHandle handle;
-  // ResumeOptions resumeAttributes;
+  ConduitProperties properties;
 };
 
 class ReceiveObject {

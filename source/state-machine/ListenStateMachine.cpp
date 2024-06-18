@@ -39,7 +39,7 @@ void ApiListenContext::updateListen(
   this->listenCb = _cb;
 };
 void ApiListenContext::updateAccept(
-    RaceHandle /* _handle */, std::function<void(ApiStatus, RaceHandle)> _cb) {
+                                    RaceHandle /* _handle */, std::function<void(ApiStatus, RaceHandle, ConduitProperties)> _cb) {
   this->acceptCb.push_back(_cb);
 };
 void ApiListenContext::updateClose(RaceHandle /* handle */,
@@ -211,7 +211,7 @@ struct StateListenWaiting : public ListenState {
       RaceHandle preConnSMHandle = std::move(ctx.preConduitSM.front());
       ctx.preConduitSM.pop();
       if (!ctx.manager.onListenAccept(preConnSMHandle, cb)) {
-        cb(ApiStatus::INTERNAL_ERROR, {});
+        cb(ApiStatus::INTERNAL_ERROR, {}, {});
       };
     }
 
@@ -227,7 +227,7 @@ struct StateListenFinished : public ListenState {
     auto &ctx = getContext(context);
 
     for (auto &cb : ctx.acceptCb) {
-      cb(ApiStatus::CLOSING, {});
+      cb(ApiStatus::CLOSING, {}, {});
     }
     ctx.acceptCb = {};
 
@@ -253,7 +253,7 @@ struct StateListenFailed : public ListenState {
     }
 
     for (auto &cb : ctx.acceptCb) {
-      cb(ApiStatus::INTERNAL_ERROR, {});
+      cb(ApiStatus::INTERNAL_ERROR, {}, {});
     }
     ctx.acceptCb = {};
 

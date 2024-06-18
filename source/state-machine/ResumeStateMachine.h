@@ -27,7 +27,7 @@ public:
 
   virtual void
   updateResume(const ResumeOptions &resumeOptions,
-             std::function<void(ApiStatus, RaceHandle)> cb) override;
+               std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) override;
 
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
@@ -35,7 +35,7 @@ public:
 
 public:
   ResumeOptions opts;
-  std::function<void(ApiStatus, RaceHandle)> resumeCallback;
+  std::function<void(ApiStatus, RaceHandle, ConduitProperties)> resumeCallback;
 
   RaceHandle sendConnSMHandle;
   ConnectionID sendConnId;

@@ -57,21 +57,21 @@ public:
       std::function<void(ApiStatus, std::vector<uint8_t>)> /* cb */) {}
   virtual void updateDial(const SendOptions & /* sendOptions */,
                           std::vector<uint8_t> && /* data */,
-                          std::function<void(ApiStatus, RaceHandle)> /* cb */) {
+                          std::function<void(ApiStatus, RaceHandle, ConduitProperties)> /* cb */) {
   }
   virtual void updateResume(const ResumeOptions & /* resumeOptions */,
-                          std::function<void(ApiStatus, RaceHandle)> /* cb */) {
+                            std::function<void(ApiStatus, RaceHandle, ConduitProperties)> /* cb */) {
   }
   virtual void updateBootstrapDial(const BootstrapConnectionOptions & /* options */,
                           std::vector<uint8_t> && /* data */,
-                          std::function<void(ApiStatus, RaceHandle)> /* cb */) {
+                          std::function<void(ApiStatus, RaceHandle, ConduitProperties)> /* cb */) {
   }
   virtual void updateListen(
       const ReceiveOptions & /* recvOptions */,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> /* cb */) {}
   virtual void
   updateAccept(RaceHandle /* handle */,
-               std::function<void(ApiStatus, RaceHandle)> /* cb */) {}
+               std::function<void(ApiStatus, RaceHandle, ConduitProperties)> /* cb */) {}
   virtual void updateBootstrapListen(
       const BootstrapConnectionOptions & /* options */,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> /* cb */) {}
@@ -148,7 +148,7 @@ public:
       std::vector<std::vector<uint8_t>> /* recvMessages */){};
 
   virtual void
-  updateListenAccept(std::function<void(ApiStatus, RaceHandle)> /* cb */) {}
+  updateListenAccept(std::function<void(ApiStatus, RaceHandle, ConduitProperties)> /* cb */) {}
 
   std::string toString() {
     std::stringstream s;

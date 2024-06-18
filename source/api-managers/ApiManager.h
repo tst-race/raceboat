@@ -86,12 +86,12 @@ public:
               std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
   virtual void dial(uint64_t postId, SendOptions sendOptions,
                     std::vector<uint8_t> data,
-                    std::function<void(ApiStatus, RaceHandle)> callback);
+                    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
   virtual void resume(uint64_t postId, ResumeOptions resumeOptions,
-                    std::function<void(ApiStatus, RaceHandle)> callback);
+                    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
   virtual void bootstrapDial(uint64_t postId, BootstrapConnectionOptions options,
                     std::vector<uint8_t> data,
-                    std::function<void(ApiStatus, RaceHandle)> callback);
+                    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
   virtual void getReceiveObject(
       uint64_t postId, ReceiveOptions recvOptions,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
@@ -110,7 +110,7 @@ public:
   bootstrapListen(uint64_t postId, BootstrapConnectionOptions options,
          std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
   virtual void accept(uint64_t postId, OpHandle handle,
-                      std::function<void(ApiStatus, RaceHandle)> callback);
+                      std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
 
   virtual void
   read(uint64_t postId, OpHandle handle,
@@ -196,10 +196,10 @@ public:
       std::vector<std::vector<uint8_t>> recvMessages);
   virtual bool
   onListenAccept(RaceHandle contextHandle,
-                 std::function<void(ApiStatus, RaceHandle)> acceptCb);
+                 std::function<void(ApiStatus, RaceHandle, ConduitProperties)> acceptCb);
   virtual bool
   onBootstrapListenAccept(RaceHandle contextHandle,
-                          std::function<void(ApiStatus, RaceHandle)> acceptCb);
+                          std::function<void(ApiStatus, RaceHandle, ConduitProperties)> acceptCb);
   virtual bool detachConnSM(RaceHandle contextHandle,
                             RaceHandle connSMContextHandle);
   virtual void addDependent(RaceHandle contextHandle, RaceHandle newDependentHandle);
@@ -285,11 +285,11 @@ public:
   sendReceive(SendOptions sendOptions, std::vector<uint8_t> data,
               std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
   virtual SdkResponse dial(SendOptions sendOptions, std::vector<uint8_t> data,
-                           std::function<void(ApiStatus, RaceHandle)> callback);
+                           std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
   virtual SdkResponse resume(ResumeOptions resumeOptions,
-                             std::function<void(ApiStatus, RaceHandle)> callback);
+                             std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
   virtual SdkResponse bootstrapDial(BootstrapConnectionOptions options, std::vector<uint8_t> data,
-                           std::function<void(ApiStatus, RaceHandle)> callback);
+                           std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
   virtual SdkResponse getReceiveObject(
       ReceiveOptions recvOptions,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
@@ -307,7 +307,7 @@ public:
   bootstrapListen(BootstrapConnectionOptions options,
          std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
   virtual SdkResponse
-  accept(OpHandle handle, std::function<void(ApiStatus, RaceHandle)> callback);
+  accept(OpHandle handle, std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
 
   virtual SdkResponse
   read(OpHandle handle,

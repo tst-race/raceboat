@@ -39,7 +39,7 @@ void ApiBootstrapListenContext::updateBootstrapListen(
   this->listenCb = _cb;
 };
 void ApiBootstrapListenContext::updateAccept(
-    RaceHandle /* _handle */, std::function<void(ApiStatus, RaceHandle)> _cb) {
+    RaceHandle /* _handle */, std::function<void(ApiStatus, RaceHandle, ConduitProperties)> _cb) {
   this->acceptCb.push_back(_cb);
 };
 void ApiBootstrapListenContext::updateClose(RaceHandle /* handle */,
@@ -369,7 +369,7 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
       ctx.preBootstrapConduitSM.pop();
       if (!ctx.manager.onBootstrapListenAccept(preBootstrapConnSMHandle, cb)) {
         helper::logError(logPrefix + "bootstrap listen accept failed");
-        cb(ApiStatus::INTERNAL_ERROR, {});
+        cb(ApiStatus::INTERNAL_ERROR, {}, {});
       };
     }
 
@@ -385,7 +385,7 @@ struct StateBootstrapListenFinished : public BootstrapListenState {
     auto &ctx = getContext(context);
 
     for (auto &cb : ctx.acceptCb) {
-      cb(ApiStatus::CLOSING, {});
+      cb(ApiStatus::CLOSING, {}, {});
     }
     ctx.acceptCb = {};
 
@@ -413,7 +413,7 @@ struct StateBootstrapListenFailed : public BootstrapListenState {
 
     for (auto &cb : ctx.acceptCb) {
       helper::logDebug(logPrefix + "accept callback not null");
-      cb(ApiStatus::INTERNAL_ERROR, {});
+      cb(ApiStatus::INTERNAL_ERROR, {}, {});
     }
     ctx.acceptCb = {};
 

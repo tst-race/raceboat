@@ -94,7 +94,7 @@ void BootstrapPreConduitContext::updateConnStateMachineConnected(
 // }
 
 void BootstrapPreConduitContext::updateListenAccept(
-    std::function<void(ApiStatus, RaceHandle)> cb) {
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) {
   this->acceptCb = cb;
 }
 
@@ -370,7 +370,7 @@ struct StateBootstrapPreConduitFinished : public BootstrapPreConduitState {
       return EventResult::NOT_SUPPORTED;
     }
 
-    ctx.acceptCb(ApiStatus::OK, connObjectApiHandle);
+    ctx.acceptCb(ApiStatus::OK, connObjectApiHandle, {});
     ctx.acceptCb = {};
 
     ctx.manager.stateMachineFinished(ctx);
@@ -388,7 +388,7 @@ struct StateBootstrapPreConduitFailed : public BootstrapPreConduitState {
 
     if (ctx.acceptCb) {
       helper::logDebug(logPrefix + "accept callback not null");
-      ctx.acceptCb(ApiStatus::INTERNAL_ERROR, {});
+      ctx.acceptCb(ApiStatus::INTERNAL_ERROR, {}, {});
       ctx.acceptCb = {};
     }
 

@@ -22,6 +22,7 @@
 
 #include "Core.h"
 #include "helper.h"
+#include "base64.h"
 
 namespace Raceboat {
 
@@ -56,13 +57,13 @@ std::string resumeOptionsToString(const ResumeOptions &resumeOptions) {
   std::stringstream ss;
 
   ss << "ResumeOptions {";
-  ss << "send_channel: '" << resumeOptions.send_channel << "', ";
+  ss << "package_id: '" << resumeOptions.package_id << "', ";
   ss << "recv_channel: '" << resumeOptions.recv_channel << "', ";
-  ss << "alt_channel: '" << resumeOptions.alt_channel << "', ";
-  ss << "send_address: '" << resumeOptions.send_address << "', ";
-  ss << "send_role: '" << resumeOptions.send_role << "', ";
-  ss << "recv_address: '" << resumeOptions.recv_address << "', ";
   ss << "recv_role: '" << resumeOptions.recv_role << "', ";
+  ss << "recv_address: '" << resumeOptions.recv_address << "', ";
+  ss << "send_channel: '" << resumeOptions.send_channel << "', ";
+  ss << "send_role: '" << resumeOptions.send_role << "', ";
+  ss << "send_address: '" << resumeOptions.send_address << "', ";
   ss << "timeout_ms: '" << resumeOptions.timeout_ms << "'}";
   return ss.str();
 }
@@ -109,17 +110,23 @@ std::string apiStatusToString(const ApiStatus status) {
 }
 
 
-Conduit::Conduit(std::shared_ptr<Core> core, OpHandle handle)
-    : core(core), handle(handle) {}
+Conduit::Conduit(std::shared_ptr<Core> core, OpHandle handle,
+                 ConduitProperties properties)
+  : core(core), handle(handle), properties(properties) {}
 Conduit::Conduit(const Conduit &that) {
   core = that.core;
   handle = that.handle;
+  properties = that.properties;
 }
 
 OpHandle Conduit::getHandle() { 
   return handle; 
 }
 
+ConduitProperties Conduit::getConduitProperties() {
+  return properties;
+}
+  
 std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read(int timeoutSeconds) {
   TRACE_METHOD(timeoutSeconds);
   std::promise<std::pair<ApiStatus, std::vector<uint8_t>>> promise;
@@ -338,22 +345,22 @@ AcceptObject::AcceptObject(std::shared_ptr<Core> core, OpHandle handle)
     : core(core), handle(handle) {}
 
 std::pair<ApiStatus, Conduit> AcceptObject::accept() {
-  std::promise<std::pair<ApiStatus, RaceHandle>> promise;
+  std::promise<std::tuple<ApiStatus, RaceHandle, ConduitProperties>> promise;
   auto future = promise.get_future();
   if (core == nullptr) {
-    return {ApiStatus::INVALID_ARGUMENT, {nullptr, NULL_RACE_HANDLE}};
+    return {ApiStatus::INVALID_ARGUMENT, {nullptr, NULL_RACE_HANDLE, {}}};
   }
 
   auto response = core->getApiManager().accept(
-      handle, [&promise](ApiStatus status, RaceHandle _handle) {
-        promise.set_value({status, _handle});
+                                               handle, [&promise](ApiStatus status, RaceHandle _handle, ConduitProperties properties) {
+                                                 promise.set_value({status, _handle, properties});
       });
   if (response.status != SDK_OK) {
-    return {ApiStatus::INTERNAL_ERROR, {nullptr, NULL_RACE_HANDLE}};
+    return {ApiStatus::INTERNAL_ERROR, {nullptr, NULL_RACE_HANDLE, {}}};
   }
 
-  auto [status, connHandle] = future.get();
-  Conduit connection(core, connHandle);
+  auto [status, connHandle, properties] = future.get();
+  Conduit connection(core, connHandle, properties);
   return {status, connection};
 }
 
@@ -478,16 +485,16 @@ std::pair<ApiStatus, std::string> Race::send_receive_str(SendOptions options,
 std::pair<ApiStatus, Conduit> Race::dial(SendOptions options,
                                                   std::vector<uint8_t> bytes) {
   TRACE_METHOD();
-  std::promise<std::tuple<ApiStatus, RaceHandle>> promise;
+  std::promise<std::tuple<ApiStatus, RaceHandle, ConduitProperties>> promise;
   auto future = promise.get_future();
 
   core->getApiManager().dial(options, bytes,
-                             [&promise](ApiStatus status, RaceHandle handle) {
-                               promise.set_value({status, handle});
+                             [&promise](ApiStatus status, RaceHandle handle, ConduitProperties properties) {
+                               promise.set_value({status, handle, properties});
                              });
 
-  auto [status, handle] = future.get();
-  Conduit receiver(core, handle);
+  auto [status, handle, properties] = future.get();
+  Conduit receiver(core, handle, properties);
   return {status, receiver};
 }
 
@@ -501,16 +508,15 @@ std::pair<ApiStatus, Conduit> Race::dial_str(SendOptions options,
   
 std::pair<ApiStatus, Conduit> Race::resume(ResumeOptions options) {
   TRACE_METHOD();
-  std::promise<std::tuple<ApiStatus, RaceHandle>> promise;
+  std::promise<std::tuple<ApiStatus, RaceHandle, ConduitProperties>> promise;
   auto future = promise.get_future();
-
   core->getApiManager().resume(options,
-                             [&promise](ApiStatus status, RaceHandle handle) {
-                               promise.set_value({status, handle});
+                               [&promise](ApiStatus status, RaceHandle handle, ConduitProperties properties) {
+                               promise.set_value({status, handle, properties});
                              });
 
-  auto [status, handle] = future.get();
-  Conduit receiver(core, handle);
+  auto [status, handle, properties] = future.get();
+  Conduit receiver(core, handle, properties);
   return {status, receiver};
 }
 
@@ -518,16 +524,16 @@ std::pair<ApiStatus, Conduit> Race::resume(ResumeOptions options) {
 std::pair<ApiStatus, Conduit> Race::bootstrap_dial(BootstrapConnectionOptions options,
                                                   std::vector<uint8_t> bytes) {
   TRACE_METHOD();
-  std::promise<std::tuple<ApiStatus, RaceHandle>> promise;
+  std::promise<std::tuple<ApiStatus, RaceHandle, ConduitProperties>> promise;
   auto future = promise.get_future();
 
   core->getApiManager().bootstrapDial(options, bytes,
-                             [&promise](ApiStatus status, RaceHandle handle) {
-                               promise.set_value({status, handle});
+                                      [&promise](ApiStatus status, RaceHandle handle, ConduitProperties properties) {
+                                        promise.set_value({status, handle, properties});
                              });
 
-  auto [status, handle] = future.get();
-  Conduit receiver(core, handle);
+  auto [status, handle, properties] = future.get();
+  Conduit receiver(core, handle, properties);
   return {status, receiver};
 }
 

@@ -117,7 +117,7 @@ SdkResponse ApiManager::sendReceive(
 
 SdkResponse
 ApiManager::dial(SendOptions sendOptions, std::vector<uint8_t> data,
-                 std::function<void(ApiStatus, RaceHandle)> callback) {
+                 std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   TRACE_METHOD();
 
   if (!callback) {
@@ -130,7 +130,7 @@ ApiManager::dial(SendOptions sendOptions, std::vector<uint8_t> data,
 
 SdkResponse
 ApiManager::resume(ResumeOptions resumeOptions, 
-                 std::function<void(ApiStatus, RaceHandle)> callback) {
+                 std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   TRACE_METHOD();
 
   if (!callback) {
@@ -143,7 +143,7 @@ ApiManager::resume(ResumeOptions resumeOptions,
 
 SdkResponse
 ApiManager::bootstrapDial(BootstrapConnectionOptions options, std::vector<uint8_t> data,
-                 std::function<void(ApiStatus, RaceHandle)> callback) {
+                 std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   TRACE_METHOD();
 
   if (!callback) {
@@ -218,7 +218,7 @@ SdkResponse ApiManager::bootstrapListen(
 
 SdkResponse
 ApiManager::accept(OpHandle handle,
-                   std::function<void(ApiStatus, RaceHandle)> callback) {
+                   std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   TRACE_METHOD();
 
   if (!callback) {
@@ -376,7 +376,7 @@ void ApiManagerInternal::sendReceive(
 
 void ApiManagerInternal::dial(
     uint64_t postId, SendOptions sendOptions, std::vector<uint8_t> data,
-    std::function<void(ApiStatus, RaceHandle)> callback) {
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   TRACE_METHOD(postId, sendOptionsToString(sendOptions), data);
 
   auto context = newDialContext();
@@ -386,7 +386,7 @@ void ApiManagerInternal::dial(
 
 void ApiManagerInternal::resume(
     uint64_t postId, ResumeOptions resumeOptions,
-    std::function<void(ApiStatus, RaceHandle)> callback) {
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   TRACE_METHOD(postId, resumeOptionsToString(resumeOptions));
 
   auto context = newResumeContext();
@@ -396,7 +396,7 @@ void ApiManagerInternal::resume(
 
 void ApiManagerInternal::bootstrapDial(
     uint64_t postId, BootstrapConnectionOptions options, std::vector<uint8_t> data,
-    std::function<void(ApiStatus, RaceHandle)> callback) {
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   TRACE_METHOD(postId, bootstrapConnectionOptionsToString(options), data);
 
   auto context = newBootstrapDialContext();
@@ -527,7 +527,7 @@ void ApiManagerInternal::bootstrapListen(
 
 void ApiManagerInternal::accept(
     uint64_t postId, OpHandle handle,
-    std::function<void(ApiStatus, RaceHandle)> callback) {
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   // API read receive connection - should call callback when a package is
   // available
   TRACE_METHOD(postId, handle);
@@ -535,7 +535,7 @@ void ApiManagerInternal::accept(
   auto contexts = getContexts(handle);
   if (contexts.size() != 1) {
     helper::logError(logPrefix + "Invalid handle passed to accept");
-    callback(ApiStatus::INTERNAL_ERROR, {});
+    callback(ApiStatus::INTERNAL_ERROR, {}, {});
     callback = {};
   }
 
@@ -1066,7 +1066,7 @@ void ApiManagerInternal::addDependent(RaceHandle contextHandle, RaceHandle newDe
 }
 bool ApiManagerInternal::onListenAccept(
     RaceHandle contextHandle,
-    std::function<void(ApiStatus, RaceHandle)> acceptCb) {
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> acceptCb) {
   TRACE_METHOD(contextHandle);
 
   EventType event = EVENT_LISTEN_ACCEPTED;
@@ -1082,7 +1082,7 @@ bool ApiManagerInternal::onListenAccept(
 
 bool ApiManagerInternal::onBootstrapListenAccept(
     RaceHandle contextHandle,
-    std::function<void(ApiStatus, RaceHandle)> acceptCb) {
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> acceptCb) {
   TRACE_METHOD(contextHandle);
 
   EventType event = EVENT_LISTEN_ACCEPTED;

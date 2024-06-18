@@ -31,7 +31,7 @@ namespace Raceboat {
 
 void ApiBootstrapDialContext::updateBootstrapDial(const BootstrapConnectionOptions &options,
                                 std::vector<uint8_t> &&_data,
-                                std::function<void(ApiStatus, RaceHandle)> cb) {
+                                std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) {
   this->opts = options;
   this->helloData = _data;
   this->dialCallback = cb;
@@ -95,7 +95,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
         // Need an address to load
         helper::logError(logPrefix +
                          "Invalid options: initial send address is required");
-        ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {});
+        ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {}, {});
         ctx.dialCallback = {};
         return EventResult::NOT_SUPPORTED;
       }
@@ -133,7 +133,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
           // Need an address to load
           helper::logError(logPrefix +
                            "Invalid options: initial recv address is required");
-          ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {});
+          ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {}, {});
           ctx.dialCallback = {};
           return EventResult::NOT_SUPPORTED;
         }
@@ -454,7 +454,8 @@ struct StateBootstrapDialFinished : public BootstrapDialState {
       return EventResult::NOT_SUPPORTED;
     }
 
-    ctx.dialCallback(ApiStatus::OK, connObjectApiHandle);
+    // TODO
+    ctx.dialCallback(ApiStatus::OK, connObjectApiHandle, {});
     ctx.dialCallback = {};
 
     ctx.manager.stateMachineFinished(ctx);
@@ -471,7 +472,7 @@ struct StateBootstrapDialFailed : public BootstrapDialState {
 
     if (ctx.dialCallback) {
       helper::logDebug(logPrefix + "dial callback not null");
-      ctx.dialCallback(ApiStatus::INTERNAL_ERROR, {});
+      ctx.dialCallback(ApiStatus::INTERNAL_ERROR, {}, {});
       ctx.dialCallback = {};
     }
 
