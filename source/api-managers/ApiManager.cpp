@@ -1303,7 +1303,8 @@ void ApiManagerInternal::removeContext(ApiContext &context) {
        pairIt != packageIdContextMap.end();) {
     pairIt->second.erase(&context);
     if (pairIt->second.size() == 0) {
-      helper::logDebug("removeContext: Removing packageId=" + json(pairIt->first).dump());
+      std::vector<int> int_vector{pairIt->first.begin(), pairIt->first.begin() + packageIdLen};
+      helper::logDebug("removeContext: Removing packageId+ConnectionID=" + json(int_vector).dump() + pairIt->first.substr(packageIdLen));
       pairIt = packageIdContextMap.erase(pairIt);
     } else {
       ++pairIt;

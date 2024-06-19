@@ -22,12 +22,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"encoding/json"
 	golog "log"
 	"flag"
 	"os"
 	"os/signal"
 	"syscall"
 	"net"
+	"time"
 	"path"
 	/* pt "git.torproject.org/pluggable-transports/goptlib.git" */
 	pt "goptlib/goptlib"
@@ -256,6 +258,7 @@ func clientSocksAcceptLoop(ln *pt.SocksListener, clients []*race_pt3.RaceClient,
 }
 
 func copyLoop(socks, race io.ReadWriter) {
+	golog.Println("Entering copyLoop")
 	var copyWg sync.WaitGroup
 	copyWg.Add(2)
 
@@ -283,6 +286,12 @@ func copyLoop(socks, race io.ReadWriter) {
 	}()
 
 	copyWg.Wait()
+}
+
+type ResumeObject struct {
+	ResumeId string `json:"resumeId"`
+	RecvAddress string `json:"recvAddress"`
+	SendAddress string `json:"sendAddress"`
 }
 
 func serverSetup(wg *sync.WaitGroup, stop <-chan int, redirectPath string) (launched bool, listeners []race_pt3.RaceListener, servers []*race_pt3.RaceServer) {
@@ -337,6 +346,19 @@ func serverSetup(wg *sync.WaitGroup, stop <-chan int, redirectPath string) (laun
 			recvLinkAddress = arg
 			golog.Println("recvLinkAddress:", recvLinkAddress)
 		}
+		
+		resumeString := "[]"
+		if arg, ok := bindaddr.Options.Get("resumeList"); ok {
+			resumeString = arg
+			golog.Println("resumeString:", resumeString)
+		}
+		var resumeObjectList []ResumeObject
+		err := json.Unmarshal([]byte(resumeString), &resumeObjectList)
+			golog.Println("resumeString:", resumeString)
+		if err != nil {
+			golog.Println("failed to parse resume object json: ", err.Error())
+		}
+
 
 		wg.Add(1)
 		golog.Println("Calling NewRaceServer")
@@ -364,6 +386,38 @@ func serverSetup(wg *sync.WaitGroup, stop <-chan int, redirectPath string) (laun
 		if err != nil {
 			golog.Println("Listen failed.")
 			// TODO handle failure, DO NOT start the serverAcceptLoop
+		}
+
+		for idx, resumeObject := range resumeObjectList {
+			wg.Add(1)
+			golog.Println("Resume Object:")
+			golog.Println(resumeObject)
+			golog.Println(resumeObject.SendAddress)
+			golog.Println(resumeObject.RecvAddress)
+			golog.Println(resumeObject.ResumeId)
+			resumed_conn, err := server.Resume(resumeObject.SendAddress,
+				resumeObject.RecvAddress,
+				resumeObject.ResumeId)
+			if err != nil {
+				golog.Println("Resume failed idx=", idx, resumeObject.ResumeId)
+			}
+
+			golog.Println("Resumed idx=", idx, resumeObject.ResumeId)
+			// buf := make([]byte, 0, 256)
+			// for {
+			// 	n, err := resumed_conn.Read(buf)
+			// 	if err != nil {
+			// 		golog.Println("read failed", err.Error())
+			// 	}
+			// 	golog.Println("buf: ", n, buf)
+			// }
+			go func() {
+				// Sleep to allow for OR Server to be up
+				time.Sleep(60 * time.Second)
+				serverHandler(&resumed_conn, &ptServerInfo)
+			}()
+			wg.Done()
+			golog.Println("Handed off resumed conn")
 		}
 
 		go func() {
@@ -400,6 +454,14 @@ func serverAcceptLoop(ln *race_pt3.RaceListener, info *pt.ServerInfo, wg *sync.W
 				}
 				// continue
 			}
+			// buf := make([]byte, 0, 256)
+			// for {
+			// 	n, err := conn.Read(buf)
+			// 	if err != nil {
+			// 		golog.Println("read failed", err.Error())
+			// 	}
+			// 	golog.Println("buf: ", n, buf)
+			// }
 			go serverHandler(&conn, info)
 			wg.Done()
 		}
@@ -413,7 +475,10 @@ func serverHandler(rconn *race_pt3.RaceConn, info *pt.ServerInfo) {
 	name := "raceproxy"
 
 	// PAUL this should be a dynamic port eventually
+	golog.Println("Dialing OR in serverHandler")
+	golog.Println("Dialing with info:", info)
 	orConn, err := pt.DialOr(info, "127.0.0.1:2345", name)
+	golog.Println("Dialed OR in serverHandler")
 	if err != nil {
 		golog.Printf("%s(%s) - failed to connect to ORPort: %s", name)
 		return

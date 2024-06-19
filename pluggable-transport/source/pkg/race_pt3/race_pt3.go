@@ -391,3 +391,38 @@ func (listener RaceListener) Close() error {
 func (listener RaceListener) Addr() string {
 	return listener.linkAddress
 }
+
+func (server RaceServer) Resume(sendAddress string, recvAddress string, packageId string) (RaceConn, error) {
+	golog.Println("Calling Server Resume")
+	// Create/load
+	// Open connection
+	// Return net.Conn mapping itself to this particular connectionId
+	resumeOpts := core.NewResumeOptions()
+	defer core.DeleteResumeOptions(resumeOpts)
+	resumeOpts.SetRecv_channel(server.recvChannelId)
+	resumeOpts.SetSend_channel(server.sendChannelId)
+	resumeOpts.SetSend_address(sendAddress)
+	golog.Println("Setting Resume Options: sendAddress: ", sendAddress)
+	golog.Println("Setting Resume Options: sendAddress: ", resumeOpts.GetSend_address())
+	resumeOpts.SetRecv_address(recvAddress)
+	golog.Println("Setting Resume Options: recvAddress: ", recvAddress)
+	golog.Println("Setting Resume Options: recvAddress: ", resumeOpts.GetRecv_address())
+	resumeOpts.SetSend_role(server.sendChannelRole)
+	resumeOpts.SetRecv_role(server.recvChannelRole)
+	resumeOpts.SetTimeout_ms(server.timeoutMs)
+	resumeOpts.SetPackage_id(packageId)
+
+	// ResumeSwig() returns wrapped std::pair<ApiStatus, SwigConduit>
+	pair := server.race.ResumeSwig(resumeOpts)
+	if pair.GetFirst() != core.ApiStatus_OK {
+		golog.Println("Resume error")
+		return RaceConn{ conn: nil, race: nil, }, errors.New("race_pt3 Resume error")
+	}
+
+	return RaceConn{
+			conn: pair.GetSecond(),
+			race: server.race,
+		}, 
+		nil
+}
+

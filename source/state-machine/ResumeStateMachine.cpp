@@ -126,17 +126,20 @@ struct StateResumeInitial : public ResumeState {
     }
 
 
+    helper::logDebug(logPrefix + "Input PackageID: " + ctx.opts.package_id);
     std::string decoded_package_id = ctx.opts.package_id;
     try {
-      std::vector<uint8_t> decoded_id = base64::decode(ctx.opts.package_id);
-      decoded_package_id = std::string(decoded_id.begin(), decoded_id.end());
+      std::vector<uint8_t> byte_vector = base64::decode(ctx.opts.package_id);
+      decoded_package_id = std::string(byte_vector.begin(), byte_vector.end());
     } catch (const std::invalid_argument exception) {
       helper::logInfo(logPrefix + " could not decode resume package_id argument from base64, assuming raw value is correct");
     }
+    std::string packageIdStr =
+      json(std::vector<uint8_t>(decoded_package_id.begin(), decoded_package_id.end())).dump();
+    // std::vector<int> int_vector{decoded_package_id.begin(), decoded_package_id.end()};
+    helper::logDebug(logPrefix + "Setting PackageId To: " + packageIdStr);
 
     ctx.packageId = decoded_package_id;
-    helper::logDebug(logPrefix + "Setting packageId to " +
-                       ctx.packageId);
 
     ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
                                                              ctx.handle, sendChannelId, sendRole, sendLinkAddress, false, true);
