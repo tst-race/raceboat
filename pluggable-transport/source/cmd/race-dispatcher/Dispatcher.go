@@ -290,8 +290,8 @@ func copyLoop(socks, race io.ReadWriter) {
 
 type ResumeObject struct {
 	ResumeId string `json:"resumeId"`
-	RecvAddress string `json:"recvAddress"`
-	SendAddress string `json:"sendAddress"`
+	RecvLinkAddress string `json:"recvLinkAddress"`
+	SendLinkAddress string `json:"sendLinkAddress"`
 }
 
 func serverSetup(wg *sync.WaitGroup, stop <-chan int, redirectPath string) (launched bool, listeners []race_pt3.RaceListener, servers []*race_pt3.RaceServer) {
@@ -392,11 +392,11 @@ func serverSetup(wg *sync.WaitGroup, stop <-chan int, redirectPath string) (laun
 			wg.Add(1)
 			golog.Println("Resume Object:")
 			golog.Println(resumeObject)
-			golog.Println(resumeObject.SendAddress)
-			golog.Println(resumeObject.RecvAddress)
+			golog.Println(resumeObject.SendLinkAddress)
+			golog.Println(resumeObject.RecvLinkAddress)
 			golog.Println(resumeObject.ResumeId)
-			resumed_conn, err := server.Resume(resumeObject.SendAddress,
-				resumeObject.RecvAddress,
+			resumed_conn, err := server.Resume(resumeObject.SendLinkAddress,
+				resumeObject.RecvLinkAddress,
 				resumeObject.ResumeId)
 			if err != nil {
 				golog.Println("Resume failed idx=", idx, resumeObject.ResumeId)
@@ -413,7 +413,7 @@ func serverSetup(wg *sync.WaitGroup, stop <-chan int, redirectPath string) (laun
 			// }
 			go func() {
 				// Sleep to allow for OR Server to be up
-				time.Sleep(60 * time.Second)
+				time.Sleep(4 * time.Second)
 				serverHandler(&resumed_conn, &ptServerInfo)
 			}()
 			wg.Done()

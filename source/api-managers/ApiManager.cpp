@@ -697,9 +697,15 @@ void ApiManagerInternal::onConnStateMachineConnected(uint64_t postId,
   TRACE_METHOD(postId, contextHandle, connId, linkAddress, channelId);
 
   // Map for when additional SMs want to re-use this link/connection
-  helper::logDebug(logPrefix + "Inserting $" + channelId + "$ + $" + linkAddress + "$ into the linkConnMap with connID " + connId);
-  linkConnMap.insert({channelId+linkAddress, {contextHandle, connId}});
-
+  // Note: this logic means we expect the channel to _always_ return a
+  // _unique_ link when we ask for a link without providing an address.
+  if (linkAddress != "") {
+    std::string normalized_address = nlohmann::json::parse(linkAddress).dump();
+    helper::logDebug(logPrefix + " compare normalized: " + linkAddress + " vs " + normalized_address);
+    helper::logDebug(logPrefix + "Inserting $" + channelId + "$ + $" + normalized_address + "$ into the linkConnMap with connID " + connId);
+    linkConnMap.insert({channelId+normalized_address, {contextHandle, connId}});
+  }
+  
   auto contexts = getContexts(contextHandle);
   for (auto context : contexts) {
     context->updateConnStateMachineConnected(contextHandle, connId,
@@ -858,6 +864,7 @@ void ApiManagerInternal::receiveEncPkg(
                                     contents->begin() + packageIdLen};
     helper::logDebug(logPrefix + "PackageId: " + json(packageIdBytes).dump());
     std::string packageId{contents->begin(), contents->begin() + packageIdLen};
+    helper::logDebug(logPrefix + "PackageId+ConnId: " + json(packageIdBytes).dump() + connId);
     auto it = packageIdContextMap.find(packageId + connId);
     if (it != packageIdContextMap.end()) {
       contexts = it->second;
@@ -875,7 +882,7 @@ void ApiManagerInternal::receiveEncPkg(
         unassociatedPackages.insert({packageId, {pkg}});
       }
       contexts = getContexts(connId);
-      helper::logDebug(logPrefix + " did not find package id");
+      helper::logDebug(logPrefix + " did not find package id in an existing conduit");
     }
   }
 
@@ -922,12 +929,15 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
                                                      bool sending) {
   TRACE_METHOD(contextHandle);
 
-  auto connContextIt = linkConnMap.find(channelId + linkAddress);
   // We already made this link/connection
   // Note: this is _only_ valid when we are specifying the link address
   // Otherwise the address is being dynamically generated and will be unique
-  if (linkAddress != "" and connContextIt != linkConnMap.end()) {
-    helper::logDebug(logPrefix + "got existing entry for $" + channelId + "$ $" + linkAddress + "$ in the linkConnMap with ConnID=" + connContextIt->second.second);
+  if (linkAddress != "") {
+    std::string normalized_address = nlohmann::json::parse(linkAddress).dump();
+    helper::logDebug(logPrefix + " compare normalized: " + linkAddress + " vs " + normalized_address);
+    auto connContextIt = linkConnMap.find(channelId + normalized_address);
+    if (connContextIt != linkConnMap.end()) {
+      helper::logDebug(logPrefix + "got existing entry for $" + channelId + "$ $" + normalized_address + "$ in the linkConnMap with ConnID=" + connContextIt->second.second);
     RaceHandle callHandle = getCore().generateHandle();
     manager.onConnStateMachineConnectedForContext(contextHandle,
                                                   callHandle,
@@ -935,6 +945,7 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
                                                   connContextIt->second.second,
                                                   linkAddress);
     return connContextIt->second.first;
+    }
   }
 
   // TODO do validation checks
@@ -1131,8 +1142,26 @@ void ApiManagerInternal::registerPackageId(ApiContext &context,
                                            const std::string &id) {
   std::string packageId =
       json(std::vector<uint8_t>(id.begin(), id.end())).dump();
-  TRACE_METHOD(context.handle, packageId);
+  TRACE_METHOD(context.handle, packageId, connId);
   packageIdContextMap[id + connId].insert(&context);
+
+  // Check for buffered received messages that came before this packageId was registered
+  auto packageListIt = unassociatedPackages.find(packageId);
+  if (packageListIt != unassociatedPackages.end()) {
+    helper::logDebug(logPrefix + "Found " + std::to_string(packageListIt->second.size()) + " packages waiting for this packageId");
+    for (auto packageIt : packageListIt->second) {
+      Contexts contexts;
+      std::shared_ptr<std::vector<uint8_t>> contents =
+        std::make_shared<std::vector<uint8_t>>(packageIt.getCipherText());
+
+      *contents = std::vector<uint8_t>(contents->begin() + packageIdLen,
+                                       contents->end());
+      context.updateReceiveEncPkg(connId, contents);
+      triggerEvent(context, EVENT_RECEIVE_PACKAGE);
+    }
+  }  else {
+    helper::logDebug(logPrefix + "No packages were waiting for this packageId");
+  }
 }
 
 void ApiManagerInternal::unregisterHandle(ApiContext &context,
