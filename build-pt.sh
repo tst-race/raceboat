@@ -57,14 +57,20 @@ fi
 
 cmake --preset=$LINUX_PRESET -DBUILD_VERSION="local"
 cmake --build -j --preset=$LINUX_PRESET --target install
+echo "Packaging LINUX_x86_64"
+cmake --install build/LINUX_x86_64/ --component sdk --verbose
 
 if [ "$(uname -m)" == "x86_64" ]
 then
     cmake --preset=ANDROID_x86_64 -DBUILD_VERSION="local"
     cmake --build -j --preset=ANDROID_x86_64 --target install
+    echo "Packaging ANDROID_x86_64"
+    cmake --install build/ANDROID_x86_64/ --component sdk --verbose
 
     cmake --preset=ANDROID_arm64-v8a -DBUILD_VERSION="local"
     cmake --build -j --preset=ANDROID_arm64-v8a --target install
+    echo "Packaging ANDROID_arm64"
+    cmake --install build/ANDROID_arm64-v8a/ --component sdk --verbose
 else
     echo "android build not supported on aarch64 arch"
     # cmake -DANDROID_STL="c++_shared -frtti"  -DBUILD_VERSION="local" -DCXX="/opt/android/ndk-bundle/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++"
@@ -89,6 +95,7 @@ echo PWD $PWD
 # Believe the current system expects $PATH/race/common/<.h files>
 ###
 
-cmake --debug-find --debug-output --preset=$LINUX_PRESET -DBUILD_VERSION="local" ${CMAKE_ARGS}
-cmake --build -j --preset=$LINUX_PRESET --target install
+# cmake --debug-find --debug-output --preset=$LINUX_PRESET -DBUILD_VERSION="local" ${CMAKE_ARGS}
+# echo BUILD
+# cmake  --build -j --preset=$LINUX_PRESET --target install
 

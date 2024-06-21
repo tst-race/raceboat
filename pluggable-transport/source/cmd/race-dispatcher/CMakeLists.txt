@@ -84,6 +84,7 @@ list(APPEND CGO_CXXFLAGS
 list(APPEND CGO_CXXFLAGS
     -std=c++17
 )
+message(RACE_COMM_LIBS_PATH $ENV{RACE_COMM_LIBS_PATH})
 
 find_library(
     RACE_COMM_LIB raceSdkCommon REQUIRED
