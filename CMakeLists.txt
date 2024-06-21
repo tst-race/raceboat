@@ -41,7 +41,6 @@ include(race/warnings)
 
 add_subdirectory(language-shims)
 add_subdirectory(source)
-# add_subdirectory(pluggable-transport)
 if(NOT ANDROID)
     add_subdirectory(app/race-cli)
     add_subdirectory(app/bridge-distro)

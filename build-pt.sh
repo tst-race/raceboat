@@ -78,24 +78,13 @@ else
     # cmake --build -j --preset=ANDROID_arm64-v8a --target install
 fi
 
+cp -r racesdk/package/LINUX_x86_64/lib/* /linux/x86_64/lib
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/x86_64/lib" 
+mkdir -p /linux/x86_64/include/race/common
+cp -r racesdk/package/LINUX_x86_64/include/* /linux/x86_64/include/race/common/
+cp /linux/x86_64/include/race/common/Race.h /linux/x86_64/include/race/
+cp -r racesdk/package/LINUX_x86_64/go/* /usr/local/go/*
+
 pushd pluggable-transport
-echo PWD $PWD
-
-###
-# docker run -it --rm --name=build-pt \
-#        -e MAKEFLAGS="-j" \
-#        -v $(pwd)/:/code/ \
-#        -w /code \
-#        ghcr.io/tst-race/race-images/race-compile:main bash
-# Manual steps so far:
-# cp /code/build/LINUX_x86_64/source/libraceSdkCommon.so /linux/x86_64/lib/ 
-# cp /code/build/LINUX_x86_64/language-shims/source/corePluginBindingsGolang.so /linux/x86_64/lib/
-# next error:
-# corePluginBindingsGO_wrap.cxx:353:10: fatal error: 'race/common/ChannelId.h' file not found
-# Believe the current system expects $PATH/race/common/<.h files>
-###
-
-# cmake --debug-find --debug-output --preset=$LINUX_PRESET -DBUILD_VERSION="local" ${CMAKE_ARGS}
-# echo BUILD
-# cmake  --build -j --preset=$LINUX_PRESET --target install
-
+cmake --debug-find --debug-output --preset=$LINUX_PRESET -DBUILD_VERSION="local" ${CMAKE_ARGS}
+cmake --build -j --preset=$LINUX_PRESET --target install 
