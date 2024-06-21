@@ -15,7 +15,7 @@
 # 
 
 # TODO: from race-compile:main once arm platform supported
-FROM --platform=$TARGETPLATFORM ghcr.io/tst-race/race-images/race-runtime-linux:main as base
+FROM --platform=$TARGETPLATFORM ghcr.io/tst-race/race-images/race-compile:main as base
 LABEL maintainer="Two Six Labs <race@twosixlabs.com>"
 
 ARG TARGETARCH
@@ -39,8 +39,10 @@ COPY build/LINUX_x86_64/app/bridge-distro/bridge-distro /usr/local/bin/bridge-di
 # preserve include structure assumed by go SWIG
 RUN mkdir -p /linux/x86_64/include/race/common
 COPY racesdk/package/LINUX_x86_64/include /linux/x86_64/include/race/common
-RUN cp /linux/x86_64/include/race/common/Race.h /linux/x86_64/include/race/
+COPY racesdk/package/LINUX_x86_64/include /linux/x86_64/include/
+RUN cp /linux/x86_64/include/race/common/*.h /linux/x86_64/include/race/
 COPY racesdk/package/LINUX_x86_64/go /usr/local/go
+RUN cp /usr/local/go/src/shims/comm/* /usr/local/go/src/shims/
 
 # arm64 linux
 FROM base as arm64-linux
@@ -60,5 +62,4 @@ COPY racesdk/package/LINUX_arm64-v8a/go /usr/local/go
 FROM ${TARGETARCH}-linux
 COPY race-cmake-modules /opt/race/race-cmake-modules
 
-RUN apt-get update && apt-get install ncat
 
