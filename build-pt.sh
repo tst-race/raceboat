@@ -89,6 +89,6 @@ echo PWD $PWD
 # Believe the current system expects $PATH/race/common/<.h files>
 ###
 
-cmake --preset=$LINUX_PRESET -DBUILD_VERSION="local" ${CMAKE_ARGS}
+cmake --debug-find --debug-output --preset=$LINUX_PRESET -DBUILD_VERSION="local" ${CMAKE_ARGS}
 cmake --build -j --preset=$LINUX_PRESET --target install
 
