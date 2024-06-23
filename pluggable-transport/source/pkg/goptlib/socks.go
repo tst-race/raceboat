@@ -316,24 +316,23 @@ func socksAuthRFC1929(rw *bufio.ReadWriter, req *SocksRequest) (err error) {
 		return
 	}
 
-	// var ulen byte
-	// if ulen, err = socksReadByte(rw); err != nil {
-	// 	return
-	// }
-	// if (int(ulen) == 255) {
-	// 	var ulenBytes []byte
-	// 	if ulenBytes, err = socksReadBytes(rw, 3); err != nil {
-	// 		return
-	// 	}
-	// 	var ulen = binary.LittleEndian.Uint32(ulenBytes)
-	// }
-	// Read the username.
-	var ulenBytes []byte
-	// TODO
-	if ulenBytes, err = socksReadBytes(rw, 4); err != nil {
+
+	var ulen uint32
+	var ulenByte byte
+	if ulenByte, err = socksReadByte(rw); err != nil {
 		return
 	}
-	var ulen = binary.LittleEndian.Uint32(ulenBytes)
+	if ulenByte == 0 {
+		// Special case: assume an extended "username" with a 4-byte length field to support larger parameters
+		var ulenBytes []byte
+		if ulenBytes, err = socksReadBytes(rw, 4); err != nil {
+			return
+		}
+		ulen = binary.LittleEndian.Uint32(ulenBytes)
+	} else {
+		ulen = uint32(ulenByte)
+	}
+	// Read the username.
 	if ulen < 1 {
 		sendErrResp()
 		err = fmt.Errorf("RFC1929 username with 0 length")
