@@ -39,7 +39,8 @@ enum class ApiStatus {
   CHANNEL_INVALID,
   INVALID_ARGUMENT,
   PLUGIN_ERROR,
-  INTERNAL_ERROR
+  INTERNAL_ERROR,
+  TIMEOUT
 };
 
 struct ReceiveOptions {
@@ -64,25 +65,74 @@ public:
   std::string recv_role;
   int timeout_ms = 0;
 };
-std::string recvOptionsToString(const ReceiveOptions &sendOptions);
-std::string sendOptionsToString(const SendOptions &sendOptions);
 
-class ConnectionObject {
+struct ResumeOptions {
 public:
-  ConnectionObject(std::shared_ptr<Core> core, OpHandle handle);
-  ConnectionObject() {}
-  ConnectionObject(const ConnectionObject &that);
-  virtual ~ConnectionObject() {}
+  ChannelId recv_channel;
+  ChannelId send_channel;
+  LinkAddress send_address;
+  std::string send_role;
+  LinkAddress recv_address;
+  std::string recv_role;
+  std::string package_id;
+  int timeout_ms = 0;
+};
 
-  std::pair<ApiStatus, std::vector<uint8_t>> read();
+struct BootstrapConnectionOptions {
+public:
+  ChannelId init_send_channel;
+  ChannelId init_recv_channel;
+  ChannelId final_send_channel;
+  ChannelId final_recv_channel;
+  LinkAddress init_send_address;
+  LinkAddress init_recv_address;
+  std::string init_send_role;
+  std::string init_recv_role;
+  std::string final_send_role;
+  std::string final_recv_role;
+  int timeout_seconds = 0;
+};
+std::string recvOptionsToString(const ReceiveOptions &recvOptions);
+std::string sendOptionsToString(const SendOptions &sendOptions);
+std::string resumeOptionsToString(const ResumeOptions &resumeOptions);
+std::string bootstrapConnectionOptionsToString(const BootstrapConnectionOptions &bootstrapConnectionOptions);
+std::string apiStatusToString(const ApiStatus status);
+
+
+struct ConduitProperties {
+public:
+  std::string package_id;
+  ChannelId recv_channel;
+  std::string recv_role;
+  LinkAddress recv_address;
+  ChannelId send_channel;
+  std::string send_role;
+  LinkAddress send_address;
+  int timeout_ms = 0;
+};
+
+class Conduit {
+public:
+  Conduit(std::shared_ptr<Core> core, OpHandle handle, ConduitProperties properties);
+  Conduit() : handle(NULL_RACE_HANDLE) {}
+  Conduit(const Conduit &that);
+  virtual ~Conduit() {}
+
+  OpHandle getHandle();  // debug
+
+  std::pair<ApiStatus, std::vector<uint8_t>> read(int timeoutTimestamp = BLOCKING_READ);
   std::pair<ApiStatus, std::string> read_str();
   ApiStatus write(std::vector<uint8_t> message);
   ApiStatus write_str(const std::string &message);
   ApiStatus close();
+  ConduitProperties getConduitProperties();
+
+  static const int BLOCKING_READ = 0;
 
 private:
   std::shared_ptr<Core> core;
   OpHandle handle;
+  ConduitProperties properties;
 };
 
 class ReceiveObject {
@@ -193,7 +243,7 @@ public:
     handle = that.handle;
   }
 
-  std::pair<ApiStatus, ConnectionObject> accept();
+  std::pair<ApiStatus, Conduit> accept();
 
 private:
   std::shared_ptr<Core> core;
@@ -261,6 +311,19 @@ public:
   listen(ReceiveOptions options);
 
   /**
+   * @brief Open the server side of a long-lived bidirection connection and
+   * start listening for
+   *
+   * @param options The options to use when opening. The send_channel field must
+   * be set.
+   * @return std::pair<LinkAddress, AcceptObject> The link address to use to
+   * connect to this node and the AcceptObject to use to accept connection
+   * requests
+   */
+  std::tuple<ApiStatus, LinkAddress, AcceptObject>
+  bootstrap_listen(BootstrapConnectionOptions options);
+
+  /**
    * @brief Send a unidirectional message to a server
    *
    * @param options The options to use when sending. The send_channel and
@@ -306,20 +369,49 @@ public:
    * @param options The options to use when sending. The send_channel,
    * send_addr, and recv_channel fields must be set.
    * @param bytes A message to send along with the introduction
-   * @return ConnectionObject an object to use to communicate with the server
+   * @return Conduit an object to use to communicate with the server
    */
-  std::pair<ApiStatus, ConnectionObject> dial(SendOptions options,
+  std::pair<ApiStatus, Conduit> dial(SendOptions options,
                                               std::vector<uint8_t> bytes);
 
   /**
+   * @brief Resume a connection to a server
+   *
+   * @param options The options to use to resume the conduit
+   * @param bytes A message to send along with the introduction
+   * @return Conduit an object to use to communicate with the server
+   */
+  std::pair<ApiStatus, Conduit> resume(ResumeOptions options);
+
+   /**
    * @brief Create a connection to a server
    *
    * @param options The options to use when sending. The send_channel,
    * send_addr, and recv_channel fields must be set.
    * @param message A message to send along with the introduction
-   * @return ConnectionObject an object to use to communicate with the server
+   * @return Conduit an object to use to communicate with the server
    */
-  std::pair<ApiStatus, ConnectionObject> dial_str(SendOptions options,
+  std::pair<ApiStatus, Conduit> dial_str(SendOptions options,
                                                   std::string message);
+
+  /**
+   * @brief Create a connection to a server
+   *
+   * @param options The options to use when sending.
+   * @param bytes A message to send along with the introduction
+   * @return Conduit an object to use to communicate with the server
+   */
+  std::pair<ApiStatus, Conduit> bootstrap_dial(BootstrapConnectionOptions options,
+                                                            std::vector<uint8_t> bytes);
+  
+  /**
+   * @brief Create a connection to a server
+   *
+   * @param options The options to use when sending. 
+   * @param message A message to send along with the introduction
+   * @return Conduit an object to use to communicate with the server
+   */
+  std::pair<ApiStatus, Conduit> bootstrap_dial_str(BootstrapConnectionOptions options,
+                                                            std::string message);
 };
 } // namespace Raceboat

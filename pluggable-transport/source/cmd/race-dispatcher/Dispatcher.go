@@ -22,14 +22,17 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"encoding/json"
 	golog "log"
 	"flag"
 	"os"
 	"os/signal"
 	"syscall"
 	"net"
+	"time"
 	"path"
-	pt "git.torproject.org/pluggable-transports/goptlib.git"
+	/* pt "git.torproject.org/pluggable-transports/goptlib.git" */
+	pt "goptlib/goptlib"
 	race_pt3 "race_pt3/race_pt3"
 	"sync"
 	"errors"
@@ -65,6 +68,7 @@ func clientSetup(redirectPath string, wg *sync.WaitGroup, stop <-chan int) (laun
 	wg.Add(1)
 	defer wg.Done()
 	go clientSocksAcceptLoop(ln, clients, redirectPath, wg, stop)
+	golog.Println("After go clientSocksAcceptLoop")
 
 	// when using ptadapter: use the "transport" in the config file
 	pt.Cmethod("race_pt3", ln.Version(), ln.Addr()) 
@@ -97,17 +101,22 @@ func clientSocksAcceptLoop(ln *pt.SocksListener, clients []*race_pt3.RaceClient,
 	// go ACCEPT SOCKS
 	defer ln.Close()
 
+	golog.Println("clientSocksAcceptLoop: Entered")
 	for {
 		wg.Add(1)
+		golog.Println("clientSocksAcceptLoop: select")
 		select {
 		case <-stop:
 			defer wg.Done()
 			golog.Println("clientSocksAcceptLoop return")
 			return
 		default:
+			golog.Println("clientSocksAcceptLoop: calling AcceptSocks")
 			conn, err := ln.AcceptSocks()
 			if err != nil {
+				golog.Println("clientSocksAcceptLoop: some error")
 				if err, ok := err.(net.Error); ok && err.Temporary() {
+					golog.Println("clientSocksAcceptLoop: temporary error")
 					continue
 				}
 				golog.Println("SOCKS accept error: %s", err)
@@ -174,34 +183,65 @@ func clientSocksAcceptLoop(ln *pt.SocksListener, clients []*race_pt3.RaceClient,
 					golog.Println("Receive address:", recvLinkAddress)
 				}
 
-				golog.Println("Calling NewRaceClient")
-				client := race_pt3.NewRaceClient(
-					sendChannel,
-					role,
-					recvChannel,
-					role,
-					"",
-					"",
-					sendLinkAddress,
-					recvLinkAddress,
-					"",
-					0,
-					race_pt3.DEBUG, // TODO: Should be INFO in release
-					"",
-					redirectPath,
-					userParams,
-				)
+				introMessage := ""
+				if arg, ok := conn.Req.Args.Get("introMessage"); ok {
+					introMessage = arg
+					golog.Println("introMessage:", introMessage)
+				}
+				
+				resumeId := ""
+				if arg, ok := conn.Req.Args.Get("resumeId"); ok {
+					resumeId = arg
+					golog.Println("resumeId:", resumeId)
+				}
 
-				clients = append(clients, client)
+				var client *race_pt3.RaceClient
+				if len(clients) == 0 {
+					golog.Println("Calling NewRaceClient")
+					client = race_pt3.NewRaceClient(
+						sendChannel,
+						role,
+						recvChannel,
+						role,
+						"",
+						"",
+						// sendLinkAddress,
+						// recvLinkAddress,
+						"",
+						0,
+						race_pt3.DEBUG, // TODO: Should be INFO in release
+						introMessage,
+						redirectPath,
+						userParams,
+					)
+
+					clients = append(clients, client)
+				} else {
+					golog.Println("Got Existing RaceClient")
+					client = clients[0]
+				}
 				golog.Printf("client address: %p\n", client)  // debug
 
-				golog.Println("Dialing.")
-				rconn, err := client.Dial()
-				if err != nil {
-					golog.Println("ERROR on Dial")
-					return
+				var rconn race_pt3.RaceConn
+				if len(resumeId) == 0 {
+					golog.Println("Dialing.")
+					dialed_conn, err := client.Dial(sendLinkAddress)
+					if err != nil {
+						golog.Println("ERROR on Dial")
+						return
+					}
+					rconn = dialed_conn
+					golog.Println("Dialed.")
+				} else {
+					golog.Println("Resuming.")
+					resumed_conn, err := client.Resume(sendLinkAddress, recvLinkAddress, resumeId)
+					if err != nil {
+						golog.Println("ERROR on Dial")
+						return
+					}
+					rconn = resumed_conn
+					golog.Println("Resumed.")
 				}
-				golog.Println("Dialed.")
 				err = conn.Grant(&net.TCPAddr{IP: net.IPv4zero, Port: 0})
 				// socksReq.Reply(socks5.ReplySucceeded)
 				if err != nil {
@@ -218,33 +258,40 @@ func clientSocksAcceptLoop(ln *pt.SocksListener, clients []*race_pt3.RaceClient,
 }
 
 func copyLoop(socks, race io.ReadWriter) {
+	golog.Println("Entering copyLoop")
 	var copyWg sync.WaitGroup
 	copyWg.Add(2)
 
 	go func() {
-		golog.Println("Copy1")
+		golog.Println("Copy Socks to Conduit")
 		written, err := io.Copy(race, socks)
 		if err != nil {
 			golog.Println("io.Copy error " + err.Error())
 		} else {
-			golog.Println("copied " + strconv.FormatInt(written, 10) + " bytes")
+			golog.Println("copied " + strconv.FormatInt(written, 10) + " bytes from Socks to Conduit")
 		}
-		golog.Println("Copy1.1")
+		golog.Println("Done with Socks to Conduit Loop")
 		copyWg.Done()
 	}()
 	go func() {
-		golog.Println("Copy2")
+		golog.Println("Copy Conduit to Socks")
 		written, err := io.Copy(socks, race)
 		if err != nil {
 			golog.Println("io.Copy error " + err.Error())
 		} else {
-			golog.Println("copied " + strconv.FormatInt(written, 10) + " bytes")
+			golog.Println("copied " + strconv.FormatInt(written, 10) + " bytes from Conduit to Socks")
 		}
-		golog.Println("Copy2.1")
+		golog.Println("Done with Conduit to Socks Loop")
 		copyWg.Done()
 	}()
 
 	copyWg.Wait()
+}
+
+type ResumeObject struct {
+	ResumeId string `json:"resumeId"`
+	RecvLinkAddress string `json:"recvLinkAddress"`
+	SendLinkAddress string `json:"sendLinkAddress"`
 }
 
 func serverSetup(wg *sync.WaitGroup, stop <-chan int, redirectPath string) (launched bool, listeners []race_pt3.RaceListener, servers []*race_pt3.RaceServer) {
@@ -299,6 +346,19 @@ func serverSetup(wg *sync.WaitGroup, stop <-chan int, redirectPath string) (laun
 			recvLinkAddress = arg
 			golog.Println("recvLinkAddress:", recvLinkAddress)
 		}
+		
+		resumeString := "[]"
+		if arg, ok := bindaddr.Options.Get("resumeList"); ok {
+			resumeString = arg
+			golog.Println("resumeString:", resumeString)
+		}
+		var resumeObjectList []ResumeObject
+		err := json.Unmarshal([]byte(resumeString), &resumeObjectList)
+			golog.Println("resumeString:", resumeString)
+		if err != nil {
+			golog.Println("failed to parse resume object json: ", err.Error())
+		}
+
 
 		wg.Add(1)
 		golog.Println("Calling NewRaceServer")
@@ -326,6 +386,38 @@ func serverSetup(wg *sync.WaitGroup, stop <-chan int, redirectPath string) (laun
 		if err != nil {
 			golog.Println("Listen failed.")
 			// TODO handle failure, DO NOT start the serverAcceptLoop
+		}
+
+		for idx, resumeObject := range resumeObjectList {
+			wg.Add(1)
+			golog.Println("Resume Object:")
+			golog.Println(resumeObject)
+			golog.Println(resumeObject.SendLinkAddress)
+			golog.Println(resumeObject.RecvLinkAddress)
+			golog.Println(resumeObject.ResumeId)
+			resumed_conn, err := server.Resume(resumeObject.SendLinkAddress,
+				resumeObject.RecvLinkAddress,
+				resumeObject.ResumeId)
+			if err != nil {
+				golog.Println("Resume failed idx=", idx, resumeObject.ResumeId)
+			}
+
+			golog.Println("Resumed idx=", idx, resumeObject.ResumeId)
+			// buf := make([]byte, 0, 256)
+			// for {
+			// 	n, err := resumed_conn.Read(buf)
+			// 	if err != nil {
+			// 		golog.Println("read failed", err.Error())
+			// 	}
+			// 	golog.Println("buf: ", n, buf)
+			// }
+			go func() {
+				// Sleep to allow for OR Server to be up
+				time.Sleep(4 * time.Second)
+				serverHandler(&resumed_conn, &ptServerInfo)
+			}()
+			wg.Done()
+			golog.Println("Handed off resumed conn")
 		}
 
 		go func() {
@@ -360,8 +452,16 @@ func serverAcceptLoop(ln *race_pt3.RaceListener, info *pt.ServerInfo, wg *sync.W
 				if e, ok := err.(net.Error); ok && !e.Temporary() {
 					return err
 				}
-				continue
+				// continue
 			}
+			// buf := make([]byte, 0, 256)
+			// for {
+			// 	n, err := conn.Read(buf)
+			// 	if err != nil {
+			// 		golog.Println("read failed", err.Error())
+			// 	}
+			// 	golog.Println("buf: ", n, buf)
+			// }
 			go serverHandler(&conn, info)
 			wg.Done()
 		}
@@ -375,7 +475,10 @@ func serverHandler(rconn *race_pt3.RaceConn, info *pt.ServerInfo) {
 	name := "raceproxy"
 
 	// PAUL this should be a dynamic port eventually
+	golog.Println("Dialing OR in serverHandler")
+	golog.Println("Dialing with info:", info)
 	orConn, err := pt.DialOr(info, "127.0.0.1:2345", name)
+	golog.Println("Dialed OR in serverHandler")
 	if err != nil {
 		golog.Printf("%s(%s) - failed to connect to ORPort: %s", name)
 		return

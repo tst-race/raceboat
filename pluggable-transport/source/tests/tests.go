@@ -29,7 +29,7 @@ var SourceDirectory string = ""
 
 func main() {
 	serverLinkAddress := "{\"hostname\":\"localhost\",\"port\":26262}"
-	clientLinkAddress := "{\"hostname\":\"localhost\",\"port\":26265}"
+	// clientLinkAddress := "{\"hostname\":\"localhost\",\"port\":26265}"
 	userParams := make(map[string]string)
 	userParams["hostname"] = "localhost"
 	userParams["PluginCommsTwoSixStub.startPort"] = "26262"
@@ -78,8 +78,8 @@ func main() {
 			"default",
 			"",
 			"",
-			serverLinkAddress,  // sendLinkAddress
-			clientLinkAddress,  // receiveLinkAddress
+			// serverLinkAddress,  // sendLinkAddress
+			// clientLinkAddress,  // receiveLinkAddress
 			"",
 			0,
 			race_pt3.DEBUG,
@@ -87,7 +87,7 @@ func main() {
 			"",
 			userParams)
 
-		clientConn, err := client.Dial()
+		clientConn, err := client.Dial(serverLinkAddress)
 		if err != nil {
 			golog.Println("Dial failed")
 			wg.Done()

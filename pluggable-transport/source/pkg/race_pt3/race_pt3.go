@@ -42,8 +42,6 @@ type RaceClient struct {
 	recvChannelRole    string `default:"default"`
 	altChannelId       string
 	altChannelRole     string `default:"default"`
-	sendLinkAddress    string
-	receiveLinkAddress string
 	timeoutMs          int  // 0 for no timeout
 	introduction       string
 }
@@ -55,8 +53,6 @@ func NewRaceClient(
 	recvChannelRole string,
 	altChannelId string,
 	altChannelRole string,
-	sendLinkAddress string,
-	receiveLinkAddress string,
 	pluginPath string,
 	timeoutMs int,
 	logLevel int,
@@ -74,14 +70,10 @@ func NewRaceClient(
 	core.RaceLogSetLogLevelStdout(core.RaceLogLL_NONE)  // PT API uses stdout
 
 	if len(pluginPath) == 0 {
-		pluginPath = "/etc/race"
+		pluginPath = "/etc/race/plugins"
 		golog.Println("using default plugin path " + pluginPath)
 	}
 
-	if len(sendLinkAddress) == 0 && len(receiveLinkAddress) == 0 {
-		golog.Println("empty send and receive link addresses")
-		return nil
-	}
 	if len(sendChannelId) == 0 && len(recvChannelId) == 0 {
 		golog.Println("empty send and receive channel IDs")
 		return nil
@@ -103,8 +95,6 @@ func NewRaceClient(
 		recvChannelRole:    recvChannelRole,
 		altChannelId:       altChannelId,
 		altChannelRole:     altChannelRole,
-		sendLinkAddress:    sendLinkAddress,
-		receiveLinkAddress: receiveLinkAddress,	
 		timeoutMs:          timeoutMs,	
 		introduction:       introduction,
 	}
@@ -123,11 +113,11 @@ func DestroyRaceClient(raceClient *RaceClient) {
 }
 
 type RaceConn struct {
-	conn  core.SwigConnectionObject
+	conn  core.SwigConduit
 	race  core.RaceSwig
 }
 
-func (client RaceClient) Dial() (RaceConn, error) {
+func (client RaceClient) Dial(sendAddress string) (RaceConn, error) {
 	golog.Println("Calling Dial")
 	// Create/load
 	// Open connection
@@ -137,16 +127,55 @@ func (client RaceClient) Dial() (RaceConn, error) {
 	sendOpts.SetRecv_channel(client.recvChannelId)
 	sendOpts.SetSend_channel(client.sendChannelId)
 	sendOpts.SetAlt_channel(client.altChannelId)
-	sendOpts.SetSend_address(client.sendLinkAddress)
+	sendOpts.SetSend_address(sendAddress)
 	sendOpts.SetSend_role(client.sendChannelRole)
 	sendOpts.SetRecv_role(client.recvChannelRole)
 	sendOpts.SetTimeout_ms(client.timeoutMs)
 
-	// Dial_strSwig() returns wrapped std::pair<ApiStatus, SwigConnectionObject>
+	// Dial_strSwig() returns wrapped std::pair<ApiStatus, SwigConduit>
 	pair := client.race.Dial_strSwig(sendOpts, client.introduction)
 	if pair.GetFirst() != core.ApiStatus_OK {
 		golog.Println("Dial error")
 		return RaceConn{ conn: nil, race: nil, }, errors.New("race_pt3 Dial error")
+	}
+	golog.Println("Conduit Properties:")
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetPackage_id())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetRecv_channel())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetRecv_role())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetRecv_address())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetSend_channel())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetSend_role())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetSend_address())
+	golog.Println("\t", pair.GetSecond().GetConduitProperties().GetTimeout_ms())
+
+	return RaceConn{
+			conn: pair.GetSecond(),
+			race: client.race,
+		}, 
+		nil
+}
+
+func (client RaceClient) Resume(sendAddress string, recvAddress string, packageId string) (RaceConn, error) {
+	golog.Println("Calling Resume")
+	// Create/load
+	// Open connection
+	// Return net.Conn mapping itself to this particular connectionId
+	resumeOpts := core.NewResumeOptions()
+	defer core.DeleteResumeOptions(resumeOpts)
+	resumeOpts.SetRecv_channel(client.recvChannelId)
+	resumeOpts.SetSend_channel(client.sendChannelId)
+	resumeOpts.SetSend_address(sendAddress)
+	resumeOpts.SetRecv_address(recvAddress)
+	resumeOpts.SetSend_role(client.sendChannelRole)
+	resumeOpts.SetRecv_role(client.recvChannelRole)
+	resumeOpts.SetTimeout_ms(client.timeoutMs)
+	resumeOpts.SetPackage_id(packageId)
+
+	// ResumeSwig() returns wrapped std::pair<ApiStatus, SwigConduit>
+	pair := client.race.ResumeSwig(resumeOpts)
+	if pair.GetFirst() != core.ApiStatus_OK {
+		golog.Println("Resume error")
+		return RaceConn{ conn: nil, race: nil, }, errors.New("race_pt3 Resume error")
 	}
 
 	return RaceConn{
@@ -246,7 +275,7 @@ func NewRaceServer(
 	core.RaceLogSetLogLevelStdout(core.RaceLogLL_NONE)   // PT API uses stdout
 	
 	if len(pluginPath) == 0 {
-		pluginPath = "/etc/race"
+		pluginPath = "/etc/race/plugins"
 		golog.Println("using default plugin path " + pluginPath)
 	}
 
@@ -329,13 +358,14 @@ func (server *RaceServer) Listen() (RaceListener, error) {
 func (listener RaceListener) Accept() (RaceConn, error) {
 	golog.Println("Calling Accept")
 
-	// AcceptSwig() returns std::pair<ApiStatus, SwigConnectionObject>
+	// AcceptSwig() returns std::pair<ApiStatus, SwigConduit>
 	if listener.listener != nil {
 		result := listener.listener.AcceptSwig(0)
 		if result.GetFirst() != core.ApiStatus_OK {
 			golog.Println("Accept error")
 			return RaceConn{}, errors.New("race_pt3 Accept error")
 		}
+		golog.Println("AcceptSwig Returned")
 		listener.conns.Add(result.GetSecond())
 		return RaceConn{conn: result.GetSecond(), race: listener.race}, nil
 	} 
@@ -361,3 +391,38 @@ func (listener RaceListener) Close() error {
 func (listener RaceListener) Addr() string {
 	return listener.linkAddress
 }
+
+func (server RaceServer) Resume(sendAddress string, recvAddress string, packageId string) (RaceConn, error) {
+	golog.Println("Calling Server Resume")
+	// Create/load
+	// Open connection
+	// Return net.Conn mapping itself to this particular connectionId
+	resumeOpts := core.NewResumeOptions()
+	defer core.DeleteResumeOptions(resumeOpts)
+	resumeOpts.SetRecv_channel(server.recvChannelId)
+	resumeOpts.SetSend_channel(server.sendChannelId)
+	resumeOpts.SetSend_address(sendAddress)
+	golog.Println("Setting Resume Options: sendAddress: ", sendAddress)
+	golog.Println("Setting Resume Options: sendAddress: ", resumeOpts.GetSend_address())
+	resumeOpts.SetRecv_address(recvAddress)
+	golog.Println("Setting Resume Options: recvAddress: ", recvAddress)
+	golog.Println("Setting Resume Options: recvAddress: ", resumeOpts.GetRecv_address())
+	resumeOpts.SetSend_role(server.sendChannelRole)
+	resumeOpts.SetRecv_role(server.recvChannelRole)
+	resumeOpts.SetTimeout_ms(server.timeoutMs)
+	resumeOpts.SetPackage_id(packageId)
+
+	// ResumeSwig() returns wrapped std::pair<ApiStatus, SwigConduit>
+	pair := server.race.ResumeSwig(resumeOpts)
+	if pair.GetFirst() != core.ApiStatus_OK {
+		golog.Println("Resume error")
+		return RaceConn{ conn: nil, race: nil, }, errors.New("race_pt3 Resume error")
+	}
+
+	return RaceConn{
+			conn: pair.GetSecond(),
+			race: server.race,
+		}, 
+		nil
+}
+

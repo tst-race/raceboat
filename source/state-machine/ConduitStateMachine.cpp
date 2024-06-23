@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-#include "ConnectionObjectStateMachine.h"
+#include "ConduitStateMachine.h"
 
 #include "Core.h"
 #include "Events.h"
@@ -29,7 +29,7 @@ namespace Raceboat {
 // Context
 //-----------------------------------------------------------------------------------------------
 
-void ConnectionObjectContext::updateConnObjectStateMachineStart(
+void ConduitContext::updateConduitectStateMachineStart(
     RaceHandle /* contextHandle */, RaceHandle recvHandle,
     const ConnectionID &_recvConnId, RaceHandle sendHandle,
     const ConnectionID &_sendConnId, const ChannelId &_sendChannel,
@@ -49,12 +49,12 @@ void ConnectionObjectContext::updateConnObjectStateMachineStart(
   }
 }
 
-void ConnectionObjectContext::updateReceiveEncPkg(
+void ConduitContext::updateReceiveEncPkg(
     ConnectionID /* connId */, std::shared_ptr<std::vector<uint8_t>> data) {
   this->recvQueue.push(*data);
 }
 
-void ConnectionObjectContext::updatePackageStatusChanged(RaceHandle pkgHandle,
+void ConduitContext::updatePackageStatusChanged(RaceHandle pkgHandle,
                                                          PackageStatus status) {
   if (status == PACKAGE_SENT) {
     sentList.push_back(pkgHandle);
@@ -63,23 +63,23 @@ void ConnectionObjectContext::updatePackageStatusChanged(RaceHandle pkgHandle,
   }
 }
 
-void ConnectionObjectContext::updateRead(
+void ConduitContext::updateRead(
     RaceHandle /* handle */,
     std::function<void(ApiStatus, std::vector<uint8_t>)> cb) {
+      TRACE_METHOD();
   if (this->readCallback) {
-    // Call old callback
-    this->readCallback(ApiStatus::INTERNAL_ERROR, {});
+    helper::logInfo(logPrefix + "read callback not null.  This may happen if there was a read timeout.  Otherwise this should be considered an error");
   }
   this->readCallback = cb;
 }
 
-void ConnectionObjectContext::updateWrite(RaceHandle /* handle */,
+void ConduitContext::updateWrite(RaceHandle /* handle */,
                                           std::vector<uint8_t> bytes,
                                           std::function<void(ApiStatus)> cb) {
   this->sendQueue.push_back({cb, std::move(bytes)});
 }
 
-void ConnectionObjectContext::updateClose(RaceHandle /* handle */,
+void ConduitContext::updateClose(RaceHandle /* handle */,
                                           std::function<void(ApiStatus)> cb) {
   this->closeCallback = cb;
 }
@@ -88,10 +88,10 @@ void ConnectionObjectContext::updateClose(RaceHandle /* handle */,
 // States
 //-----------------------------------------------------------------------------------------------
 
-struct StateConnectionObjectInitial : public ConnectionObjectState {
-  explicit StateConnectionObjectInitial(
+struct StateConduitInitial : public ConduitState {
+  explicit StateConduitInitial(
       StateType id = STATE_CONNECTION_OBJECT_INITIAL)
-      : ConnectionObjectState(id, "STATE_CONNECTION_OBJECT_INITIAL") {}
+      : ConduitState(id, "STATE_CONNECTION_OBJECT_INITIAL") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -118,19 +118,23 @@ struct StateConnectionObjectInitial : public ConnectionObjectState {
   }
 };
 
-struct StateConnectionObjectConnected : public ConnectionObjectState {
-  explicit StateConnectionObjectConnected(
+struct StateConduitConnected : public ConduitState {
+  explicit StateConduitConnected(
       StateType id = STATE_CONNECTION_OBJECT_CONNECTED)
-      : ConnectionObjectState(id, "STATE_CONNECTION_OBJECT_CONNECTED") {}
+      : ConduitState(id, "STATE_CONNECTION_OBJECT_CONNECTED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
     PluginWrapper &plugin = getPlugin(ctx, ctx.sendChannel);
-
+    
     if (ctx.readCallback && !ctx.recvQueue.empty()) {
       ctx.readCallback(ApiStatus::OK, ctx.recvQueue.front());
       ctx.readCallback = {};
       ctx.recvQueue.pop();
+    } else if(!ctx.recvQueue.empty()) {
+      helper::logWarning(logPrefix + "null read callback and non-empty queue!");
+    } else {
+      helper::logWarning(logPrefix + "nothing to read");
     }
 
     for (auto &[cb, bytes] : ctx.sendQueue) {
@@ -147,6 +151,7 @@ struct StateConnectionObjectConnected : public ConnectionObjectState {
           plugin.sendPackage(pkgHandle, ctx.sendConnId, pkg, 0, 0);
 
       if (response.status != SdkStatus::SDK_OK) {
+        helper::logError(logPrefix + "sendPackage returned " + std::to_string(response.status));
         cb(ApiStatus::INTERNAL_ERROR);
       } else {
         ctx.manager.registerHandle(ctx, pkgHandle);
@@ -173,7 +178,7 @@ struct StateConnectionObjectConnected : public ConnectionObjectState {
       if (it == ctx.sentQueue.end()) {
         continue;
       }
-
+      helper::logInfo(logPrefix + "failed list callback");
       it->second(ApiStatus::INTERNAL_ERROR);
       ctx.sentQueue.erase(it);
     }
@@ -183,10 +188,10 @@ struct StateConnectionObjectConnected : public ConnectionObjectState {
   }
 };
 
-struct StateConnectionObjectFinished : public ConnectionObjectState {
-  explicit StateConnectionObjectFinished(
+struct StateConduitFinished : public ConduitState {
+  explicit StateConduitFinished(
       StateType id = STATE_CONNECTION_OBJECT_FINISHED)
-      : ConnectionObjectState(id, "STATE_CONNECTION_OBJECT_FINISHED") {}
+      : ConduitState(id, "STATE_CONNECTION_OBJECT_FINISHED") {}
   virtual bool finalState() { return true; }
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
@@ -194,15 +199,18 @@ struct StateConnectionObjectFinished : public ConnectionObjectState {
 
     if (ctx.readCallback) {
       ctx.readCallback(ApiStatus::CLOSING, {});
+      helper::logDebug(logPrefix + "clearing read callback");
       ctx.readCallback = {};
     }
 
     for (auto &[cb, bytes] : ctx.sendQueue) {
+      helper::logWarning(logPrefix + "send queue not empty");
       cb(ApiStatus::INTERNAL_ERROR);
     }
     ctx.sendQueue.clear();
 
     for (auto &[handle, cb] : ctx.sentQueue) {
+      helper::logWarning(logPrefix + "sent queue not empty");
       cb(ApiStatus::INTERNAL_ERROR);
     }
     ctx.sentQueue.clear();
@@ -215,36 +223,47 @@ struct StateConnectionObjectFinished : public ConnectionObjectState {
   }
 };
 
-struct StateConnectionObjectFailed : public ConnectionObjectState {
-  explicit StateConnectionObjectFailed(
+struct StateConduitFailed : public ConduitState {
+  explicit StateConduitFailed(
       StateType id = STATE_CONNECTION_OBJECT_FAILED)
-      : ConnectionObjectState(id, "STATE_CONNECTION_OBJECT_FAILED") {}
+      : ConduitState(id, "STATE_CONNECTION_OBJECT_FAILED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
     if (ctx.dialCallback) {
+      helper::logDebug(logPrefix + "dial callback not null");
       ctx.dialCallback(ApiStatus::INTERNAL_ERROR, {});
       ctx.dialCallback = {};
     }
 
+    if (ctx.resumeCallback) {
+      helper::logDebug(logPrefix + "resume callback not null");
+      ctx.resumeCallback(ApiStatus::INTERNAL_ERROR, {});
+      ctx.resumeCallback = {};
+    }
+
     for (auto &[cb, bytes] : ctx.sendQueue) {
+      helper::logDebug(logPrefix + "send queue not empty");
       cb(ApiStatus::INTERNAL_ERROR);
     }
     ctx.sendQueue.clear();
 
     for (auto &[handle, cb] : ctx.sentQueue) {
+      helper::logDebug(logPrefix + "sent queue not empty");
       cb(ApiStatus::INTERNAL_ERROR);
     }
     ctx.sentQueue.clear();
 
     if (ctx.readCallback) {
       ctx.readCallback(ApiStatus::INTERNAL_ERROR, {});
+      helper::logDebug(logPrefix + "clearing read callback");
       ctx.readCallback = {};
     }
 
     if (ctx.closeCallback) {
       ctx.closeCallback(ApiStatus::INTERNAL_ERROR);
+      helper::logDebug(logPrefix + "clearing close callback");
       ctx.closeCallback = {};
     }
 
@@ -257,16 +276,16 @@ struct StateConnectionObjectFailed : public ConnectionObjectState {
 // StateEngine
 //-----------------------------------------------------------------------------------------------
 
-ConnectionObjectStateEngine::ConnectionObjectStateEngine() {
+ConduitStateEngine::ConduitStateEngine() {
   // calls sendPackage on plugin with any package in queue, re-enters state if
   // read, write, or receiveEncPkg is called, transitions on close call
-  addInitialState<StateConnectionObjectInitial>(
+  addInitialState<StateConduitInitial>(
       STATE_CONNECTION_OBJECT_INITIAL);
-  addState<StateConnectionObjectConnected>(STATE_CONNECTION_OBJECT_CONNECTED);
+  addState<StateConduitConnected>(STATE_CONNECTION_OBJECT_CONNECTED);
   // calls state machine finished on manager, final state
-  addState<StateConnectionObjectFinished>(STATE_CONNECTION_OBJECT_FINISHED);
+  addState<StateConduitFinished>(STATE_CONNECTION_OBJECT_FINISHED);
   // call state machine failed
-  addFailedState<StateConnectionObjectFailed>(STATE_CONNECTION_OBJECT_FAILED);
+  addFailedState<StateConduitFailed>(STATE_CONNECTION_OBJECT_FAILED);
 
   // clang-format off
     declareStateTransition(STATE_CONNECTION_OBJECT_INITIAL,   EVENT_ALWAYS, STATE_CONNECTION_OBJECT_CONNECTED);
@@ -282,7 +301,7 @@ ConnectionObjectStateEngine::ConnectionObjectStateEngine() {
   // clang-format on
 }
 
-std::string ConnectionObjectStateEngine::eventToString(EventType event) {
+std::string ConduitStateEngine::eventToString(EventType event) {
   return Raceboat::eventToString(event);
 }
 

@@ -39,7 +39,7 @@ void ApiListenContext::updateListen(
   this->listenCb = _cb;
 };
 void ApiListenContext::updateAccept(
-    RaceHandle /* _handle */, std::function<void(ApiStatus, RaceHandle)> _cb) {
+                                    RaceHandle /* _handle */, std::function<void(ApiStatus, RaceHandle, ConduitProperties)> _cb) {
   this->acceptCb.push_back(_cb);
 };
 void ApiListenContext::updateClose(RaceHandle /* handle */,
@@ -108,7 +108,7 @@ struct StateListenInitial : public ListenState {
     }
 
     ctx.recvConnSMHandle = ctx.manager.startConnStateMachine(
-        ctx.handle, channelId, role, linkAddress, false);
+                                                             ctx.handle, channelId, role, linkAddress, true, false);
 
     if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -153,6 +153,7 @@ struct StateListenWaiting : public ListenState {
 
     while (!ctx.data.empty()) {
       auto data = std::move(ctx.data.front());
+
       ctx.data.pop();
 
       try {
@@ -184,7 +185,7 @@ struct StateListenWaiting : public ListenState {
 
         std::vector<uint8_t> dialMessage = base64::decode(messageB64);
 
-        RaceHandle preConnSMHandle = ctx.manager.startPreConnObjStateMachine(
+        RaceHandle preConnSMHandle = ctx.manager.startPreConduitStateMachine(
             ctx.handle, ctx.recvConnSMHandle, ctx.recvConnId,
             ctx.opts.recv_channel, ctx.opts.send_channel, ctx.opts.send_role,
             linkAddress, replyPackageId, {std::move(dialMessage)});
@@ -195,7 +196,7 @@ struct StateListenWaiting : public ListenState {
           return EventResult::NOT_SUPPORTED;
         }
 
-        ctx.preConnObjSM.push(preConnSMHandle);
+        ctx.preConduitSM.push(preConnSMHandle);
 
         break;
       } catch (std::exception &e) {
@@ -204,13 +205,13 @@ struct StateListenWaiting : public ListenState {
       }
     }
 
-    while (!ctx.acceptCb.empty() && !ctx.preConnObjSM.empty()) {
+    while (!ctx.acceptCb.empty() && !ctx.preConduitSM.empty()) {
       auto cb = std::move(ctx.acceptCb.front());
       ctx.acceptCb.pop_front();
-      RaceHandle preConnSMHandle = std::move(ctx.preConnObjSM.front());
-      ctx.preConnObjSM.pop();
+      RaceHandle preConnSMHandle = std::move(ctx.preConduitSM.front());
+      ctx.preConduitSM.pop();
       if (!ctx.manager.onListenAccept(preConnSMHandle, cb)) {
-        cb(ApiStatus::INTERNAL_ERROR, {});
+        cb(ApiStatus::INTERNAL_ERROR, {}, {});
       };
     }
 
@@ -226,7 +227,7 @@ struct StateListenFinished : public ListenState {
     auto &ctx = getContext(context);
 
     for (auto &cb : ctx.acceptCb) {
-      cb(ApiStatus::CLOSING, {});
+      cb(ApiStatus::CLOSING, {}, {});
     }
     ctx.acceptCb = {};
 
@@ -252,7 +253,7 @@ struct StateListenFailed : public ListenState {
     }
 
     for (auto &cb : ctx.acceptCb) {
-      cb(ApiStatus::INTERNAL_ERROR, {});
+      cb(ApiStatus::INTERNAL_ERROR, {}, {});
     }
     ctx.acceptCb = {};
 

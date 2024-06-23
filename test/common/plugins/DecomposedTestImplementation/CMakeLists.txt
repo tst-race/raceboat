@@ -25,8 +25,8 @@ function(setup_component_target)
     target_include_directories(
         ${COMPONENT_TARGET}
         PRIVATE 
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../include/race>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../../include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/race>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     )
 
@@ -38,7 +38,7 @@ function(setup_component_target)
         SUPPRESS unmatchedSuppression unusedFunction missingIncludeSystem
     )
     # TODO fix issue with multiple check_format targets
-    # setup_clang_format_for_target(${COMPONENT_TARGET} PARENT raceboat)
+    # setup_clang_format_for_target(${COMPONENT_TARGET} PARENT raceSdkCommon)
 
     add_custom_command(TARGET ${COMPONENT_TARGET} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/manifest.json ${CMAKE_CURRENT_BINARY_DIR}/

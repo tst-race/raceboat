@@ -18,12 +18,40 @@
 
 #include <iostream>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
 #include "race/Race.h"
 #include "race/common/RaceLog.h"
 
+// #include <boost/asio.hpp>
+// #include <boost/bind.hpp>
+// #include <boost/shared_ptr.hpp>
+// #include <boost/enable_shared_from_this.hpp>
+
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <libgen.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <poll.h>
+#include <resolv.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
+#include <syslog.h>
+#include <unistd.h>
+#define READ 0
+#define WRITE 1
+
+#define BUF_SIZE 16384
 using namespace Raceboat;
 
 enum class Mode : int {
@@ -34,6 +62,8 @@ enum class Mode : int {
   RECV_ONESHOT,
   RECV_RESPOND,
   SERVER_CONNECT,
+  CLIENT_BOOTSTRAP_CONNECT,
+  SERVER_BOOTSTRAP_CONNECT,
 };
 
 struct CmdOptions {
@@ -43,14 +73,20 @@ struct CmdOptions {
 
   std::string plugin_path = "/etc/race";
 
-  ChannelId recv_channel;
-  std::string recv_role = "default";
-  ChannelId send_channel;
-  std::string send_role = "default";
+  ChannelId init_recv_channel;
+  std::string init_recv_role = "default";
+  ChannelId init_send_channel;
+  std::string init_send_role = "default";
   ChannelId alt_channel;
   std::string alt_role = "default";
-  LinkAddress send_address;
-  LinkAddress recv_address;
+  LinkAddress init_send_address;
+  LinkAddress init_recv_address;
+  ChannelId final_recv_channel;
+  std::string final_recv_role = "default";
+  ChannelId final_send_channel;
+  std::string final_send_role = "default";
+  LinkAddress final_send_address;
+  LinkAddress final_recv_address;
   int timeout_ms = 0;
   bool multi_channel = false;
 
@@ -75,6 +111,10 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       {"recv-reply", no_argument, &mode, static_cast<int>(Mode::RECV_RESPOND)},
       {"server-connect", no_argument, &mode,
        static_cast<int>(Mode::SERVER_CONNECT)},
+      {"server-bootstrap-connect", no_argument, &mode,
+       static_cast<int>(Mode::SERVER_BOOTSTRAP_CONNECT)},
+      {"client-bootstrap-connect", no_argument, &mode,
+       static_cast<int>(Mode::CLIENT_BOOTSTRAP_CONNECT)},
 
       // channel selection
       {"recv-channel", required_argument, nullptr, 'R'},
@@ -83,6 +123,11 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       {"send-role", required_argument, nullptr, 's'},
       {"alt-channel", required_argument, nullptr, 'T'},
       {"alt-role", required_argument, nullptr, 't'},
+
+      {"final-recv-channel", required_argument, nullptr, 'K'},
+      {"final-recv-role", required_argument, nullptr, 'k'},
+      {"final-send-channel", required_argument, nullptr, 'L'},
+      {"final-send-role", required_argument, nullptr, 'l'},
 
       // destination selection
       {"send-address", required_argument, nullptr, 'a'},
@@ -126,19 +171,35 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       break;
 
     case 'R':
-      opts.recv_channel = optarg;
+      opts.init_recv_channel = optarg;
       break;
 
     case 'r':
-      opts.recv_role = optarg;
+      opts.init_recv_role = optarg;
       break;
 
     case 'S':
-      opts.send_channel = optarg;
+      opts.init_send_channel = optarg;
       break;
 
     case 's':
-      opts.send_role = optarg;
+      opts.init_send_role = optarg;
+      break;
+
+    case 'K':
+      opts.final_recv_channel = optarg;
+      break;
+
+    case 'k':
+      opts.final_recv_role = optarg;
+      break;
+
+    case 'L':
+      opts.final_send_channel = optarg;
+      break;
+
+    case 'l':
+      opts.final_send_role = optarg;
       break;
 
     case 'T':
@@ -150,11 +211,11 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       break;
 
     case 'a':
-      opts.send_address = optarg;
+      opts.init_send_address = optarg;
       break;
 
     case 'e':
-      opts.recv_address = optarg;
+      opts.init_recv_address = optarg;
       break;
 
     case 'd':
@@ -289,6 +350,7 @@ std::vector<uint8_t> readStdin() {
   while ((c = getchar()) != EOF) {
     buffer.push_back(c);
   }
+  buffer.pop_back(); // pop trailing newline
   return buffer;
 }
 
@@ -298,11 +360,11 @@ int handle_send_oneshot(const CmdOptions &opts) {
   Race race(opts.plugin_path, params);
 
   SendOptions send_opt;
-  send_opt.send_channel = opts.send_channel;
-  send_opt.send_role = opts.send_role;
-  send_opt.send_address = opts.send_address;
-  send_opt.recv_channel = opts.recv_channel;
-  send_opt.recv_role = opts.recv_role;
+  send_opt.send_channel = opts.init_send_channel;
+  send_opt.send_role = opts.init_send_role;
+  send_opt.send_address = opts.init_send_address;
+  send_opt.recv_channel = opts.init_recv_channel;
+  send_opt.recv_role = opts.init_recv_role;
   send_opt.alt_channel = opts.alt_channel;
 
   // TODO: support channel role for alt channel
@@ -325,12 +387,12 @@ int handle_recv_oneshot(const CmdOptions &opts) {
   Race race(opts.plugin_path, params);
 
   ReceiveOptions recv_opt;
-  recv_opt.recv_channel = opts.recv_channel;
-  recv_opt.recv_role = opts.recv_role;
+  recv_opt.recv_channel = opts.init_recv_channel;
+  recv_opt.recv_role = opts.init_recv_role;
 
-  recv_opt.recv_address = opts.recv_address;
-  recv_opt.send_channel = opts.send_channel;
-  recv_opt.send_role = opts.send_role;
+  recv_opt.recv_address = opts.init_recv_address;
+  recv_opt.send_channel = opts.init_send_channel;
+  recv_opt.send_role = opts.init_send_role;
   recv_opt.alt_channel = opts.alt_channel;
   recv_opt.multi_channel = opts.multi_channel;
 
@@ -370,11 +432,11 @@ int handle_send_recv(const CmdOptions &opts) {
   Race race(opts.plugin_path, params);
 
   SendOptions send_opt;
-  send_opt.send_channel = opts.send_channel;
-  send_opt.send_role = opts.send_role;
-  send_opt.send_address = opts.send_address;
-  send_opt.recv_channel = opts.recv_channel;
-  send_opt.recv_role = opts.recv_role;
+  send_opt.send_channel = opts.init_send_channel;
+  send_opt.send_role = opts.init_send_role;
+  send_opt.send_address = opts.init_send_address;
+  send_opt.recv_channel = opts.init_recv_channel;
+  send_opt.recv_role = opts.init_recv_role;
   send_opt.alt_channel = opts.alt_channel;
 
   // TODO: support channel role for alt channel
@@ -399,12 +461,12 @@ int handle_recv_respond(const CmdOptions &opts) {
   Race race(opts.plugin_path, params);
 
   ReceiveOptions recv_opt;
-  recv_opt.recv_channel = opts.recv_channel;
-  recv_opt.recv_role = opts.recv_role;
+  recv_opt.recv_channel = opts.init_recv_channel;
+  recv_opt.recv_role = opts.init_recv_role;
 
-  recv_opt.recv_address = opts.recv_address;
-  recv_opt.send_channel = opts.send_channel;
-  recv_opt.send_role = opts.send_role;
+  recv_opt.recv_address = opts.init_recv_address;
+  recv_opt.send_channel = opts.init_send_channel;
+  recv_opt.send_role = opts.init_send_role;
   recv_opt.alt_channel = opts.alt_channel;
   recv_opt.multi_channel = opts.multi_channel;
 
@@ -452,18 +514,18 @@ int handle_client_connect(const CmdOptions &opts) {
 
   Race race(opts.plugin_path, params);
 
-  if (opts.send_address.empty()) {
+  if (opts.init_send_address.empty()) {
     printf("link address required\n");
     return -1;
   }
 
   SendOptions send_opt;
-  send_opt.send_channel = opts.send_channel;
-  send_opt.send_role = opts.send_role;
+  send_opt.send_channel = opts.init_send_channel;
+  send_opt.send_role = opts.init_send_role;
   send_opt.send_address =
-      opts.send_address; // generated in handle_server_connect
-  send_opt.recv_channel = opts.recv_channel;
-  send_opt.recv_role = opts.recv_role;
+      opts.init_send_address; // generated in handle_server_connect
+  send_opt.recv_channel = opts.init_recv_channel;
+  send_opt.recv_role = opts.init_recv_role;
   send_opt.alt_channel = opts.alt_channel;
 
   std::string introductionMsg = "hello";
@@ -512,10 +574,10 @@ int handle_server_connect(const CmdOptions &opts) {
   Race race(opts.plugin_path, params);
 
   ReceiveOptions recv_opt;
-  recv_opt.recv_channel = opts.recv_channel;
-  recv_opt.recv_role = opts.recv_role;
-  recv_opt.send_channel = opts.send_channel;
-  recv_opt.send_role = opts.send_role;
+  recv_opt.recv_channel = opts.init_recv_channel;
+  recv_opt.recv_role = opts.init_recv_role;
+  recv_opt.send_channel = opts.init_send_channel;
+  recv_opt.send_role = opts.init_send_role;
 
   auto [status, link_addr, listener] = race.listen(recv_opt);
   if (status != ApiStatus::OK) {
@@ -578,6 +640,457 @@ int handle_server_connect(const CmdOptions &opts) {
   return (status == ApiStatus::OK);
 }
 
+
+void close_socket(int &socket_fd) {
+  printf("closing socket %d\n", socket_fd);
+  if (-1 == ::shutdown(socket_fd, SHUT_RDWR)) { // prevent further socket IO
+    printf("failed to shutdown() socket %d (%d): %s", socket_fd, errno, strerror(errno));
+  }
+  if (-1 == ::close(socket_fd)) {
+    printf("failed to close() socket %d (%d): %s", socket_fd, errno, strerror(errno));
+  }
+  socket_fd = -1;
+}
+
+int create_listening_socket(int port) {
+  int listening_sock, optval = 1;
+  char on = 1;
+  struct addrinfo hints, *res = NULL;
+  char portstr[12];
+
+  memset(&hints, 0x00, sizeof(hints));
+
+  hints.ai_flags = AI_NUMERICSERV; // numeric service number, not resolve
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+
+  std::string bind_addr = "localhost";
+  sprintf(portstr, "%d", port);
+
+  // Try to resolve address if bind_address is a hostname
+  if (::getaddrinfo(bind_addr.c_str(), portstr, &hints, &res) != 0) {
+    printf("getadddrinfo() failed\n");
+    return -1;
+  }
+
+  printf("new listening socket family:%d, type:%d, protocol:%d\n", res->ai_family, res->ai_socktype, res->ai_protocol);
+  listening_sock = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+
+  if (listening_sock >= 0 &&
+      ::setsockopt(listening_sock, SOL_SOCKET, SO_REUSEADDR, &optval,
+                   sizeof(optval)) < 0) {
+    printf("setsockopt() failed\n");
+    close_socket(listening_sock);
+    listening_sock = -1;
+  }
+
+  // make non-blocking so ::poll() can timeout
+  if (listening_sock >= 0 && ::ioctl(listening_sock, FIONBIO, &on) < 0) {
+    perror("ioctl() failed to make socket non-blocking");
+    close_socket(listening_sock);
+    listening_sock = -1;
+  }
+
+  if (listening_sock >= 0 &&
+      ::bind(listening_sock, res->ai_addr, res->ai_addrlen) == -1) {
+    perror("bind() failed");
+    close_socket(listening_sock);
+    listening_sock = -1;
+  }
+
+  if (listening_sock >= 0 && ::listen(listening_sock, 20) < 0) {
+    printf("listen() failed\n");
+    close_socket(listening_sock);
+    listening_sock = -1;
+  }
+
+  if (res != nullptr) {
+    ::freeaddrinfo(res);
+  }
+  if (listening_sock > 0) {
+    printf("created listening socket %d\n", listening_sock);
+  }
+  return listening_sock;
+}
+
+int create_client_connection(std::string &hostaddr, uint16_t port) {
+  struct addrinfo hints, *res = NULL;
+  int client_sock;
+  char portstr[12];
+
+  memset(&hints, 0x00, sizeof(hints));
+
+  hints.ai_flags = AI_NUMERICSERV; // numeric service number, not resolve
+  hints.ai_family = AF_UNSPEC;  // socket.h
+  hints.ai_socktype = SOCK_STREAM;
+  sprintf(portstr, "%d", port);
+
+  // Try to resolve address if remote_host is a hostname
+  if (::getaddrinfo(hostaddr.c_str(), portstr, &hints, &res) != 0) {
+    printf("getadddrinfo() failed\n");
+    return -1;
+  }
+
+  printf("SOCKET new client socket family:%d, type:%d, protocol:%d\n", res->ai_family, res->ai_socktype, res->ai_protocol);
+  client_sock = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  if (client_sock >= 0 &&
+      ::connect(client_sock, res->ai_addr, res->ai_addrlen) < 0) {
+    printf("SOCKET connect() failed\n");
+    close_socket(client_sock);
+    client_sock = -1;
+  }
+
+  if (res != nullptr) {
+    ::freeaddrinfo(res);
+  }
+  printf("SOCKET connected socket %d\n", client_sock);
+  return client_sock;
+}
+
+int await_socket_input(const int socket_fd, int timeout_ms) {
+  pollfd poll_fd;
+  memset(&poll_fd, 0, sizeof(poll_fd));
+  poll_fd.fd = socket_fd;
+  poll_fd.events = POLLIN;
+  
+  int poll_result = ::poll(&poll_fd, 1, timeout_ms);
+
+  if (poll_result < 0) {
+    perror("poll() error");
+  } else if (poll_result == 0) {
+    printf("poll timed out\n");
+  } else if (poll_fd.revents != POLLIN) {
+    printf("unexpected poll event %d\n", poll_fd.revents);
+  }
+  
+  if (poll_result > 1) {
+    // this "shouldn't" happen, but here for visibility
+    printf("poll returned %d\n", poll_result);
+  }
+  return poll_result;
+}
+
+// struct ForwardRecord {
+//   int local_sock;
+//   Conduit &conduit;
+//   long timeoutSeconds;
+//   std::atomic<long> currentConduitTimeoutSinceEpoch;  // shared amongst threads
+//   bool closeSocketsUponExit;  // relinquish ownership / close upon exit of forward_*() functions
+// };
+
+void forward_local_to_conduit(int local_sock, Conduit &conduit, const int timeoutSeconds) {
+  local_sock = dup(local_sock);
+  std::vector<uint8_t> buffer(BUF_SIZE);
+  // TODO -- client (only) local read timeout, if timeout occurs, close local socket and conduit
+  // 2 cases to fail, user closes local app, or server times out connection
+  // TODO -- make sure timeout flag supports forever case
+  printf("local_to_conduit with socket fd %d, and %d second timeout\n", local_sock, timeoutSeconds);
+  int poll_status = 1;
+  
+  // TODO this needs to consider the remaining conduit_to_local timeout duration to timeout about the same time
+  if(timeoutSeconds != Conduit::BLOCKING_READ) {
+    poll_status = await_socket_input(local_sock, timeoutSeconds*1000);
+  }
+
+  while (poll_status > 0) {
+    ssize_t received_bytes = ::recv(local_sock, buffer.data(), BUF_SIZE, 0);
+
+    if (received_bytes > 0) {
+      std::vector<uint8_t> result(buffer.begin(),
+                                buffer.begin() + received_bytes);
+      printf("Relaying data %s from local socket to conduit -- %lu\n",
+        std::string(buffer.begin(), buffer.begin() + received_bytes).c_str(), conduit.getHandle());
+
+      auto status = conduit.write(result); // send data to output socket
+      if (status != ApiStatus::OK) {
+        printf("conduit write failed with status: %d on socket\n", status);
+        break;
+      }
+    } else if (received_bytes < 0) {
+      // EWOULDBLOCK/EAGAIN "shouldn't" occur when poll() indicates received data available or when blocking forever
+      char buf[64];
+      snprintf(buf, sizeof(buf) -1, "recv() failed on fd %d", local_sock);
+      perror(buf);
+      break;
+    } else { // 0 - indicates graceful disconnect
+      printf("remote socket disconnected\n");
+      break;
+    }
+
+    if(timeoutSeconds != Conduit::BLOCKING_READ) {
+      poll_status = await_socket_input(local_sock, timeoutSeconds*1000);
+    }
+  }
+
+  conduit.close();  // close the conduit, so the forward_conduit_to_local thread will stop blocking and return
+  printf("Exiting local_to_conduit loop\n");
+}
+
+void forward_conduit_to_local(Conduit &conduit, int local_sock, const int timeoutSeconds) {
+  local_sock = dup(local_sock);
+  printf("conduit_to_local with socket fd %d, with %d second timeout\n", local_sock, timeoutSeconds);
+  ssize_t send_status;
+
+  while (true) {
+    auto [status, buffer] = conduit.read(timeoutSeconds);
+    
+    if (status != ApiStatus::OK) {
+      printf("conduit read failed with status: %s\n", apiStatusToString(status).c_str());
+      break;
+    } else {
+      printf("Relaying data %s from conduit to local socket\n",
+        std::string(buffer.begin(), buffer.end()).c_str());
+      send_status = ::send(local_sock, buffer.data(), buffer.size(), 0);
+      if (send_status < 0) {
+        char buf[64];
+        snprintf(buf, sizeof(buf) -1, "send() failed on fd %d", local_sock);
+        perror(buf);
+        break;
+      } else if (send_status < static_cast<ssize_t>(buffer.size())) {
+        // this "shouldn't" happen, but visibility provided just in case
+        printf("WARNING: sent %zd of %lu bytes\n", send_status, buffer.size());
+      }
+    }
+  }
+
+  ::close(local_sock);  // close the socket so the forward_local_to_conduit thread will stop blocking
+  printf("Exiting conduit_to_local loop\n");
+}
+
+void relay_data_loop(const int client_sock, Raceboat::Conduit conduit, const int timeoutSeconds, const bool blocking) {
+  printf("relay_data_loop socket: %d with race read timeout %d seconds\n", client_sock, timeoutSeconds);
+  std::thread local_to_conduit_thread([client_sock, &conduit, timeoutSeconds]() {
+    forward_local_to_conduit(client_sock, conduit, timeoutSeconds);
+  });
+
+  std::thread conduit_to_local_thread([client_sock, &conduit, timeoutSeconds]() {
+    forward_conduit_to_local(conduit, client_sock, timeoutSeconds);
+  });
+  if (blocking) {
+    local_to_conduit_thread.join();
+    conduit_to_local_thread.join();
+  } else {
+    local_to_conduit_thread.detach();
+    conduit_to_local_thread.detach();
+  }
+}
+
+void client_connection_loop(int server_sock,
+                            const BootstrapConnectionOptions &conn_opt,
+                            Race &race) {
+  pollfd poll_fd;
+  memset(&poll_fd, 0, sizeof(poll_fd));
+  poll_fd.fd = server_sock;
+  poll_fd.events = POLLIN;
+  int timeoutSeconds = 300;  // 5 minute timeout default
+  int timeout_ms = (timeoutSeconds * 1000);
+  int poll_result;
+
+  if(conn_opt.timeout_seconds > 0) {
+    timeoutSeconds = conn_opt.timeout_seconds;
+    timeout_ms = timeoutSeconds * 1000;
+  } else if (conn_opt.timeout_seconds == -1) {
+    timeoutSeconds = Conduit::BLOCKING_READ;
+    timeout_ms = -1;
+  }
+
+
+
+  // allow re-connect, but only 1 active connection due to blocking IO threads
+  do {
+    poll_result = await_socket_input(server_sock, timeout_ms);
+   
+    if (poll_result > 0) {
+      printf("accept()ing client socket\n");
+      int client_sock = ::accept(server_sock, NULL, 0);
+      printf("accepted socket %d\n", client_sock);
+      if (client_sock < 0) {
+        perror("accept() error");
+      } else {
+        printf("calling bootstrap_dial_str\n");
+        auto [status, connection] = race.bootstrap_dial_str(conn_opt, "");
+        if (status != ApiStatus::OK) {
+          printf("dial failed with status: %i\n", status);
+          connection.close();
+        } else {
+          printf("dial success\n");
+          // block so accept() isn't called until after socket error
+          relay_data_loop(client_sock, connection, timeoutSeconds, /* blocking threads */ true);
+          // connection.close();
+          // ::close_socket(client_sock);
+        }
+      }
+    } else if (poll_result == 0) {
+      printf("socket timeout\n");
+    } else {
+      perror("socket poll error");
+    }
+  // allow retries (via poll_result == 0)
+  } while (poll_result >= 0);
+
+  printf("exiting client loop\n");
+}
+
+void check_for_local_port_override(const CmdOptions &opts, int &local_port) {
+  for (auto pair: opts.params) {
+    if (pair.first == "localPort") {
+      local_port = stoi(pair.second);
+      printf("local port: %d\n", local_port);
+      break;
+    }
+  }
+}
+
+int handle_client_bootstrap_connect(const CmdOptions &opts) {
+  // listen for localhost connection
+  // dial into / connect to race connection
+  // connect to race conduit connections
+  // relay data to race conduit side
+  // relay data from race conduit to localhost
+
+  ChannelParamStore params = getParams(opts);
+
+  Race race(opts.plugin_path, params);
+
+  if (opts.init_send_address.empty()) {
+    printf("link address required\n");
+    return -1;
+  }
+
+  BootstrapConnectionOptions conn_opt;
+  conn_opt.init_send_channel = opts.init_send_channel;
+  conn_opt.init_send_role = opts.init_send_role;
+  conn_opt.init_send_address =
+      opts.init_send_address; // generated in handle_server_connect
+  conn_opt.init_recv_channel = opts.init_recv_channel;
+  conn_opt.init_recv_role = opts.init_recv_role;
+  conn_opt.final_send_channel = opts.final_send_channel;
+  conn_opt.final_send_role = opts.final_send_role;
+  conn_opt.final_recv_channel = opts.final_recv_channel;
+  conn_opt.final_recv_role = opts.final_recv_role;
+  conn_opt.timeout_seconds = opts.timeout_ms;
+
+  int local_port = 9999;
+  check_for_local_port_override(opts, local_port);
+
+  int server_sock;
+  printf("CREATING LOCAL SOCKET\n");
+  // start server for client app to connect to
+  if ((server_sock = create_listening_socket(local_port)) < 0) {
+    printf("Failed to create local socket\n");
+    return -1;
+  }
+
+  client_connection_loop(server_sock, conn_opt, race);
+
+  printf("closing local socket\n");
+  close_socket(server_sock);
+
+  return 0;
+}
+
+
+ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_opt, int local_port) {
+  // establish a <local-app-socket, conduit> connection pair to relay data to and from each other
+  // close both upon timeout
+  ApiStatus status = ApiStatus::OK;
+  
+  int timeoutSeconds = 300;  // 5 minute read timeout default
+  if(conn_opt.timeout_seconds > 0) {
+    timeoutSeconds = conn_opt.timeout_seconds;
+  } else if (conn_opt.timeout_seconds == -1) {
+    timeoutSeconds = Conduit::BLOCKING_READ;
+  }
+
+  printf("CREATING RACE SERVER SOCKET\n");
+  // listen on race side
+  auto [status1, link_addr, listener] = race.bootstrap_listen(conn_opt);
+  if (status1 != ApiStatus::OK) {
+    printf("listen failed with status: %i\n", status1);
+    return status1;
+  }
+  printf("\nlistening on link address: '%s'\n", link_addr.c_str());
+
+  std::string host = "localhost";
+  // std::unordered_map<OpHandle, Raceboat::Conduit> connections;
+  while (1) {
+    printf("server calling accept\n");
+    auto [status2, connection] = listener.accept();
+    if (status2 != ApiStatus::OK) {
+      printf("accept failed with status: %i\n", status2);
+      status = status2;
+      break;
+    }
+  
+    printf("conduit accept success\n");
+    printf("AWAITING LOCAL CLIENT\n");
+    
+    // create client connection for listening socket to connect on
+    // assume listening local app process is or will be running
+    int client_sock = -1;
+    while (client_sock < 0) {
+      if ((client_sock = create_client_connection(host, local_port)) < 0) {
+        printf("Awaiting listening socket \n");
+        sleep(5);
+      }
+    }
+
+    // connections[connection.getHandle()] = connection;
+    printf("SOCKET client_sock: %d\n", client_sock);
+    // TODO - relinquish ownership of socket / conduit to relay_data_loop
+    relay_data_loop(client_sock, connection, timeoutSeconds, false);
+
+    // for (auto handleConnPair: connections) {
+    //   void* ptr = &handleConnPair.second;
+    //   printf(" -- %lu:%lu - %p\n", handleConnPair.first, handleConnPair.second.getHandle(), ptr);
+    //   if (handleConnPair.first != handleConnPair.second.getHandle()) {
+    //     printf("CONDUIT HANDLE CHANGED! Was %lu, now %lu\n", handleConnPair.first, handleConnPair.second.getHandle());
+    //   }
+    // }
+  }
+
+  printf("closing race sockets\n");
+  // for (auto conn: connections) {
+  //   auto close_status = conn.second.close();
+  //   if (ApiStatus::OK != close_status) {
+  //     printf("close failed with status: %i\n", close_status);
+  //   }
+  // }
+  return status;
+}
+
+int handle_server_bootstrap_connect(const CmdOptions &opts) {
+  // connect to localhost
+  // listen for race connections
+  // relay data from race conduit to localhost
+  // relay data from localhost to race conduit
+
+  ChannelParamStore params = getParams(opts);
+
+  Race race(opts.plugin_path, params);
+
+  BootstrapConnectionOptions conn_opt;
+  conn_opt.init_recv_channel = opts.init_recv_channel;
+  conn_opt.init_recv_role = opts.init_recv_role;
+  conn_opt.init_recv_address = opts.init_recv_address;
+  conn_opt.init_send_channel = opts.init_send_channel;
+  conn_opt.init_send_role = opts.init_send_role;
+  conn_opt.init_send_address = opts.init_send_address;
+  conn_opt.final_recv_channel = opts.final_recv_channel;
+  conn_opt.final_recv_role = opts.final_recv_role;
+  conn_opt.final_send_channel = opts.final_send_channel;
+  conn_opt.final_send_role = opts.final_send_role;
+  conn_opt.timeout_seconds = opts.timeout_ms / 1000;
+  
+  printf("handle_server_bootstrap_connect\n");
+  
+  int local_port = 7777;
+  check_for_local_port_override(opts, local_port);
+  ApiStatus status = server_connections_loop(race, conn_opt, local_port);
+
+  return (status == ApiStatus::OK);
+}
+
 int main(int argc, char **argv) {
   auto opts = parseOpts(argc, argv);
   if (!opts.has_value()) {
@@ -606,6 +1119,12 @@ int main(int argc, char **argv) {
     break;
   case Mode::SERVER_CONNECT:
     result = handle_server_connect(*opts);
+    break;
+  case Mode::SERVER_BOOTSTRAP_CONNECT:
+    result = handle_server_bootstrap_connect(*opts);
+    break;
+  case Mode::CLIENT_BOOTSTRAP_CONNECT:
+    result = handle_client_bootstrap_connect(*opts);
     break;
   default:
     printf("%s: A mode must be selected [send, send-recv, client-connect, "

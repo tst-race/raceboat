@@ -22,12 +22,12 @@
 
 namespace Raceboat {
 
-class PreConnObjContext : public ApiContext {
+class PreConduitContext : public ApiContext {
 public:
-  PreConnObjContext(ApiManagerInternal &manager, StateEngine &engine)
+  PreConduitContext(ApiManagerInternal &manager, StateEngine &engine)
       : ApiContext(manager, engine) {}
 
-  virtual void updatePreConnObjStateMachineStart(
+  virtual void updatePreConduitStateMachineStart(
       RaceHandle contextHandle, RaceHandle recvHandle,
       const ConnectionID &_recvConnId, const ChannelId &_recvChannel,
       const ChannelId &_sendChannel, const std::string &_sendRole,
@@ -41,11 +41,11 @@ public:
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
                                   std::string linkAddress) override;
   virtual void
-  updateListenAccept(std::function<void(ApiStatus, RaceHandle)> cb) override;
+  updateListenAccept(std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) override;
 
 public:
   std::vector<std::vector<uint8_t>> recvQueue;
-  std::function<void(ApiStatus, RaceHandle)> acceptCb;
+  std::function<void(ApiStatus, RaceHandle, ConduitProperties)> acceptCb;
 
   RaceHandle parentHandle;
 
@@ -64,12 +64,12 @@ public:
   RaceHandle apiHandle;
 };
 
-class PreConnObjStateEngine : public StateEngine {
+class PreConduitStateEngine : public StateEngine {
 public:
-  PreConnObjStateEngine();
+  PreConduitStateEngine();
   virtual std::string eventToString(EventType event);
 };
 
-using PreConnObjState = BaseApiState<PreConnObjContext>;
+using PreConduitState = BaseApiState<PreConduitContext>;
 
 } // namespace Raceboat

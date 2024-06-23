@@ -44,6 +44,7 @@ add_executable(testStandaloneLibrary
     ApiManager/RecvTest.cpp
     ApiManager/SendTest.cpp
     ApiManager/SendReceiveTest.cpp
+    # ApiManager/BootstrapListenTest.cpp
 )
 
 target_compile_definitions(testStandaloneLibrary 
@@ -72,7 +73,7 @@ target_link_libraries(testStandaloneLibrary
     GTest::gmock
     GTest::gtest
     Threads::Threads
-    raceboat
+    raceSdkCommon
 )
 
 add_dependencies(testStandaloneLibrary
@@ -85,9 +86,9 @@ add_dependencies(testStandaloneLibrary
     DecomposedTestTransportImplementation
 )
 
-add_dependencies(build_raceboat_tests testStandaloneLibrary)
+# add_dependencies(build_raceSdkCommon_tests testStandaloneLibrary)
 add_test(race-lib ${CMAKE_CURRENT_BINARY_DIR}/testStandaloneLibrary)
-set_tests_properties(race-lib PROPERTIES LABELS "unit;raceboat")
+set_tests_properties(race-lib PROPERTIES LABELS "unit;raceSdkCommon")
 setup_coverage_for_target(
     TARGET testStandaloneLibrary
     SOURCE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../..
@@ -95,4 +96,4 @@ setup_coverage_for_target(
 setup_valgrind_for_target(testStandaloneLibrary)
 
 # Setup style validation
-setup_clang_format_for_target(testStandaloneLibrary PARENT raceboat)
+setup_clang_format_for_target(testStandaloneLibrary PARENT raceSdkCommon)

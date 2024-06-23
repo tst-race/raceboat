@@ -18,9 +18,11 @@
 
 #include <atomic>
 #include <future>
+#include <sstream>
 
 #include "Core.h"
 #include "helper.h"
+#include "base64.h"
 
 namespace Raceboat {
 
@@ -51,14 +53,82 @@ std::string sendOptionsToString(const SendOptions &sendOptions) {
   return ss.str();
 }
 
-ConnectionObject::ConnectionObject(std::shared_ptr<Core> core, OpHandle handle)
-    : core(core), handle(handle) {}
-ConnectionObject::ConnectionObject(const ConnectionObject &that) {
-  core = that.core;
-  handle = that.handle;
+std::string resumeOptionsToString(const ResumeOptions &resumeOptions) {
+  std::stringstream ss;
+
+  ss << "ResumeOptions {";
+  ss << "package_id: '" << resumeOptions.package_id << "', ";
+  ss << "recv_channel: '" << resumeOptions.recv_channel << "', ";
+  ss << "recv_role: '" << resumeOptions.recv_role << "', ";
+  ss << "recv_address: '" << resumeOptions.recv_address << "', ";
+  ss << "send_channel: '" << resumeOptions.send_channel << "', ";
+  ss << "send_role: '" << resumeOptions.send_role << "', ";
+  ss << "send_address: '" << resumeOptions.send_address << "', ";
+  ss << "timeout_ms: '" << resumeOptions.timeout_ms << "'}";
+  return ss.str();
 }
 
-std::pair<ApiStatus, std::vector<uint8_t>> ConnectionObject::read() {
+std::string bootstrapConnectionOptionsToString(const BootstrapConnectionOptions &bootstrapConnectionOptions) {
+  std::stringstream ss;
+
+  ss << "BootstrapConnectionOptions {";
+  ss << "init_recv_channel: '" << bootstrapConnectionOptions.init_recv_channel << "', ";
+  ss << "init_send_channel: '" << bootstrapConnectionOptions.init_send_channel << "', ";
+  ss << "final_recv_channel: '" << bootstrapConnectionOptions.final_recv_channel << "', ";
+  ss << "final_send_channel: '" << bootstrapConnectionOptions.final_send_channel << "', ";
+  ss << "init_send_address: '" << bootstrapConnectionOptions.init_send_address << "', ";
+  ss << "init_recv_address: '" << bootstrapConnectionOptions.init_recv_address << "', ";
+  ss << "init_send_role: '" << bootstrapConnectionOptions.init_send_role << "', ";
+  ss << "init_recv_role: '" << bootstrapConnectionOptions.init_recv_role << "', ";
+  ss << "final_send_role: '" << bootstrapConnectionOptions.final_send_role << "', ";
+  ss << "final_recv_role: '" << bootstrapConnectionOptions.final_recv_role << "', ";
+  ss << "timeout_seconds: '" << bootstrapConnectionOptions.timeout_seconds << "'}";
+  return ss.str();
+}
+
+std::string apiStatusToString(const ApiStatus status) {
+  switch(status) {
+    case ApiStatus::INVALID:
+      return "INVALID";
+    case ApiStatus::OK:
+      return "OK";
+    case ApiStatus::CLOSING:
+      return "CLOSING";
+    case ApiStatus::CHANNEL_INVALID:
+      return "CHANNEL_INVALID";
+    case ApiStatus::INVALID_ARGUMENT:
+      return "INVALID_ARGUMENT";
+    case ApiStatus::PLUGIN_ERROR:
+      return "PLUGIN_ERROR";
+    case ApiStatus::INTERNAL_ERROR:
+      return "INTERNAL_ERROR";
+    case ApiStatus::TIMEOUT:
+      return "TIMEOUT";
+    default:
+    return "UNKNOWN";
+  }
+}
+
+
+Conduit::Conduit(std::shared_ptr<Core> core, OpHandle handle,
+                 ConduitProperties properties)
+  : core(core), handle(handle), properties(properties) {}
+Conduit::Conduit(const Conduit &that) {
+  core = that.core;
+  handle = that.handle;
+  properties = that.properties;
+}
+
+OpHandle Conduit::getHandle() { 
+  return handle; 
+}
+
+ConduitProperties Conduit::getConduitProperties() {
+  return properties;
+}
+  
+std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read(int timeoutSeconds) {
+  TRACE_METHOD(timeoutSeconds);
   std::promise<std::pair<ApiStatus, std::vector<uint8_t>>> promise;
   auto future = promise.get_future();
 
@@ -66,9 +136,6 @@ std::pair<ApiStatus, std::vector<uint8_t>> ConnectionObject::read() {
     return {ApiStatus::INVALID, {}};
   }
 
-  // Taking promise by reference is fine because we block waiting for the
-  // return. If this function gets changed to timeout, this should be changed as
-  // well.
   auto response = core->getApiManager().read(
       handle, [&promise](ApiStatus status, std::vector<uint8_t> bytes) {
         promise.set_value({status, std::move(bytes)});
@@ -77,16 +144,27 @@ std::pair<ApiStatus, std::vector<uint8_t>> ConnectionObject::read() {
     return {ApiStatus::INVALID_ARGUMENT, {}};
   }
 
-  return future.get();
+  if (timeoutSeconds != BLOCKING_READ) { 
+    if(std::future_status::ready != future.wait_for(std::chrono::seconds(timeoutSeconds))) {
+      helper::logDebug(logPrefix + "timed out");
+      return {ApiStatus::TIMEOUT, {}};
+    } else {
+      return future.get();  
+    }
+  } else {
+    return future.get();
+  }
 }
 
-std::pair<ApiStatus, std::string> ConnectionObject::read_str() {
+std::pair<ApiStatus, std::string> Conduit::read_str() {
+  TRACE_METHOD();
   auto [status, bytes] = read();
   std::string str{bytes.begin(), bytes.end()};
   return {status, str};
 }
 
-ApiStatus ConnectionObject::write(std::vector<uint8_t> bytes) {
+ApiStatus Conduit::write(std::vector<uint8_t> bytes) {
+  TRACE_METHOD();
   std::promise<ApiStatus> promise;
   auto future = promise.get_future();
 
@@ -107,12 +185,14 @@ ApiStatus ConnectionObject::write(std::vector<uint8_t> bytes) {
   return future.get();
 }
 
-ApiStatus ConnectionObject::write_str(const std::string &message) {
+ApiStatus Conduit::write_str(const std::string &message) {
+  TRACE_METHOD();
   std::vector<uint8_t> bytes{message.begin(), message.end()};
   return write(bytes);
 }
 
-ApiStatus ConnectionObject::close() {
+ApiStatus Conduit::close() {
+  TRACE_METHOD();
   std::promise<ApiStatus> promise;
   auto future = promise.get_future();
   if (core == nullptr) {
@@ -264,23 +344,23 @@ ApiStatus ReceiveRespondObject::close() {
 AcceptObject::AcceptObject(std::shared_ptr<Core> core, OpHandle handle)
     : core(core), handle(handle) {}
 
-std::pair<ApiStatus, ConnectionObject> AcceptObject::accept() {
-  std::promise<std::pair<ApiStatus, RaceHandle>> promise;
+std::pair<ApiStatus, Conduit> AcceptObject::accept() {
+  std::promise<std::tuple<ApiStatus, RaceHandle, ConduitProperties>> promise;
   auto future = promise.get_future();
   if (core == nullptr) {
-    return {ApiStatus::INVALID_ARGUMENT, {nullptr, NULL_RACE_HANDLE}};
+    return {ApiStatus::INVALID_ARGUMENT, {nullptr, NULL_RACE_HANDLE, {}}};
   }
 
   auto response = core->getApiManager().accept(
-      handle, [&promise](ApiStatus status, RaceHandle _handle) {
-        promise.set_value({status, _handle});
+                                               handle, [&promise](ApiStatus status, RaceHandle _handle, ConduitProperties properties) {
+                                                 promise.set_value({status, _handle, properties});
       });
   if (response.status != SDK_OK) {
-    return {ApiStatus::INTERNAL_ERROR, {nullptr, NULL_RACE_HANDLE}};
+    return {ApiStatus::INTERNAL_ERROR, {nullptr, NULL_RACE_HANDLE, {}}};
   }
 
-  auto [status, connHandle] = future.get();
-  ConnectionObject connection(core, connHandle);
+  auto [status, connHandle, properties] = future.get();
+  Conduit connection(core, connHandle, properties);
   return {status, connection};
 }
 
@@ -347,6 +427,23 @@ Race::listen(ReceiveOptions options) {
   return {status, addr, receiver};
 }
 
+std::tuple<ApiStatus, LinkAddress, AcceptObject>
+Race::bootstrap_listen(BootstrapConnectionOptions options) {
+  TRACE_METHOD();
+  std::promise<std::tuple<ApiStatus, LinkAddress, RaceHandle>> promise;
+  auto future = promise.get_future();
+
+  core->getApiManager().bootstrapListen(
+      options,
+      [&promise](ApiStatus status, LinkAddress addr, RaceHandle handle) {
+        promise.set_value({status, addr, handle});
+      });
+
+  auto [status, addr, handle] = future.get();
+  AcceptObject receiver(core, handle);
+  return {status, addr, receiver};
+}
+
 ApiStatus Race::send(SendOptions options, std::vector<uint8_t> data) {
   TRACE_METHOD();
   std::promise<ApiStatus> promise;
@@ -385,27 +482,66 @@ std::pair<ApiStatus, std::string> Race::send_receive_str(SendOptions options,
   return {status, str};
 }
 
-std::pair<ApiStatus, ConnectionObject> Race::dial(SendOptions options,
+std::pair<ApiStatus, Conduit> Race::dial(SendOptions options,
                                                   std::vector<uint8_t> bytes) {
   TRACE_METHOD();
-  std::promise<std::tuple<ApiStatus, RaceHandle>> promise;
+  std::promise<std::tuple<ApiStatus, RaceHandle, ConduitProperties>> promise;
   auto future = promise.get_future();
 
   core->getApiManager().dial(options, bytes,
-                             [&promise](ApiStatus status, RaceHandle handle) {
-                               promise.set_value({status, handle});
+                             [&promise](ApiStatus status, RaceHandle handle, ConduitProperties properties) {
+                               promise.set_value({status, handle, properties});
                              });
 
-  auto [status, handle] = future.get();
-  ConnectionObject receiver(core, handle);
+  auto [status, handle, properties] = future.get();
+  Conduit receiver(core, handle, properties);
   return {status, receiver};
 }
 
-std::pair<ApiStatus, ConnectionObject> Race::dial_str(SendOptions options,
+std::pair<ApiStatus, Conduit> Race::dial_str(SendOptions options,
                                                       std::string message) {
   TRACE_METHOD();
   std::vector<uint8_t> bytes{message.begin(), message.end()};
   return dial(options, bytes);
+}
+
+  
+std::pair<ApiStatus, Conduit> Race::resume(ResumeOptions options) {
+  TRACE_METHOD();
+  std::promise<std::tuple<ApiStatus, RaceHandle, ConduitProperties>> promise;
+  auto future = promise.get_future();
+  core->getApiManager().resume(options,
+                               [&promise](ApiStatus status, RaceHandle handle, ConduitProperties properties) {
+                               promise.set_value({status, handle, properties});
+                             });
+
+  auto [status, handle, properties] = future.get();
+  Conduit receiver(core, handle, properties);
+  return {status, receiver};
+}
+
+
+std::pair<ApiStatus, Conduit> Race::bootstrap_dial(BootstrapConnectionOptions options,
+                                                  std::vector<uint8_t> bytes) {
+  TRACE_METHOD();
+  std::promise<std::tuple<ApiStatus, RaceHandle, ConduitProperties>> promise;
+  auto future = promise.get_future();
+
+  core->getApiManager().bootstrapDial(options, bytes,
+                                      [&promise](ApiStatus status, RaceHandle handle, ConduitProperties properties) {
+                                        promise.set_value({status, handle, properties});
+                             });
+
+  auto [status, handle, properties] = future.get();
+  Conduit receiver(core, handle, properties);
+  return {status, receiver};
+}
+
+std::pair<ApiStatus, Conduit> Race::bootstrap_dial_str(BootstrapConnectionOptions options,
+                                                      std::string message) {
+  TRACE_METHOD();
+  std::vector<uint8_t> bytes{message.begin(), message.end()};
+  return bootstrap_dial(options, bytes);
 }
 
 } // namespace Raceboat

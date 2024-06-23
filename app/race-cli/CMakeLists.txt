@@ -26,9 +26,15 @@ target_include_directories(race-cli PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+target_include_directories(race-cli PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+
 
 target_link_libraries(race-cli
-    raceboat
+    raceSdkCommon
     stdc++fs
     Threads::Threads
     ${CMAKE_DL_LIBS} # Contains dlopen and dlcose for dynamically loading plugins.
@@ -41,4 +47,4 @@ setup_clang_tidy_for_target(TARGET race-cli)
 #     CHECKS all
 #     SUPPRESS unmatchedSuppression unusedFunction missingIncludeSystem useStlAlgorithm
 # )
-setup_clang_format_for_target(race-cli PARENT raceboat)
+setup_clang_format_for_target(race-cli PARENT raceSdkCommon)

@@ -25,4 +25,25 @@ ApiContext::ApiContext(ApiManagerInternal &_manager, StateEngine &_engine)
     : manager(_manager), engine(_engine),
       handle(manager.getCore().generateHandle()) {}
 
+bool ApiContext::shouldCreate(const ChannelId &channelId, bool useForRecv) {
+  ChannelProperties props = manager.getCore().getChannelManager().getChannelProperties(channelId);
+
+  // Treat LOADER_TO_CREATOR and BIDIRECTIONAL as the same
+  // If sending, we create for CREATOR_TO_LOADER and otherwise load
+  bool shouldCreate = props.linkDirection == LD_CREATOR_TO_LOADER;
+  // If receiving, we load for CREATOR_TO_LOADER and otherwise create
+  if (useForRecv) {
+    return not shouldCreate;
+  }
+  return shouldCreate;
+}
+bool ApiContext::shouldCreateSender(const ChannelId &channelId) {
+  return shouldCreate(channelId, false);
+}
+
+bool ApiContext::shouldCreateReceiver(const ChannelId &channelId) {
+  return shouldCreate(channelId, true);
+}
+
+
 } // namespace Raceboat

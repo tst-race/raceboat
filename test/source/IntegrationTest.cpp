@@ -32,16 +32,16 @@ using testing::Return;
 
 struct IntegrationFileSystem : public FileSystem {
   IntegrationFileSystem(const fs::path &path) : FileSystem(path) {}
-  virtual const char *getHostArch() { return "myArch"; }
-  virtual const char *getHostOsType() { return "myOS"; }
+  virtual const char *getHostArch() { return ""; }
+  virtual const char *getHostOsType() { return ""; }
 };
 
 struct IntegrationCore : public Core {
   IntegrationCore(const fs::path &path, const ChannelParamStore &params)
-      : Core("", params), integrationFS(IntegrationFileSystem(path)) {
-    helper::logDebug("path:" + path.string());
-    helper::logDebug("plugin path:" + getFS().pluginsInstallPath.string());
-    init();
+      : Core(path, params), integrationFS(IntegrationFileSystem(path)) {
+    helper::logInfo("path:" + path.string());
+    helper::logInfo("plugin path:" + getFS().pluginsInstallPath.string());
+    // init();
   }
 
   virtual FileSystem &getFS() override { return integrationFS; }
@@ -63,14 +63,16 @@ TEST(IntegrationTest, oneshot) {
 
     auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
     auto plugin_path = stub_path.parent_path()
-                           .parent_path()
-                           .parent_path()
-                           .parent_path()
                            .parent_path();
+
+    helper::logInfo("stub_path:" + stub_path.string());
+    helper::logInfo("plugin_path:" + plugin_path.string());
+    
 
     auto core = std::make_shared<IntegrationCore>(plugin_path.string(), params);
     Race race(core);
     // Race race(plugin_path.string(), params);
+    helper::logInfo("CORE INSTANTIATED");
 
     ReceiveOptions opt;
     opt.recv_channel = "DecomposedTestImplementation";
@@ -93,9 +95,6 @@ TEST(IntegrationTest, oneshot) {
 
     auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
     auto plugin_path = stub_path.parent_path()
-                           .parent_path()
-                           .parent_path()
-                           .parent_path()
                            .parent_path();
     auto core = std::make_shared<IntegrationCore>(plugin_path.string(), params);
     Race race(core);
@@ -131,9 +130,6 @@ TEST(IntegrationTest, bidi) {
 
     auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
     auto plugin_path = stub_path.parent_path()
-                           .parent_path()
-                           .parent_path()
-                           .parent_path()
                            .parent_path();
 
     auto core = std::make_shared<IntegrationCore>(plugin_path.string(), params);
@@ -166,9 +162,6 @@ TEST(IntegrationTest, bidi) {
 
         auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
         auto plugin_path = stub_path.parent_path()
-                               .parent_path()
-                               .parent_path()
-                               .parent_path()
                                .parent_path();
         auto core =
             std::make_shared<IntegrationCore>(plugin_path.string(), params);
@@ -209,9 +202,6 @@ TEST(IntegrationTest, connect) {
 
     auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
     auto plugin_path = stub_path.parent_path()
-                           .parent_path()
-                           .parent_path()
-                           .parent_path()
                            .parent_path();
 
     auto core = std::make_shared<IntegrationCore>(plugin_path.string(), params);
@@ -258,9 +248,6 @@ TEST(IntegrationTest, connect) {
 
     auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
     auto plugin_path = stub_path.parent_path()
-                           .parent_path()
-                           .parent_path()
-                           .parent_path()
                            .parent_path();
     auto core = std::make_shared<IntegrationCore>(plugin_path.string(), params);
     Race race(core);
@@ -281,3 +268,100 @@ TEST(IntegrationTest, connect) {
   thread1.join();
   thread2.join();
 }
+
+TEST(IntegrationTest, bootstrap) {
+  std::promise<LinkAddress> linkAddrPromise;
+  auto future = linkAddrPromise.get_future();
+
+  std::string message1 = "Hello from client";
+  std::string message2 = "Hello from server";
+  std::string message3 = "Hello from client message 2";
+
+  // 'server' thread
+  auto thread1 = std::thread([promise = std::move(linkAddrPromise), message1,
+                              message2, message3]() mutable {
+    ChannelParamStore params;
+    params.setChannelParam("PluginCommsTwoSixStub.startPort", "26262");
+    params.setChannelParam("PluginCommsTwoSixStub.endPort", "26264");
+    params.setChannelParam("hostname", "127.0.0.1");
+
+    auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
+    auto plugin_path = stub_path.parent_path()
+                           .parent_path();
+
+    auto core = std::make_shared<IntegrationCore>(plugin_path.string(), params);
+    Race race(core);
+    // Race race(plugin_path.string(), params);
+
+    BootstrapConnectionOptions opt;
+    opt.init_recv_channel = "DecomposedTestImplementation";
+    opt.init_recv_role = "default";
+    opt.init_send_channel = "DecomposedTestImplementation";
+    opt.init_send_role = "default";
+    opt.final_recv_channel = "DecomposedTestImplementation";
+    opt.final_recv_role = "default";
+    opt.final_send_channel = "DecomposedTestImplementation";
+    opt.final_send_role = "default";
+
+    auto [status, link_addr, listener] = race.bootstrap_listen(opt);
+    ASSERT_EQ(status, ApiStatus::OK);
+    promise.set_value(link_addr);
+    auto [status2, connection] = listener.accept();
+    ASSERT_EQ(status2, ApiStatus::OK);
+    auto status5 = connection.write_str(message2);
+    ASSERT_EQ(status5, ApiStatus::OK);
+    auto [status3, received_message] = connection.read_str();
+    ASSERT_EQ(status3, ApiStatus::OK);
+    EXPECT_EQ(received_message, message1);
+    auto [status4, received_message2] = connection.read_str();
+    ASSERT_EQ(status4, ApiStatus::OK);
+    EXPECT_EQ(received_message2, message3);
+    auto status6 = connection.close();
+    ASSERT_EQ(status6, ApiStatus::OK);
+  });
+
+  // 'client' thread
+  auto thread2 = std::thread([future = std::move(future), message1, message2,
+                              message3]() mutable {
+    ChannelParamStore params;
+    params.setChannelParam("PluginCommsTwoSixStub.startPort", "26262");
+    params.setChannelParam("PluginCommsTwoSixStub.endPort", "26264");
+    params.setChannelParam("hostname", "127.0.0.1");
+
+    BootstrapConnectionOptions opt;
+    opt.init_recv_channel = "DecomposedTestImplementation";
+    opt.init_recv_role = "default";
+    opt.init_send_channel = "DecomposedTestImplementation";
+    opt.init_send_role = "default";
+    opt.final_recv_channel = "DecomposedTestImplementation";
+    opt.final_recv_role = "default";
+    opt.final_send_channel = "DecomposedTestImplementation";
+    opt.final_send_role = "default";
+
+    
+    nlohmann::json json = nlohmann::json::parse(future.get());
+    helper::logInfo("Promised LinkAddr Json:" + json.dump());
+    opt.init_send_address = json["initSendLinkAddress"];
+
+    auto stub_path = std::filesystem::path(DECOMPOSED_IMPLEMENTATION);
+    auto plugin_path = stub_path.parent_path()
+                           .parent_path();
+    auto core = std::make_shared<IntegrationCore>(plugin_path.string(), params);
+    Race race(core);
+
+    auto [status, connection] = race.bootstrap_dial_str(opt, message1);
+    // auto [status, connection] = race.dial_str(opt, "");
+    ASSERT_EQ(status, ApiStatus::OK);
+    auto status2 = connection.write_str(message3);
+    ASSERT_EQ(status2, ApiStatus::OK);
+    auto [status3, received_message] = connection.read_str();
+    ASSERT_EQ(status3, ApiStatus::OK);
+    EXPECT_EQ(received_message, message2);
+    auto status4 = connection.close();
+    ASSERT_EQ(status4, ApiStatus::OK);
+  });
+
+  thread1.join();
+  thread2.join();
+}
+

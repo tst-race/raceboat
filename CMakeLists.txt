@@ -15,7 +15,7 @@
 # 
 
 cmake_minimum_required(VERSION 3.13)
-project(raceboat LANGUAGES CXX)
+project(raceSdkCommon LANGUAGES CXX)
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -v")
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/race-cmake-modules)
@@ -36,16 +36,17 @@ include(race/test-targets)
 include(race/valgrind)
 include(race/warnings)
 
-setup_project_test_targets(raceboat UNIT INTEGRATION)
-setup_project_format_targets(raceboat)
+# setup_project_test_targets(raceSdkCommon UNIT INTEGRATION)
+# setup_project_format_targets(raceSdkCommon)
 
 add_subdirectory(language-shims)
 add_subdirectory(source)
 if(NOT ANDROID)
     add_subdirectory(app/race-cli)
+    add_subdirectory(app/bridge-distro)
     add_subdirectory(test/common/UnifiedTestStub EXCLUDE_FROM_ALL)
     add_subdirectory(test/common/DecomposedTestStub EXCLUDE_FROM_ALL)
-    add_subdirectory(test/common/plugins/myOS/myArch/DecomposedTestImplementation EXCLUDE_FROM_ALL)
+    add_subdirectory(test/common/plugins/DecomposedTestImplementation EXCLUDE_FROM_ALL)
     add_subdirectory(test/source EXCLUDE_FROM_ALL)
 endif()
 
@@ -54,13 +55,13 @@ setup_project_coverage_target()
 
 install(
     TARGETS
-        raceboat
-    EXPORT raceboat
+        raceSdkCommon
+    EXPORT raceSdkCommon
     LIBRARY DESTINATION lib
     PUBLIC_HEADER DESTINATION include
 )
 
 install(
-    EXPORT raceboat
+    EXPORT raceSdkCommon
     DESTINATION lib/cmake
 )

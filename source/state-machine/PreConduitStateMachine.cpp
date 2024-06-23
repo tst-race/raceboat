@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-#include "PreConnObjStateMachine.h"
+#include "PreConduitStateMachine.h"
 
 #include "../../include/race/Race.h"
 #include "Core.h"
@@ -23,6 +23,7 @@
 #include "PluginWrapper.h"
 #include "States.h"
 #include "api-managers/ApiManager.h"
+#include "base64.h"
 #include "helper.h"
 
 namespace Raceboat {
@@ -31,7 +32,7 @@ namespace Raceboat {
 // Context
 //-----------------------------------------------------------------------------------------------
 
-void PreConnObjContext::updatePreConnObjStateMachineStart(
+void PreConduitContext::updatePreConduitStateMachineStart(
     RaceHandle contextHandle, RaceHandle recvHandle,
     const ConnectionID &_recvConnId, const ChannelId &_recvChannel,
     const ChannelId &_sendChannel, const std::string &_sendRole,
@@ -48,19 +49,19 @@ void PreConnObjContext::updatePreConnObjStateMachineStart(
   this->recvQueue = recvMessages;
 }
 
-void PreConnObjContext::updateReceiveEncPkg(
+void PreConduitContext::updateReceiveEncPkg(
     ConnectionID /* connId */, std::shared_ptr<std::vector<uint8_t>> data) {
   this->recvQueue.push_back(*data);
 }
 
-void PreConnObjContext::updateConnStateMachineConnected(
+void PreConduitContext::updateConnStateMachineConnected(
     RaceHandle /* contextHandle */, ConnectionID connId,
     std::string /* linkAddress */) {
   this->sendConnId = connId;
 }
 
-void PreConnObjContext::updateListenAccept(
-    std::function<void(ApiStatus, RaceHandle)> cb) {
+void PreConduitContext::updateListenAccept(
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) {
   this->acceptCb = cb;
 }
 
@@ -68,9 +69,9 @@ void PreConnObjContext::updateListenAccept(
 // States
 //-----------------------------------------------------------------------------------------------
 
-struct StatePreConnObjInitial : public PreConnObjState {
-  explicit StatePreConnObjInitial(StateType id = STATE_PRE_CONN_OBJ_INITIAL)
-      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_INITIAL") {}
+struct StatePreConduitInitial : public PreConduitState {
+  explicit StatePreConduitInitial(StateType id = STATE_PRE_CONN_OBJ_INITIAL)
+      : PreConduitState(id, "STATE_PRE_CONN_OBJ_INITIAL") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
@@ -82,15 +83,15 @@ struct StatePreConnObjInitial : public PreConnObjState {
   }
 };
 
-struct StatePreConnObjAccepted : public PreConnObjState {
-  explicit StatePreConnObjAccepted(StateType id = STATE_PRE_CONN_OBJ_ACCEPTED)
-      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_ACCEPTED") {}
+struct StatePreConduitAccepted : public PreConduitState {
+  explicit StatePreConduitAccepted(StateType id = STATE_PRE_CONN_OBJ_ACCEPTED)
+      : PreConduitState(id, "STATE_PRE_CONN_OBJ_ACCEPTED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
     ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
-        ctx.handle, ctx.sendChannel, ctx.sendRole, ctx.sendLinkAddress, true);
+                                                             ctx.handle, ctx.sendChannel, ctx.sendRole, ctx.sendLinkAddress, false, true);
 
     if (ctx.sendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -104,24 +105,24 @@ struct StatePreConnObjAccepted : public PreConnObjState {
   }
 };
 
-struct StatePreConnObjOpening : public PreConnObjState {
-  explicit StatePreConnObjOpening(StateType id = STATE_PRE_CONN_OBJ_OPENING)
-      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_OPENING") {}
+struct StatePreConduitOpening : public PreConduitState {
+  explicit StatePreConduitOpening(StateType id = STATE_PRE_CONN_OBJ_OPENING)
+      : PreConduitState(id, "STATE_PRE_CONN_OBJ_OPENING") {}
   virtual EventResult enter(Context & /* context */) {
     TRACE_METHOD();
     return EventResult::SUCCESS;
   }
 };
 
-struct StatePreConnObjOpen : public PreConnObjState {
-  explicit StatePreConnObjOpen(StateType id = STATE_PRE_CONN_OBJ_FINISHED)
-      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_FINISHED") {}
+struct StatePreConduitOpen : public PreConduitState {
+  explicit StatePreConduitOpen(StateType id = STATE_PRE_CONN_OBJ_FINISHED)
+      : PreConduitState(id, "STATE_PRE_CONN_OBJ_FINISHED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
     RaceHandle connObjectApiHandle = ctx.manager.getCore().generateHandle();
-    RaceHandle connObjectHandle = ctx.manager.startConnObjectStateMachine(
+    RaceHandle connObjectHandle = ctx.manager.startConduitectStateMachine(
         ctx.handle, ctx.recvConnSMHandle, ctx.recvConnId, ctx.sendConnSMHandle,
         ctx.sendConnId, ctx.sendChannel, ctx.recvChannel, ctx.packageId,
         {std::move(ctx.recvQueue)}, connObjectApiHandle);
@@ -139,7 +140,17 @@ struct StatePreConnObjOpen : public PreConnObjState {
       return EventResult::NOT_SUPPORTED;
     }
 
-    ctx.acceptCb(ApiStatus::OK, connObjectApiHandle);
+    ConduitProperties properties;
+    properties.package_id = base64::encode(std::vector<uint8_t>(
+                                                                ctx.packageId.begin(), ctx.packageId.end()));
+    properties.recv_channel = ctx.recvChannel;
+    // properties.recv_role = ctx.opts.recv_role;
+    // properties.recv_address = ctx.recvLinkAddress;
+    properties.send_channel = ctx.sendChannel;
+    // properties.send_role = ctx.opts.send_role;
+    // properties.send_address = ctx.opts.send_address;
+    // properties.timeout_ms = ctx.opts.timeout_ms;
+    ctx.acceptCb(ApiStatus::OK, connObjectApiHandle, properties);
     ctx.acceptCb = {};
 
     ctx.manager.stateMachineFinished(ctx);
@@ -148,15 +159,16 @@ struct StatePreConnObjOpen : public PreConnObjState {
   virtual bool finalState() { return true; }
 };
 
-struct StatePreConnObjFailed : public PreConnObjState {
-  explicit StatePreConnObjFailed(StateType id = STATE_PRE_CONN_OBJ_FAILED)
-      : PreConnObjState(id, "STATE_PRE_CONN_OBJ_FAILED") {}
+struct StatePreConduitFailed : public PreConduitState {
+  explicit StatePreConduitFailed(StateType id = STATE_PRE_CONN_OBJ_FAILED)
+      : PreConduitState(id, "STATE_PRE_CONN_OBJ_FAILED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
     if (ctx.acceptCb) {
-      ctx.acceptCb(ApiStatus::INTERNAL_ERROR, {});
+      helper::logWarning(logPrefix + "accept callback not null");
+      ctx.acceptCb(ApiStatus::INTERNAL_ERROR, {}, {});
       ctx.acceptCb = {};
     }
 
@@ -169,12 +181,12 @@ struct StatePreConnObjFailed : public PreConnObjState {
 // StateEngine
 //-----------------------------------------------------------------------------------------------
 
-PreConnObjStateEngine::PreConnObjStateEngine() {
-  addInitialState<StatePreConnObjInitial>(STATE_PRE_CONN_OBJ_INITIAL);
-  addState<StatePreConnObjAccepted>(STATE_PRE_CONN_OBJ_ACCEPTED);
-  addState<StatePreConnObjOpening>(STATE_PRE_CONN_OBJ_OPENING);
-  addState<StatePreConnObjOpen>(STATE_PRE_CONN_OBJ_FINISHED);
-  addFailedState<StatePreConnObjFailed>(STATE_PRE_CONN_OBJ_FAILED);
+PreConduitStateEngine::PreConduitStateEngine() {
+  addInitialState<StatePreConduitInitial>(STATE_PRE_CONN_OBJ_INITIAL);
+  addState<StatePreConduitAccepted>(STATE_PRE_CONN_OBJ_ACCEPTED);
+  addState<StatePreConduitOpening>(STATE_PRE_CONN_OBJ_OPENING);
+  addState<StatePreConduitOpen>(STATE_PRE_CONN_OBJ_FINISHED);
+  addFailedState<StatePreConduitFailed>(STATE_PRE_CONN_OBJ_FAILED);
 
   // clang-format off
     // initial -> opening -> open
@@ -186,7 +198,7 @@ PreConnObjStateEngine::PreConnObjStateEngine() {
   // clang-format on
 }
 
-std::string PreConnObjStateEngine::eventToString(EventType event) {
+std::string PreConduitStateEngine::eventToString(EventType event) {
   return Raceboat::eventToString(event);
 }
 

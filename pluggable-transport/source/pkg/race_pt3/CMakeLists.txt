@@ -31,7 +31,8 @@ set(PT_FILE ${CMAKE_CURRENT_BINARY_DIR}/${PT_FILE_NAME})
 set(GOMOD_PATH ${CMAKE_CURRENT_SOURCE_DIR}/go.mod)
 set(GOCMD go build -work -o ${PT_FILE})
 
-
+message("MESSAGE RACE_COMM_INCLUDE_PATH ${RACE_COMM_INCLUDE_PATH}")
+message("MESSAGE RACE_COMM_LIB_INSTALL_PATH ${RACE_COMM_LIB_INSTALL_PATH}")
 list(APPEND CGO_CXXFLAGS "-I$ENV{RACE_COMM_LIB_INSTALL_PATH}/include")
 list(APPEND CGO_CXXFLAGS "-I$ENV{RACE_COMM_INCLUDE_PATH}")
 list(APPEND CGO_LDFLAGS "-L$ENV{RACE_COMM_LIB_INSTALL_PATH}/lib")
@@ -89,7 +90,7 @@ list(APPEND CGO_CXXFLAGS
 )
 
 find_library(
-    RACE_COMM_LIB raceboat REQUIRED
+    RACE_COMM_LIB raceSdkCommon REQUIRED
     PATHS $ENV{RACE_COMM_LIBS_PATH}
 )
 find_library(
@@ -100,7 +101,7 @@ find_library(
 
 list(APPEND CGO_LDFLAGS
     -Wl,--unresolved-symbols=ignore-all
-    -lraceboat
+    -lraceSdkCommon
     -l:corePluginBindingsGolang.so
 )
 

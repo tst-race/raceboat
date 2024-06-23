@@ -518,7 +518,7 @@ void Handler::remove_work_internal(std::shared_ptr<Work> work) {
 }
 
 void Handler::block_queue_internal(Handler::QueueIter &queue) {
-  // mark this queue as blocked, and adjust work counts approppriately
+  // mark this queue as blocked, and adjust work counts appropriately
   queue->blocked = true;
 
   // update counts

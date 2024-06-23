@@ -21,9 +21,9 @@ using namespace Raceboat;
 
 
 %template(ByteVector) std::vector<uint8_t>;
-%template(StatusConnectionPair) std::pair<Raceboat::ApiStatus, Raceboat::ConnectionObject>;
+%template(StatusConnectionPair) std::pair<Raceboat::ApiStatus, Raceboat::Conduit>;
 %template(StatusStringPair) std::pair<Raceboat::ApiStatus, std::string>;
-%template(StatusSwigConnectionPair) std::pair<Raceboat::ApiStatus, Raceboat::SwigConnectionObject>;
+%template(StatusSwigConnectionPair) std::pair<Raceboat::ApiStatus, Raceboat::SwigConduit>;
 
 %include "race/common/ChannelId.h"
 %include "race/common/RaceHandle.h"
@@ -38,15 +38,15 @@ struct ReadResult {
     std::vector<uint8_t> result;
 };
 
-struct SwigConnectionObject: public ConnectionObject {
+struct SwigConduit: public Conduit {
     // default / copy ctors necessary for swig
-    SwigConnectionObject() {}
-    SwigConnectionObject(const ConnectionObject &that) : ConnectionObject(that) {}
+    SwigConduit() {}
+    SwigConduit(const Conduit &that) : Conduit(that) {}
 
-    SwigConnectionObject(std::shared_ptr<Core> core, OpHandle handle) :
-        ConnectionObject(core, handle) {}
+   SwigConduit(std::shared_ptr<Core> core, OpHandle handle, ConduitProperties properties) :
+    Conduit(core, handle, properties) {}
     
-    virtual ~SwigConnectionObject() {}
+    virtual ~SwigConduit() {}
 
       // SWIG fails when wrapping the read() return pair
     ReadResult readSwig() {
@@ -56,9 +56,9 @@ struct SwigConnectionObject: public ConnectionObject {
 };
 
 
-// accept needs to return a SwigConnectionObject 
+// accept needs to return a SwigConduit 
 struct SwigAcceptObject: public AcceptObject {
-    std::pair<ApiStatus, SwigConnectionObject> acceptSwig(int) {
+    std::pair<ApiStatus, SwigConduit> acceptSwig(int) {
         auto pair = accept();
         return { pair.first, pair.second };
     }
@@ -83,12 +83,17 @@ struct RaceSwig: public Race {
         return ListenResult { std::get<0>(tuple), std::get<1>(tuple), std::get<2>(tuple) };
     }
 
-    std::pair<ApiStatus, SwigConnectionObject> dial_strSwig(SendOptions options, std::string message) {
+    std::pair<ApiStatus, SwigConduit> dial_strSwig(SendOptions options, std::string message) {
         auto pair = dial_str(options, message);
+        return { pair.first, pair.second };
+    }
+
+    std::pair<ApiStatus, SwigConduit> resumeSwig(ResumeOptions options) {
+        auto pair = resume(options);
         return { pair.first, pair.second };
     }
 };
 }  // namespace Raceboat
 %}
 
-%template(SwigConnVector) std::vector<SwigConnectionObject>; // go doesn't support generic containers
+%template(SwigConnVector) std::vector<SwigConduit>; // go doesn't support generic containers

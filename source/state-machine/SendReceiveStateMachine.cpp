@@ -118,7 +118,7 @@ struct StateSendReceiveInitial : public SendReceiveState {
     }
 
     ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
-        ctx.handle, sendChannelId, sendRole, sendLinkAddress, true);
+                                                             ctx.handle, sendChannelId, sendRole, sendLinkAddress, false, true);
 
     if (ctx.sendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -126,7 +126,7 @@ struct StateSendReceiveInitial : public SendReceiveState {
     }
 
     ctx.recvConnSMHandle = ctx.manager.startConnStateMachine(
-        ctx.handle, recvChannelId, recvRole, "", false);
+                                                             ctx.handle, recvChannelId, recvRole, "", true, false);
 
     if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");

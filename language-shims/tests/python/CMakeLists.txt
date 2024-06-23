@@ -39,7 +39,7 @@ find_package(GTest REQUIRED CONFIG)
 
 target_link_libraries(unitTestPythonBindings
     GTest::gmock
-    raceboat
+    raceSdkCommon
     commsPluginBindings
 )
 
@@ -49,10 +49,10 @@ setup_coverage_for_target(
     EXCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/*"
 )
 
-add_dependencies(build_raceboat_tests unitTestPythonBindings)
+# add_dependencies(build_raceboat_tests unitTestPythonBindings)
 
 add_test(python-bindings ${CMAKE_CURRENT_BINARY_DIR}/unitTestPythonBindings)
-set_tests_properties(python-bindings PROPERTIES LABELS "unit;raceboat")
+set_tests_properties(python-bindings PROPERTIES LABELS "unit;raceSdkCommon")
 
 string(CONCAT PYTHON_BINDINGS_PATHDEPS_STR
             "${CMAKE_CURRENT_SOURCE_DIR}:"

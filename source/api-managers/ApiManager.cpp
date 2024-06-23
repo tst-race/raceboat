@@ -22,6 +22,7 @@
 #include "PluginWrapper.h"
 #include "base64.h"
 #include "state-machine/Events.h"
+#include "state-machine/BootstrapListenStateMachine.h"
 
 namespace Raceboat {
 
@@ -66,6 +67,7 @@ SdkResponse ApiManager::post(const std::string &logPrefix, T &&function,
 
       return std::make_optional(true);
     };
+
     auto [success, queueSize, future] = handler.post(
         "", 0, -1, std::bind(std::move(workFunc), std::forward<Args>(args)...));
 
@@ -115,7 +117,7 @@ SdkResponse ApiManager::sendReceive(
 
 SdkResponse
 ApiManager::dial(SendOptions sendOptions, std::vector<uint8_t> data,
-                 std::function<void(ApiStatus, RaceHandle)> callback) {
+                 std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   TRACE_METHOD();
 
   if (!callback) {
@@ -123,6 +125,32 @@ ApiManager::dial(SendOptions sendOptions, std::vector<uint8_t> data,
   }
 
   return post(logPrefix, &ApiManagerInternal::dial, sendOptions, data,
+              callback);
+}
+
+SdkResponse
+ApiManager::resume(ResumeOptions resumeOptions, 
+                 std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
+  TRACE_METHOD();
+
+  if (!callback) {
+    return SDK_INVALID_ARGUMENT;
+  }
+
+  return post(logPrefix, &ApiManagerInternal::resume, resumeOptions,
+              callback);
+}
+
+SdkResponse
+ApiManager::bootstrapDial(BootstrapConnectionOptions options, std::vector<uint8_t> data,
+                 std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
+  TRACE_METHOD();
+
+  if (!callback) {
+    return SDK_INVALID_ARGUMENT;
+  }
+
+  return post(logPrefix, &ApiManagerInternal::bootstrapDial, options, data,
               callback);
 }
 
@@ -176,9 +204,21 @@ SdkResponse ApiManager::listen(
   return post(logPrefix, &ApiManagerInternal::listen, recvOptions, callback);
 }
 
+SdkResponse ApiManager::bootstrapListen(
+    BootstrapConnectionOptions options,
+    std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback) {
+  TRACE_METHOD();
+
+  if (!callback) {
+    return SDK_INVALID_ARGUMENT;
+  }
+
+  return post(logPrefix, &ApiManagerInternal::bootstrapListen, options, callback);
+}
+
 SdkResponse
 ApiManager::accept(OpHandle handle,
-                   std::function<void(ApiStatus, RaceHandle)> callback) {
+                   std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   TRACE_METHOD();
 
   if (!callback) {
@@ -197,7 +237,9 @@ SdkResponse ApiManager::read(
     return SDK_INVALID_ARGUMENT;
   }
 
-  return post(logPrefix, &ApiManagerInternal::read, handle, callback);
+  auto response = post(logPrefix, &ApiManagerInternal::read, handle, callback);
+  handler.unblock_queue("");  // in case of timeout
+  return response;
 }
 
 SdkResponse ApiManager::write(OpHandle handle, std::vector<uint8_t> bytes,
@@ -247,10 +289,11 @@ SdkResponse ApiManager::onConnectionStatusChanged(
 
 SdkResponse ApiManager::onConnStateMachineConnected(RaceHandle contextHandle,
                                                     ConnectionID connId,
-                                                    std::string linkAddress) {
+                                                    std::string linkAddress,
+                                                    std::string channelId) {
   TRACE_METHOD();
   return post(logPrefix, &ApiManagerInternal::onConnStateMachineConnected,
-              contextHandle, connId, linkAddress);
+              contextHandle, connId, linkAddress, channelId);
 }
 
 SdkResponse ApiManager::onChannelStatusChangedForContext(
@@ -260,6 +303,14 @@ SdkResponse ApiManager::onChannelStatusChangedForContext(
   TRACE_METHOD();
   return post(logPrefix, &ApiManagerInternal::onChannelStatusChangedForContext,
               contextHandle, callHandle, channelGid, status, properties);
+}
+
+SdkResponse ApiManager::onConnStateMachineConnectedForContext(
+                                                            RaceHandle contextHandle, RaceHandle callHandle,
+                                                            RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress) {
+  TRACE_METHOD();
+  return post(logPrefix, &ApiManagerInternal::onConnStateMachineConnectedForContext,
+              contextHandle, callHandle, connContextHandle, connId, linkAddress);
 }
 
 // Plugin callbacks
@@ -325,12 +376,32 @@ void ApiManagerInternal::sendReceive(
 
 void ApiManagerInternal::dial(
     uint64_t postId, SendOptions sendOptions, std::vector<uint8_t> data,
-    std::function<void(ApiStatus, RaceHandle)> callback) {
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   TRACE_METHOD(postId, sendOptionsToString(sendOptions), data);
 
   auto context = newDialContext();
   context->updateDial(sendOptions, std::move(data), callback);
   dialEngine.start(*context);
+}
+
+void ApiManagerInternal::resume(
+    uint64_t postId, ResumeOptions resumeOptions,
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
+  TRACE_METHOD(postId, resumeOptionsToString(resumeOptions));
+
+  auto context = newResumeContext();
+  context->updateResume(resumeOptions, callback);
+  resumeEngine.start(*context);
+}
+
+void ApiManagerInternal::bootstrapDial(
+    uint64_t postId, BootstrapConnectionOptions options, std::vector<uint8_t> data,
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
+  TRACE_METHOD(postId, bootstrapConnectionOptionsToString(options), data);
+
+  auto context = newBootstrapDialContext();
+  context->updateBootstrapDial(options, std::move(data), callback);
+  bootstrapDialEngine.start(*context);
 }
 
 void ApiManagerInternal::getReceiveObject(
@@ -444,17 +515,27 @@ void ApiManagerInternal::listen(
   listenEngine.start(*context);
 }
 
+void ApiManagerInternal::bootstrapListen(
+    uint64_t postId, BootstrapConnectionOptions options,
+    std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback) {
+  TRACE_METHOD(postId, bootstrapConnectionOptionsToString(options));
+
+  auto context = newBootstrapListenContext();
+  context->updateBootstrapListen(options, callback);
+  bootstrapListenEngine.start(*context);
+}
+
 void ApiManagerInternal::accept(
     uint64_t postId, OpHandle handle,
-    std::function<void(ApiStatus, RaceHandle)> callback) {
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   // API read receive connection - should call callback when a package is
   // available
   TRACE_METHOD(postId, handle);
 
   auto contexts = getContexts(handle);
   if (contexts.size() != 1) {
-    helper::logError(logPrefix + "Invalid handle passed to read");
-    callback(ApiStatus::INTERNAL_ERROR, {});
+    helper::logError(logPrefix + "Invalid handle passed to accept");
+    callback(ApiStatus::INTERNAL_ERROR, {}, {});
     callback = {};
   }
 
@@ -564,9 +645,10 @@ void ApiManagerInternal::stateMachineFinished(ApiContext &context) {
 
 void ApiManagerInternal::connStateMachineConnected(RaceHandle contextHandle,
                                                    ConnectionID connId,
-                                                   std::string linkAddress) {
-  TRACE_METHOD(contextHandle, connId);
-  manager.onConnStateMachineConnected(contextHandle, connId, linkAddress);
+                                                   std::string linkAddress,
+                                                   std::string channelId) {
+  TRACE_METHOD(contextHandle, connId, linkAddress, channelId);
+  manager.onConnStateMachineConnected(contextHandle, connId, linkAddress, channelId);
 }
 
 void ApiManagerInternal::onStateMachineFailed(uint64_t postId,
@@ -610,9 +692,20 @@ void ApiManagerInternal::onStateMachineFinished(uint64_t postId,
 void ApiManagerInternal::onConnStateMachineConnected(uint64_t postId,
                                                      RaceHandle contextHandle,
                                                      ConnectionID connId,
-                                                     std::string linkAddress) {
-  TRACE_METHOD(postId, contextHandle, connId);
+                                                     std::string linkAddress,
+                                                     std::string channelId) {
+  TRACE_METHOD(postId, contextHandle, connId, linkAddress, channelId);
 
+  // Map for when additional SMs want to re-use this link/connection
+  // Note: this logic means we expect the channel to _always_ return a
+  // _unique_ link when we ask for a link without providing an address.
+  if (linkAddress != "") {
+    std::string normalized_address = nlohmann::json::parse(linkAddress).dump();
+    helper::logDebug(logPrefix + " compare normalized: " + linkAddress + " vs " + normalized_address);
+    helper::logDebug(logPrefix + "Inserting $" + channelId + "$ + $" + normalized_address + "$ into the linkConnMap with connID " + connId);
+    linkConnMap.insert({channelId+normalized_address, {contextHandle, connId}});
+  }
+  
   auto contexts = getContexts(contextHandle);
   for (auto context : contexts) {
     context->updateConnStateMachineConnected(contextHandle, connId,
@@ -645,6 +738,32 @@ void ApiManagerInternal::onChannelStatusChangedForContext(
   context.updateChannelStatusChanged(callHandle, channelGid, status,
                                      properties);
   triggerEvent(context, event);
+}
+
+  // This is triggered by startConnStateMachine if a connection for
+  // the channelId+linkAddress is already ready
+void ApiManagerInternal::onConnStateMachineConnectedForContext(
+    uint64_t postId, RaceHandle contextHandle, RaceHandle callHandle,
+    RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress) {
+  TRACE_METHOD(postId, contextHandle, callHandle, connContextHandle, connId, linkAddress);
+
+  auto contextIt = activeContexts.find(contextHandle);
+  if (contextIt == activeContexts.end()) {
+    helper::logError(logPrefix + " could not find calling context");
+    return;
+  }
+
+  auto connContextIt = activeContexts.find(connContextHandle);
+  if (connContextIt == activeContexts.end()) {
+    helper::logError(logPrefix + " could not connContext");
+    return;
+  }
+
+  contextIt->second->updateConnStateMachineConnected(connContextHandle,
+                                                     connId,
+                                                     linkAddress);
+  connContextIt->second->updateDependent(contextHandle);
+  triggerEvent(*contextIt->second, EVENT_CONN_STATE_MACHINE_CONNECTED);
 }
 
 //--------------------------------------------------------
@@ -745,6 +864,7 @@ void ApiManagerInternal::receiveEncPkg(
                                     contents->begin() + packageIdLen};
     helper::logDebug(logPrefix + "PackageId: " + json(packageIdBytes).dump());
     std::string packageId{contents->begin(), contents->begin() + packageIdLen};
+    helper::logDebug(logPrefix + "PackageId+ConnId: " + json(packageIdBytes).dump() + connId);
     auto it = packageIdContextMap.find(packageId + connId);
     if (it != packageIdContextMap.end()) {
       contexts = it->second;
@@ -753,8 +873,16 @@ void ApiManagerInternal::receiveEncPkg(
       helper::logDebug(logPrefix + " found package id");
 
     } else {
+      // buffer messages that might be for conduits/packageIds we have
+      // not _yet_ resumed
+      auto packagesIt = unassociatedPackages.find(packageId);
+      if (packagesIt != unassociatedPackages.end()) {
+          packagesIt->second.emplace_back(pkg);
+      } else{
+        unassociatedPackages.insert({packageId, {pkg}});
+      }
       contexts = getContexts(connId);
-      helper::logDebug(logPrefix + " did not find package id");
+      helper::logDebug(logPrefix + " did not find package id in an existing conduit");
     }
   }
 
@@ -797,13 +925,35 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
                                                      ChannelId channelId,
                                                      std::string role,
                                                      std::string linkAddress,
+                                                     bool creating,
                                                      bool sending) {
   TRACE_METHOD(contextHandle);
 
+  // We already made this link/connection
+  // Note: this is _only_ valid when we are specifying the link address
+  // Otherwise the address is being dynamically generated and will be unique
+  if (linkAddress != "") {
+    std::string normalized_address = nlohmann::json::parse(linkAddress).dump();
+    helper::logDebug(logPrefix + " compare normalized: " + linkAddress + " vs " + normalized_address);
+    auto connContextIt = linkConnMap.find(channelId + normalized_address);
+    if (connContextIt != linkConnMap.end()) {
+      helper::logDebug(logPrefix + "got existing entry for $" + channelId + "$ $" + normalized_address + "$ in the linkConnMap with ConnID=" + connContextIt->second.second);
+    RaceHandle callHandle = getCore().generateHandle();
+    manager.onConnStateMachineConnectedForContext(contextHandle,
+                                                  callHandle,
+                                                  connContextIt->second.first,
+                                                  connContextIt->second.second,
+                                                  linkAddress);
+    return connContextIt->second.first;
+    }
+  }
+
+  // TODO do validation checks
+  
   // create a connection context and copy information from the send/recv context
   auto context = newConnContext();
   context->updateConnStateMachineStart(contextHandle, channelId, role,
-                                       linkAddress, sending);
+                                       linkAddress, creating, sending);
 
   EventResult result = connEngine.start(*context);
   if (result != EventResult::SUCCESS) {
@@ -813,7 +963,7 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
   return context->handle;
 }
 
-RaceHandle ApiManagerInternal::startConnObjectStateMachine(
+RaceHandle ApiManagerInternal::startConduitectStateMachine(
     RaceHandle contextHandle, RaceHandle recvHandle,
     const ConnectionID &recvConnId, RaceHandle sendHandle,
     const ConnectionID &sendConnId, const ChannelId &sendChannel,
@@ -823,18 +973,20 @@ RaceHandle ApiManagerInternal::startConnObjectStateMachine(
                sendHandle, sendConnId);
 
   // create a connection context and copy information from the send/recv context
-  auto context = newConnObjectContext();
-  context->updateConnObjectStateMachineStart(
+  auto context = newConduitectContext();
+  context->updateConduitectStateMachineStart(
       contextHandle, recvHandle, recvConnId, sendHandle, sendConnId,
       sendChannel, recvChannel, packageId, std::move(recvMessages), apiHandle);
 
   EventResult result = connObjectEngine.start(*context);
   if (result != EventResult::SUCCESS) {
+    helper::logError(logPrefix + "connObjectEngine.start failed");
     return NULL_RACE_HANDLE;
   }
 
   auto recvContextIt = activeContexts.find(recvHandle);
   if (recvContextIt == activeContexts.end()) {
+    helper::logError(logPrefix + "recvContextIt could not be found for recvHandle");
     return NULL_RACE_HANDLE;
   }
 
@@ -843,28 +995,34 @@ RaceHandle ApiManagerInternal::startConnObjectStateMachine(
 
   auto sendContextIt = activeContexts.find(sendHandle);
   if (sendContextIt == activeContexts.end()) {
+    helper::logError(logPrefix + "sendContextIt could not be found for sendHandle");
     return NULL_RACE_HANDLE;
   }
 
   sendContextIt->second->updateDependent(context->handle);
   triggerEvent(*sendContextIt->second, EVENT_ADD_DEPENDENT);
 
+  if (context->handle == NULL_RACE_HANDLE) {
+    helper::logError(logPrefix + "context->handle is NULL");
+  }
   return context->handle;
 }
 
-RaceHandle ApiManagerInternal::startPreConnObjStateMachine(
+RaceHandle ApiManagerInternal::startPreConduitStateMachine(
     RaceHandle contextHandle, RaceHandle recvHandle,
     const ConnectionID &recvConnId, const ChannelId &recvChannel,
     const ChannelId &sendChannel, const std::string &sendRole,
     const std::string &sendLinkAddress, const std::string &packageId,
     std::vector<std::vector<uint8_t>> recvMessages) {
+        helper::logInfo(
+                         " START PRECONN OBJECT being called");
   // create a connection context and copy information from the send/recv context
-  auto context = newPreConnObjContext();
-  context->updatePreConnObjStateMachineStart(
+  auto context = newPreConduitContext();
+  context->updatePreConduitStateMachineStart(
       contextHandle, recvHandle, recvConnId, recvChannel, sendChannel, sendRole,
       sendLinkAddress, packageId, recvMessages);
 
-  EventResult result = preConnObjEngine.start(*context);
+  EventResult result = preConduitEngine.start(*context);
   if (result != EventResult::SUCCESS) {
     return NULL_RACE_HANDLE;
   }
@@ -880,9 +1038,62 @@ RaceHandle ApiManagerInternal::startPreConnObjStateMachine(
   return context->handle;
 }
 
+RaceHandle ApiManagerInternal::startBootstrapPreConduitStateMachine(
+                                                RaceHandle contextHandle,
+                                                const ApiBootstrapListenContext &listenContext,
+                                                const std::string &packageId,
+                                                std::vector<std::vector<uint8_t>> recvMessages) {
+        helper::logInfo(
+                         " START BOOTSTRAP PRECONN OBJECT being called");
+  // create a connection context and copy information from the send/recv context
+  auto context = newBootstrapPreConduitContext();
+  // auto listenContextIt = activeContexts.find(contextHandle);
+  // if (listenContextIt == activeContexts.end()) {
+  //   return NULL_RACE_HANDLE;
+  // }
+
+  // This may need to be a reinterpret_cast - don't want to lose the extended link info
+  // ApiBootstrapListenContext listenContext = static_cast<ApiBootstrapListenContext>(*listenContextIt->second);
+  context->updateBootstrapPreConduitStateMachineStart(contextHandle,
+                                                      listenContext,
+                                                      packageId, recvMessages);
+  EventResult result = bootstrapPreConduitEngine.start(*context);
+  if (result != EventResult::SUCCESS) {
+    return NULL_RACE_HANDLE;
+  }
+
+  addDependent(listenContext.initSendConnSMHandle, context->handle);
+  addDependent(listenContext.initRecvConnSMHandle, context->handle);
+  return context->handle;
+}
+
+void ApiManagerInternal::addDependent(RaceHandle contextHandle, RaceHandle newDependentHandle) {
+  auto connContextIt = activeContexts.find(contextHandle);
+  if (connContextIt == activeContexts.end()) {
+    return;
+  }
+  connContextIt->second->updateDependent(newDependentHandle);
+  triggerEvent(*connContextIt->second, EVENT_ADD_DEPENDENT);
+}
 bool ApiManagerInternal::onListenAccept(
     RaceHandle contextHandle,
-    std::function<void(ApiStatus, RaceHandle)> acceptCb) {
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> acceptCb) {
+  TRACE_METHOD(contextHandle);
+
+  EventType event = EVENT_LISTEN_ACCEPTED;
+  auto context = activeContexts.find(contextHandle);
+  if (context == activeContexts.end()) {
+    helper::logError(logPrefix + "Could not find context for handle");
+    return false;
+  }
+  context->second->updateListenAccept(acceptCb);
+  triggerEvent(*context->second, event);
+  return true;
+}
+
+bool ApiManagerInternal::onBootstrapListenAccept(
+    RaceHandle contextHandle,
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> acceptCb) {
   TRACE_METHOD(contextHandle);
 
   EventType event = EVENT_LISTEN_ACCEPTED;
@@ -931,8 +1142,26 @@ void ApiManagerInternal::registerPackageId(ApiContext &context,
                                            const std::string &id) {
   std::string packageId =
       json(std::vector<uint8_t>(id.begin(), id.end())).dump();
-  TRACE_METHOD(context.handle, packageId);
+  TRACE_METHOD(context.handle, packageId, connId);
   packageIdContextMap[id + connId].insert(&context);
+
+  // Check for buffered received messages that came before this packageId was registered
+  auto packageListIt = unassociatedPackages.find(packageId);
+  if (packageListIt != unassociatedPackages.end()) {
+    helper::logDebug(logPrefix + "Found " + std::to_string(packageListIt->second.size()) + " packages waiting for this packageId");
+    for (auto packageIt : packageListIt->second) {
+      Contexts contexts;
+      std::shared_ptr<std::vector<uint8_t>> contents =
+        std::make_shared<std::vector<uint8_t>>(packageIt.getCipherText());
+
+      *contents = std::vector<uint8_t>(contents->begin() + packageIdLen,
+                                       contents->end());
+      context.updateReceiveEncPkg(connId, contents);
+      triggerEvent(context, EVENT_RECEIVE_PACKAGE);
+    }
+  }  else {
+    helper::logDebug(logPrefix + "No packages were waiting for this packageId");
+  }
 }
 
 void ApiManagerInternal::unregisterHandle(ApiContext &context,
@@ -957,17 +1186,25 @@ ApiContext *ApiManagerInternal::newConnContext() {
   return activeContexts[handle].get();
 }
 
-ApiContext *ApiManagerInternal::newConnObjectContext() {
+ApiContext *ApiManagerInternal::newConduitectContext() {
   auto newContext =
-      std::make_unique<ConnectionObjectContext>(*this, connObjectEngine);
+      std::make_unique<ConduitContext>(*this, connObjectEngine);
   auto handle = newContext->handle;
   activeContexts[handle] = (std::move(newContext));
   return activeContexts[handle].get();
 }
 
-ApiContext *ApiManagerInternal::newPreConnObjContext() {
+ApiContext *ApiManagerInternal::newPreConduitContext() {
   auto newContext =
-      std::make_unique<PreConnObjContext>(*this, preConnObjEngine);
+      std::make_unique<PreConduitContext>(*this, preConduitEngine);
+  auto handle = newContext->handle;
+  activeContexts[handle] = (std::move(newContext));
+  return activeContexts[handle].get();
+}
+
+ApiContext *ApiManagerInternal::newBootstrapPreConduitContext() {
+  auto newContext =
+      std::make_unique<BootstrapPreConduitContext>(*this, bootstrapPreConduitEngine);
   auto handle = newContext->handle;
   activeContexts[handle] = (std::move(newContext));
   return activeContexts[handle].get();
@@ -1002,8 +1239,30 @@ ApiContext *ApiManagerInternal::newDialContext() {
   return activeContexts[handle].get();
 }
 
+ApiContext *ApiManagerInternal::newResumeContext() {
+  auto newContext = std::make_unique<ApiResumeContext>(*this, resumeEngine);
+  auto handle = newContext->handle;
+  activeContexts[handle] = (std::move(newContext));
+  return activeContexts[handle].get();
+}
+
+ApiContext *ApiManagerInternal::newBootstrapDialContext() {
+  auto newContext = std::make_unique<ApiBootstrapDialContext>(*this, bootstrapDialEngine);
+  auto handle = newContext->handle;
+  activeContexts[handle] = (std::move(newContext));
+  return activeContexts[handle].get();
+}
+
+
 ApiContext *ApiManagerInternal::newListenContext() {
   auto newContext = std::make_unique<ApiListenContext>(*this, listenEngine);
+  auto handle = newContext->handle;
+  activeContexts[handle] = (std::move(newContext));
+  return activeContexts[handle].get();
+}
+
+ApiContext *ApiManagerInternal::newBootstrapListenContext() {
+  auto newContext = std::make_unique<ApiBootstrapListenContext>(*this, bootstrapListenEngine);
   auto handle = newContext->handle;
   activeContexts[handle] = (std::move(newContext));
   return activeContexts[handle].get();
@@ -1073,6 +1332,8 @@ void ApiManagerInternal::removeContext(ApiContext &context) {
        pairIt != packageIdContextMap.end();) {
     pairIt->second.erase(&context);
     if (pairIt->second.size() == 0) {
+      std::vector<int> int_vector{pairIt->first.begin(), pairIt->first.begin() + packageIdLen};
+      helper::logDebug("removeContext: Removing packageId+ConnectionID=" + json(int_vector).dump() + pairIt->first.substr(packageIdLen));
       pairIt = packageIdContextMap.erase(pairIt);
     } else {
       ++pairIt;
@@ -1085,7 +1346,7 @@ void ApiManagerInternal::removeContext(ApiContext &context) {
 EventResult ApiManagerInternal::triggerEvent(ApiContext &context,
                                              EventType event) {
   EventResult result = context.engine.handleEvent(context, event);
-
+  
   if (result != EventResult::SUCCESS) {
     helper::logDebug("triggerEvent " + eventToString(event) + " failed");
   }
@@ -1093,4 +1354,44 @@ EventResult ApiManagerInternal::triggerEvent(ApiContext &context,
   return result;
 }
 
+//--------------------------------------------------------
+// debug
+//--------------------------------------------------------
+void ApiManagerInternal::dumpContexts(std::string context){
+  TRACE_METHOD();
+
+  if(context.size()) {
+    printf("%s\n", context.c_str());
+  }
+  printf("dumping activeContexts handles ---\n");
+  for(std::unordered_map<RaceHandle, std::unique_ptr<Raceboat::ApiContext>>::iterator it = activeContexts.begin(); it != activeContexts.end(); ++it) { 
+    printf("  %lu --  ", it->first);
+    it->second->dumpContext();
+  }
+
+  printf("dumping handleContextMap ---\n");
+  for (auto pair: handleContextMap) {
+    // second is Contexts = std::unordered_set<ApiContext *>;
+    printf("  %lu: \n", pair.first);
+    for (auto ctx: pair.second)  {
+      ctx->dumpContext();
+    }
+  }
+
+  printf("dumping idContextMap ---\n");
+  for (auto pair: idContextMap) {
+    printf("  %s: \n", pair.first.c_str());
+    for (auto ctx: pair.second)  {
+      ctx->dumpContext();
+    }
+  }
+
+  printf("dumping packageIdContextMap ---\n");
+  for (auto pair: packageIdContextMap) {
+    printf("  %s: \n", pair.first.c_str());
+    for (auto ctx: pair.second)  {
+      ctx->dumpContext();
+    }
+  }
+}
 } // namespace Raceboat

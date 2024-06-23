@@ -84,9 +84,10 @@ list(APPEND CGO_CXXFLAGS
 list(APPEND CGO_CXXFLAGS
     -std=c++17
 )
+message(RACE_COMM_LIBS_PATH $ENV{RACE_COMM_LIBS_PATH})
 
 find_library(
-    RACE_COMM_LIB raceboat REQUIRED
+    RACE_COMM_LIB raceSdkCommon REQUIRED
     PATHS $ENV{RACE_COMM_LIBS_PATH}
 )
 find_library(
@@ -97,7 +98,7 @@ find_library(
 
 list(APPEND CGO_LDFLAGS
     -Wl,--unresolved-symbols=ignore-all
-    -lraceboat
+    -lraceSdkCommon
     -l:corePluginBindingsGolang.so
 )
 

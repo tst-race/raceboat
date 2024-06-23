@@ -22,10 +22,11 @@ PLUGIN_PATH=$1 # e.g. /path/to/private-race-core/plugin-comms-twosix-cpp/kit/art
 echo "IP of Bridge Container: " $(docker inspect pt-server | grep IPAddress\": | head -n 1 | tr -s ' ' | cut -d ' ' -f3)
 
 docker run --rm --name=pt-client -it \
+       --network=rib-overlay-network --ip=10.11.1.3 \
        -v /tmp/.X11-unix:/tmp/.X11-unix \
        -v $RACEBOAT_HOME:/code \
-       -v $RACEBOAT_HOME/pluggable-transport/log/:/log \
+       -v $RACEBOAT_HOME/pluggable-transport/log/client/:/log \
        -v $RACEBOAT_HOME/racesdk/package/LINUX_x86_64/:/usr/local/bin/race/ \
-       -v $PLUGIN_PATH:/etc/race/plugins/unix/x86_64/ \
+       -v $PLUGIN_PATH:/etc/race/plugins/ \
        -e DISPLAY=:0 \
        pt-client bash tor-browser/Browser/start-tor-browser

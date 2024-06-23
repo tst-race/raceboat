@@ -35,12 +35,14 @@ void ApiConnContext::updateConnStateMachineStart(RaceHandle _contextHandle,
                                                  ChannelId _channelId,
                                                  std::string _role,
                                                  std::string _linkAddress,
+                                                 bool _creating,
                                                  bool _sending) {
   this->dependents.insert(_contextHandle);
   this->newestDependent = _contextHandle;
   this->channelId = _channelId;
   this->channelRole = _role;
   this->linkAddress = _linkAddress;
+  this->create = _creating;
   this->send = _sending;
 }
 
@@ -124,16 +126,20 @@ struct StateConnActivated : public ConnState {
     PluginWrapper &plugin = getPlugin(ctx, ctx.channelId);
 
     SdkResponse response = SDK_INVALID;
-    if (ctx.send && ctx.linkAddress.empty()) {
-      throw std::invalid_argument("missing link address");
-    } else if (ctx.send && !ctx.linkAddress.empty()) {
-      response =
-          plugin.loadLinkAddress(linkHandle, ctx.channelId, ctx.linkAddress, 0);
-    } else if (ctx.linkAddress.empty()) {
-      response = plugin.createLink(linkHandle, ctx.channelId, 0);
+    if (ctx.create) {
+      if (ctx.linkAddress.empty()) {
+        response = plugin.createLink(linkHandle, ctx.channelId, 0);
+      } else {
+        response = plugin.createLinkFromAddress(linkHandle, ctx.channelId,
+                                                ctx.linkAddress, 0);
+      }
     } else {
-      response = plugin.createLinkFromAddress(linkHandle, ctx.channelId,
-                                              ctx.linkAddress, 0);
+      if (ctx.linkAddress.empty()) {
+        throw std::invalid_argument("missing link address for load");
+      } else {
+        response =
+          plugin.loadLinkAddress(linkHandle, ctx.channelId, ctx.linkAddress, 0);
+      }
     }
 
     if (response.status != SDK_OK) {
@@ -157,6 +163,7 @@ struct StateConnLinkEstablished : public ConnState {
 
     ctx.manager.registerId(ctx, ctx.linkId);
 
+    // TODO I don't think this should be only for recv links
     if (!ctx.send && !ctx.linkAddress.empty() &&
         ctx.updatedLinkAddress != ctx.linkAddress) {
       nlohmann::json updatedJson =
@@ -195,7 +202,8 @@ struct StateConnConnectionOpen : public ConnState {
 
     ctx.manager.registerId(ctx, ctx.connId);
     ctx.manager.connStateMachineConnected(ctx.handle, ctx.connId,
-                                          ctx.updatedLinkAddress);
+                                          ctx.updatedLinkAddress,
+                                          ctx.channelId);
 
     ctx.pendingEvents.push(EVENT_ALWAYS);
 

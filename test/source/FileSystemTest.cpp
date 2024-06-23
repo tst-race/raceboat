@@ -119,8 +119,7 @@ TEST_F(FileSystemTestFixture, makePluginFilePath) {
 
 TEST_F(FileSystemTestFixture, makePluginInstallPath) {
   FileSystemTestable fst(INPUT_FILE_DIR);
-  fs::path expectedInstallPath = fs::path(INPUT_FILE_DIR) / "plugins" / "myOS" /
-                                 "myArch" / pluginId / fileName;
+  fs::path expectedInstallPath = fs::path(INPUT_FILE_DIR) / pluginId / fileName;
   fs::path installPath = fst.makePluginInstallPath(fileName, pluginId);
   EXPECT_STREQ(installPath.c_str(), expectedInstallPath.c_str());
 }

@@ -19,6 +19,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #include "PluginContainer.h"
 #include "StateMachine.h"
@@ -34,6 +35,7 @@
 namespace Raceboat {
 
 class ApiManagerInternal;
+class ApiBootstrapListenContext;
 class PluginWrapper;
 
 class ApiContext : public Context {
@@ -42,7 +44,12 @@ public:
 
   // prevent contexts from being copied accidentally
   ApiContext(const ApiContext &) = delete;
-  virtual void updateSend(const SendOptions & /* sendOptions */,
+
+  bool shouldCreate(const ChannelId &channelId,
+                    bool useForRecv);
+  bool shouldCreateSender(const ChannelId &channelId);
+  bool shouldCreateReceiver(const ChannelId &channelId);
+   virtual void updateSend(const SendOptions & /* sendOptions */,
                           std::vector<uint8_t> && /* data */,
                           std::function<void(ApiStatus)> /* cb */){};
   virtual void updateSendReceive(
@@ -50,14 +57,24 @@ public:
       std::function<void(ApiStatus, std::vector<uint8_t>)> /* cb */) {}
   virtual void updateDial(const SendOptions & /* sendOptions */,
                           std::vector<uint8_t> && /* data */,
-                          std::function<void(ApiStatus, RaceHandle)> /* cb */) {
+                          std::function<void(ApiStatus, RaceHandle, ConduitProperties)> /* cb */) {
+  }
+  virtual void updateResume(const ResumeOptions & /* resumeOptions */,
+                            std::function<void(ApiStatus, RaceHandle, ConduitProperties)> /* cb */) {
+  }
+  virtual void updateBootstrapDial(const BootstrapConnectionOptions & /* options */,
+                          std::vector<uint8_t> && /* data */,
+                          std::function<void(ApiStatus, RaceHandle, ConduitProperties)> /* cb */) {
   }
   virtual void updateListen(
       const ReceiveOptions & /* recvOptions */,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> /* cb */) {}
   virtual void
   updateAccept(RaceHandle /* handle */,
-               std::function<void(ApiStatus, RaceHandle)> /* cb */) {}
+               std::function<void(ApiStatus, RaceHandle, ConduitProperties)> /* cb */) {}
+  virtual void updateBootstrapListen(
+      const BootstrapConnectionOptions & /* options */,
+      std::function<void(ApiStatus, LinkAddress, RaceHandle)> /* cb */) {}
   virtual void updateGetReceiver(
       const ReceiveOptions & /* recvOptions */,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> /* cb */){};
@@ -99,8 +116,9 @@ public:
                                            ChannelId /* channelId */,
                                            std::string /* role */,
                                            std::string /* linkAddress */,
+                                           bool /* creating */,
                                            bool /* sending */){};
-  virtual void updateConnObjectStateMachineStart(
+  virtual void updateConduitectStateMachineStart(
       RaceHandle /* contextHandle */, RaceHandle /* recvHandle */,
       const ConnectionID & /* recvConnId */, RaceHandle /* sendHandle */,
       const ConnectionID & /* sendConnId */,
@@ -109,7 +127,7 @@ public:
       std::vector<std::vector<uint8_t>> /* recvMessages */,
       RaceHandle /* apiHandle */){};
 
-  virtual void updatePreConnObjStateMachineStart(
+  virtual void updatePreConduitStateMachineStart(
       RaceHandle /* contextHandle */, RaceHandle /* recvHandle */,
       const ConnectionID & /* _recvConnId */,
       const ChannelId & /* _recvChannel */,
@@ -118,8 +136,30 @@ public:
       const std::string & /* _packageId */,
       std::vector<std::vector<uint8_t>> /* recvMessages */){};
 
+  virtual void updateBootstrapPreConduitStateMachineStart(
+      RaceHandle /* contextHandle */,
+      const ApiBootstrapListenContext &/* parentContext */,
+      // RaceHandle /* recvHandle */,
+      // const ConnectionID & /* _recvConnId */,
+      // const ChannelId & /* _recvChannel */,
+      // const ChannelId & /* _sendChannel */, const std::string & /* _sendRole */,
+      // const std::string & /* _sendLinkAddress */,
+      const std::string & /* _packageId */,
+      std::vector<std::vector<uint8_t>> /* recvMessages */){};
+
   virtual void
-  updateListenAccept(std::function<void(ApiStatus, RaceHandle)> /* cb */) {}
+  updateListenAccept(std::function<void(ApiStatus, RaceHandle, ConduitProperties)> /* cb */) {}
+
+  std::string toString() {
+    std::stringstream s;
+    void* thisPtr = this;
+    s << thisPtr << ": " << handle;
+    return s.str();
+  }
+
+  void dumpContext(std::string context="") {  // debug
+    printf("   %s %s\n", context.c_str(), toString().c_str());
+  }
 
 public:
   ApiManagerInternal &manager;

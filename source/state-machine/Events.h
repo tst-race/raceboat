@@ -47,6 +47,9 @@ enum ApiManagerEvent : EventType {
   EVENT_ALWAYS,
   EVENT_RECV_NO_PACKAGES_REMAINING,
   EVENT_RECV_PACKAGES_REMAINING,
+  EVENT_SATISFIED,
+  EVENT_NEEDS_SEND,
+  EVENT_NEEDS_RECV,
 };
 
 std::string eventToString(EventType event);

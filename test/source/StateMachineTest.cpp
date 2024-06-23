@@ -28,7 +28,7 @@ enum TestEvents { FIRST_TRANSITION = EVENT_FIRST_UNUSED, SECOND_TRANSITION };
 class StateMachineTestFixture : public ::testing::Test {
 public:
     StateMachineTestFixture() {
-        context = std::make_shared<ConnectionContext>();
+        context = std::make_shared<ConduitContext>();
     }
 
     struct TestableStateEngine : public StateEngine {
@@ -44,7 +44,7 @@ public:
         }
     } engine;
     Core core;
-    std::shared_ptr<ConnectionContext> context;
+    std::shared_ptr<ConduitContext> context;
 };
 
 TEST_F(StateMachineTestFixture, validate) {

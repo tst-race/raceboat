@@ -28,11 +28,15 @@
 #include "../../include/race/Race.h"
 #include "../../include/race/unified/SdkResponse.h"
 #include "../state-machine/ApiContext.h"
-#include "../state-machine/ConnectionObjectStateMachine.h"
+#include "../state-machine/ConduitStateMachine.h"
 #include "../state-machine/ConnectionStateMachine.h"
 #include "../state-machine/DialStateMachine.h"
+#include "../state-machine/ResumeStateMachine.h"
 #include "../state-machine/ListenStateMachine.h"
-#include "../state-machine/PreConnObjStateMachine.h"
+#include "../state-machine/PreConduitStateMachine.h"
+#include "../state-machine/BootstrapDialStateMachine.h"
+#include "../state-machine/BootstrapListenStateMachine.h"
+#include "../state-machine/BootstrapPreConduitStateMachine.h"
 #include "../state-machine/ReceiveStateMachine.h"
 #include "../state-machine/SendReceiveStateMachine.h"
 #include "../state-machine/SendStateMachine.h"
@@ -65,6 +69,7 @@ static const int packageIdLen = 16;
 class PluginContainer;
 
 class ApiManager;
+class BootstrapPreConduitContext;
 enum class ActivateChannelStatusCode;
 
 class ApiManagerInternal {
@@ -81,7 +86,12 @@ public:
               std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
   virtual void dial(uint64_t postId, SendOptions sendOptions,
                     std::vector<uint8_t> data,
-                    std::function<void(ApiStatus, RaceHandle)> callback);
+                    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
+  virtual void resume(uint64_t postId, ResumeOptions resumeOptions,
+                    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
+  virtual void bootstrapDial(uint64_t postId, BootstrapConnectionOptions options,
+                    std::vector<uint8_t> data,
+                    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
   virtual void getReceiveObject(
       uint64_t postId, ReceiveOptions recvOptions,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
@@ -96,8 +106,11 @@ public:
   virtual void
   listen(uint64_t postId, ReceiveOptions recvOptions,
          std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
+  virtual void
+  bootstrapListen(uint64_t postId, BootstrapConnectionOptions options,
+         std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
   virtual void accept(uint64_t postId, OpHandle handle,
-                      std::function<void(ApiStatus, RaceHandle)> callback);
+                      std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
 
   virtual void
   read(uint64_t postId, OpHandle handle,
@@ -117,7 +130,8 @@ public:
   virtual void stateMachineFinished(ApiContext &context);
   virtual void connStateMachineConnected(RaceHandle contextHandle,
                                          ConnectionID connId,
-                                         std::string linkAddress);
+                                         std::string linkAddress,
+                                         std::string channelId);
 
   virtual void onStateMachineFailed(uint64_t postId, RaceHandle contextHandle);
   virtual void onStateMachineFinished(uint64_t postId,
@@ -125,12 +139,16 @@ public:
   virtual void onConnStateMachineConnected(uint64_t postId,
                                            RaceHandle contextHandle,
                                            ConnectionID connId,
-                                           std::string linkAddress);
+                                           std::string linkAddress,
+                                           std::string channelId);
 
   virtual void onChannelStatusChangedForContext(
       uint64_t postId, RaceHandle contextHandle, RaceHandle callHandle,
       const ChannelId &channelGid, ChannelStatus status,
       const ChannelProperties &properties);
+  virtual void onConnStateMachineConnectedForContext(
+      uint64_t postId, RaceHandle contextHandle, RaceHandle callHandle,
+      RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress);
   // Plugin callbacks
   virtual void onChannelStatusChanged(uint64_t postId, RaceHandle handle,
                                       const ChannelId &channelGid,
@@ -153,24 +171,38 @@ public:
                                            ChannelId channelId,
                                            std::string role,
                                            std::string linkAddress,
+                                           bool creating,
                                            bool sending);
-  virtual RaceHandle startConnObjectStateMachine(
+  virtual RaceHandle startConduitectStateMachine(
       RaceHandle contextHandle, RaceHandle recvHandle,
       const ConnectionID &recvConnId, RaceHandle sendHandle,
       const ConnectionID &sendConnId, const ChannelId &sendChannel,
       const ChannelId &recvChannel, const std::string &packageId,
       std::vector<std::vector<uint8_t>> recvMessages, RaceHandle apiHandle);
-  virtual RaceHandle startPreConnObjStateMachine(
+  virtual RaceHandle startPreConduitStateMachine(
       RaceHandle contextHandle, RaceHandle recvHandle,
       const ConnectionID &recvConnId, const ChannelId &recvChannel,
       const ChannelId &sendChannel, const std::string &sendRole,
       const std::string &sendLinkAddress, const std::string &packageId,
       std::vector<std::vector<uint8_t>> recvMessages);
+  virtual RaceHandle startBootstrapPreConduitStateMachine(
+      RaceHandle contextHandle, 
+      const ApiBootstrapListenContext &listenContext,
+      // const ConnectionID &initSendConnId, const ChannelId &initSendChannel, const std::string &initSendRole,
+      // const ConnectionID &initRecvConnId, const ChannelId &initRecvChannel, const std::string &initRecvRole,
+      // const ConnectionID &finalSendConnId, const ChannelId &finalSendChannel, const std::string &finalSendRole, const LinkAddress &finalSendAddress
+      // const ConnectionID &finalRecvConnId, const ChannelId &finalRecvChannel, const std::string &finalRecvRole, const LinkAddress &finalRecvAddress
+      const std::string &packageId,
+      std::vector<std::vector<uint8_t>> recvMessages);
   virtual bool
   onListenAccept(RaceHandle contextHandle,
-                 std::function<void(ApiStatus, RaceHandle)> acceptCb);
+                 std::function<void(ApiStatus, RaceHandle, ConduitProperties)> acceptCb);
+  virtual bool
+  onBootstrapListenAccept(RaceHandle contextHandle,
+                          std::function<void(ApiStatus, RaceHandle, ConduitProperties)> acceptCb);
   virtual bool detachConnSM(RaceHandle contextHandle,
                             RaceHandle connSMContextHandle);
+  virtual void addDependent(RaceHandle contextHandle, RaceHandle newDependentHandle);
 
   virtual Core &getCore();
 
@@ -182,6 +214,7 @@ public:
                                  const std::string &id);
   virtual void unregisterHandle(ApiContext &context, RaceHandle handle);
 
+  void dumpContexts(std::string context="");  // debug
   using Contexts = std::unordered_set<ApiContext *>;
 
 protected:
@@ -191,8 +224,12 @@ protected:
   virtual ApiContext *newDialContext();
   virtual ApiContext *newListenContext();
   virtual ApiContext *newConnContext();
-  virtual ApiContext *newConnObjectContext();
-  virtual ApiContext *newPreConnObjContext();
+  virtual ApiContext *newConduitectContext();
+  virtual ApiContext *newPreConduitContext();
+  virtual ApiContext *newBootstrapDialContext();
+  virtual ApiContext *newBootstrapListenContext();
+  virtual ApiContext *newBootstrapPreConduitContext();
+  virtual ApiContext *newResumeContext();
 
   virtual Contexts getContexts(RaceHandle handle);
   virtual Contexts getContexts(const std::string &id);
@@ -209,13 +246,17 @@ public:
 
   // stateless state engines support multiple contexts simultaneously
   ConnStateEngine connEngine;
-  ConnectionObjectStateEngine connObjectEngine;
-  PreConnObjStateEngine preConnObjEngine;
+  ConduitStateEngine connObjectEngine;
+  PreConduitStateEngine preConduitEngine;
   SendStateEngine sendEngine;
   SendReceiveStateEngine sendReceiveEngine;
   DialStateEngine dialEngine;
   ListenStateEngine listenEngine;
   RecvStateEngine recvEngine;
+  BootstrapDialStateEngine bootstrapDialEngine;
+  BootstrapListenStateEngine bootstrapListenEngine;
+  BootstrapPreConduitStateEngine bootstrapPreConduitEngine;
+  ResumeStateEngine resumeEngine;
 
   // channel, link, and connection IDs are strings, and will never conflict
   // map IDs and system event handles to the appropriate context
@@ -227,6 +268,9 @@ public:
   std::unordered_map<std::string, Contexts> packageIdContextMap;
   std::unordered_map<ChannelId, std::pair<ChannelStatus, ChannelProperties>>
       activatedChannels;
+  std::unordered_map<std::string, std::pair<RaceHandle, ConnectionID>> linkConnMap;
+
+  std::unordered_map<std::string, std::vector<EncPkg>> unassociatedPackages;
 };
 
 class ApiManager {
@@ -241,7 +285,11 @@ public:
   sendReceive(SendOptions sendOptions, std::vector<uint8_t> data,
               std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
   virtual SdkResponse dial(SendOptions sendOptions, std::vector<uint8_t> data,
-                           std::function<void(ApiStatus, RaceHandle)> callback);
+                           std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
+  virtual SdkResponse resume(ResumeOptions resumeOptions,
+                             std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
+  virtual SdkResponse bootstrapDial(BootstrapConnectionOptions options, std::vector<uint8_t> data,
+                           std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
   virtual SdkResponse getReceiveObject(
       ReceiveOptions recvOptions,
       std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
@@ -256,7 +304,10 @@ public:
   listen(ReceiveOptions recvOptions,
          std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
   virtual SdkResponse
-  accept(OpHandle handle, std::function<void(ApiStatus, RaceHandle)> callback);
+  bootstrapListen(BootstrapConnectionOptions options,
+         std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
+  virtual SdkResponse
+  accept(OpHandle handle, std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
 
   virtual SdkResponse
   read(OpHandle handle,
@@ -272,11 +323,18 @@ public:
   virtual SdkResponse onStateMachineFinished(RaceHandle contextHandle);
   virtual SdkResponse onConnStateMachineConnected(RaceHandle contextHandle,
                                                   ConnectionID connId,
-                                                  std::string linkAddress);
+                                                  std::string linkAddress,
+                                                  std::string channelId);
   virtual SdkResponse onChannelStatusChangedForContext(
       RaceHandle contextHandle, RaceHandle callHandle,
       const ChannelId &channelGid, ChannelStatus status,
       const ChannelProperties &properties);
+
+  virtual SdkResponse onConnStateMachineConnectedForContext(
+      RaceHandle contextHandle,
+      RaceHandle callHandle,
+      RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress);
+
 
   // Plugin callbacks
   virtual SdkResponse
