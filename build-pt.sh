@@ -86,6 +86,6 @@ cp /linux/x86_64/include/race/common/Race.h /linux/x86_64/include/race/
 cp -r racesdk/package/LINUX_x86_64/go/* /usr/local/go/*
 
 pushd pluggable-transport
-cmake --debug-find --debug-output --preset=$LINUX_PRESET -DBUILD_VERSION="local" ${CMAKE_ARGS}
+cmake --preset=$LINUX_PRESET -DBUILD_VERSION="local" ${CMAKE_ARGS}
 cmake --build -j --preset=$LINUX_PRESET --target install 
 cp -r racesdk/package/LINUX_x86_64/lib/race/raceDispatcher ../racesdk/package/LINUX_x86_64/lib/raceDispatcher
