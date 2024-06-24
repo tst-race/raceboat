@@ -82,7 +82,7 @@ std::string bootstrapConnectionOptionsToString(const BootstrapConnectionOptions 
   ss << "init_recv_role: '" << bootstrapConnectionOptions.init_recv_role << "', ";
   ss << "final_send_role: '" << bootstrapConnectionOptions.final_send_role << "', ";
   ss << "final_recv_role: '" << bootstrapConnectionOptions.final_recv_role << "', ";
-  ss << "timeout_seconds: '" << bootstrapConnectionOptions.timeout_seconds << "'}";
+  ss << "timeout_seconds: '" << bootstrapConnectionOptions.timeout_ms << "'}";
   return ss.str();
 }
 

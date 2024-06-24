@@ -72,7 +72,6 @@ public:
 
   std::function<void(ApiStatus, RaceHandle)> dialCallback;
   std::function<void(ApiStatus, RaceHandle)> resumeCallback;
-  std::function<void(ApiStatus, std::vector<uint8_t>)> readCallback;
   std::function<void(ApiStatus)> closeCallback;
 
 protected:
