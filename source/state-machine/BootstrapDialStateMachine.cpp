@@ -263,10 +263,12 @@ struct StateBootstrapDialSendHello : public BootstrapDialState {
     // ctx.manager.registerId(ctx, ctx.recvConnId);
 
     // TODO: There's better ways to encode than base64 inside json
+    helper::logInfo(logPrefix + "encoding packageId");
     nlohmann::json json = {
         {"packageId", base64::encode(std::vector<uint8_t>(
                           ctx.packageId.begin(), ctx.packageId.end()))},
     };
+    helper::logInfo(logPrefix + "Creating links");
 
     //
     if (ctx.shouldCreateReceiver(ctx.opts.init_recv_channel) and !ctx.initRecvLinkAddress.empty()) {
@@ -274,26 +276,32 @@ struct StateBootstrapDialSendHello : public BootstrapDialState {
         json["initSendLinkAddress"] = ctx.initRecvLinkAddress;
         json["initSendChannel"] = ctx.opts.init_recv_channel;
     }
+    helper::logInfo(logPrefix + " sendlink");
     if (!ctx.finalSendLinkAddress.empty()) {
       // Json name is relative to the recipient, so this is a "recv" link for them
         json["finalRecvLinkAddress"] = ctx.finalSendLinkAddress;
         json["finalRecvChannel"] = ctx.opts.final_send_channel;
     }
+    helper::logInfo(logPrefix + " recvLink");
     if (!ctx.finalRecvLinkAddress.empty()) {
       // Json name is relative to the recipient, so this is a "send" link for them
         json["finalSendLinkAddress"] = ctx.finalRecvLinkAddress;
         json["finalSendChannel"] = ctx.opts.final_recv_channel;
     }
 
+    helper::logInfo(logPrefix + "encoding hello");
     std::string dataB64 = base64::encode(std::move(ctx.helloData));
     json["message"] = dataB64;
     ctx.helloData.clear();
+    helper::logInfo(logPrefix + "converting packageId to bytes");
 
+    helper::logInfo(logPrefix + " json.dump");
     std::string message = std::string(packageIdLen, '\0') + json.dump();
     std::vector<uint8_t> bytes(message.begin(), message.end());
 
     EncPkg pkg(0, 0, bytes);
     RaceHandle pkgHandle = ctx.manager.getCore().generateHandle();
+    helper::logInfo(logPrefix + " send package");
     SdkResponse response =
         plugin.sendPackage(pkgHandle, ctx.initSendConnId, pkg, 0, 0);
     ctx.manager.registerHandle(ctx, pkgHandle);

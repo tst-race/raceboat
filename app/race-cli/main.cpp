@@ -255,6 +255,8 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       try {
         // convert from seconds to milliseconds
         opts.timeout_ms = static_cast<int>(ceil(std::stod(optarg) * 1000));
+        // opts.timeout_ms = static_cast<int>(std::stod(optarg));
+        fprintf(stdout, "timeout %d\n", opts.timeout_ms);
       } catch (std::exception &e) {
         fprintf(stderr, "%s: received invalid argument for timeout %s\n",
                 argv[0], optarg);
@@ -825,7 +827,7 @@ void forward_local_to_conduit(int local_sock, std::shared_ptr<Raceboat::Conduit>
     }
   }
 
-  conduit->close();  // close the conduit, so the forward_conduit_to_local thread will stop blocking and return
+  ::close(local_sock);  // close the socket so the forward_local_to_conduit thread will stop blocking
   printf("Exiting local_to_conduit loop\n");
 }
 
@@ -869,7 +871,7 @@ void forward_conduit_to_local(std::shared_ptr<Raceboat::Conduit> conduit, int lo
     }
   }
 
-  ::close(local_sock);  // close the socket so the forward_local_to_conduit thread will stop blocking
+  conduit->close();  // close the conduit, so the forward_conduit_to_local thread will stop blocking and return
   printf("Exiting conduit_to_local loop\n");
 }
 
