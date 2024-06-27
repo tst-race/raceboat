@@ -211,7 +211,10 @@ struct StateConduitFinished : public ConduitState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
-    ctx.callReadCallback(ApiStatus::CLOSING, {});
+    /* TODO: this causes a segfault when the conduit gets closed via timeout.
+       It would be nice to cleanly closeout the conduit in case it has ended for some other reason and a blocking reader might be left hanging
+     */
+    // ctx.callReadCallback(ApiStatus::CLOSING, {});
 
     for (auto &[cb, bytes] : ctx.sendQueue) {
       helper::logWarning(logPrefix + "send queue not empty");

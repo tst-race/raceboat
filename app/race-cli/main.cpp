@@ -826,7 +826,7 @@ void forward_local_to_conduit(int local_sock, std::shared_ptr<Raceboat::Conduit>
       poll_status = await_socket_input(local_sock, (timeout*1000));
     }
   }
-
+  
   ::close(local_sock);  // close the socket so the forward_local_to_conduit thread will stop blocking
   printf("Exiting local_to_conduit loop\n");
 }
@@ -873,6 +873,21 @@ void forward_conduit_to_local(std::shared_ptr<Raceboat::Conduit> conduit, int lo
 
   conduit->close();  // close the conduit, so the forward_conduit_to_local thread will stop blocking and return
   printf("Exiting conduit_to_local loop\n");
+}
+
+void relay_data_loop_client(const int client_sock, std::shared_ptr<Raceboat::Conduit> conduit, const int timeoutSeconds, const bool blocking) {
+  printf("relay_data_loop socket: %d with race read timeout %d seconds\n", client_sock, timeoutSeconds);
+  std::shared_ptr<std::atomic_int> activityTimeoutTs = std::make_shared<std::atomic_int>(now() + timeoutSeconds);
+
+  std::thread local_to_conduit_thread([client_sock, conduit, activityTimeoutTs, timeoutSeconds]() {
+    forward_local_to_conduit(client_sock, conduit, activityTimeoutTs, timeoutSeconds);
+  });
+
+  std::thread conduit_to_local_thread([client_sock, conduit, activityTimeoutTs, timeoutSeconds]() {
+    forward_conduit_to_local(conduit, client_sock, activityTimeoutTs, timeoutSeconds);
+  });
+  local_to_conduit_thread.join();
+  // conduit_to_local_thread.join();
 }
 
 void relay_data_loop(const int client_sock, std::shared_ptr<Raceboat::Conduit> conduit, const int timeoutSeconds, const bool blocking) {

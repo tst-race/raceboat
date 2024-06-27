@@ -216,6 +216,7 @@ public:
                                  const ConnectionID &connId,
                                  const std::string &id);
   virtual void unregisterHandle(ApiContext &context, RaceHandle handle);
+  virtual void removeLinkConn(ApiContext &/*context*/, std::string channelId, std::string linkAddress);
 
   void dumpContexts(std::string context="");  // debug
   using Contexts = std::unordered_set<ApiContext *>;

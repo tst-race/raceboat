@@ -1338,6 +1338,18 @@ ApiManagerInternal::getContexts(RaceHandle handle, const std::string &id) {
   return contexts;
 }
 
+void ApiManagerInternal::removeLinkConn(ApiContext &/*context*/, std::string channelId, std::string linkAddress){
+  TRACE_METHOD(channelId, linkAddress);
+  if (linkAddress != "") {
+    std::string normalized_address = nlohmann::json::parse(linkAddress).dump();
+    auto connContextIt = linkConnMap.find(channelId + normalized_address);
+    if (connContextIt != linkConnMap.end()) {
+      helper::logDebug(logPrefix + "removing entry for $" + channelId + "$ $" + normalized_address + "$ in the linkConnMap with ConnID=" + connContextIt->second.second);
+      linkConnMap.erase(connContextIt);
+    }
+  }
+}
+  
 void ApiManagerInternal::removeContext(ApiContext &context) {
   TRACE_METHOD();
   for (auto pairIt = handleContextMap.begin();
