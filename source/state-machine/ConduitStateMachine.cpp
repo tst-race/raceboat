@@ -238,11 +238,13 @@ struct StateConduitFinished : public ConduitState {
 
 struct StateConduitReadCancelled : public ConduitState {
   explicit StateConduitReadCancelled(
-      StateType id = STATE_CONNECTION_OBJECT_FAILED)
-      : ConduitState(id, "STATE_CONNECTION_OBJECT_FAILED") {}
+      StateType id = STATE_CONNECTION_OBJECT_CANCELLED)
+      : ConduitState(id, "STATE_CONNECTION_OBJECT_CANCELLED") {}
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
-    getContext(context).callReadCallback(ApiStatus::CANCELLED, {});
+    auto &ctx = getContext(context);
+    ctx.callReadCallback(ApiStatus::CANCELLED, {});
+    ctx.pendingEvents.push(EVENT_ALWAYS);
     return EventResult::SUCCESS;
   }
 };

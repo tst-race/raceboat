@@ -280,6 +280,17 @@ SdkResponse ApiManager::close(OpHandle handle,
   return post(logPrefix, &ApiManagerInternal::close, handle, callback);
 }
 
+SdkResponse ApiManager::cancelRead(OpHandle handle,
+                              std::function<void(ApiStatus)> callback) {
+  TRACE_METHOD();
+
+  if (!callback) {
+    return SDK_INVALID_ARGUMENT;
+  }
+
+  return post(logPrefix, &ApiManagerInternal::cancelRead, handle, callback);
+}
+
 // internal callbacks
 SdkResponse ApiManager::onStateMachineFailed(RaceHandle contextHandle) {
   TRACE_METHOD();
@@ -616,6 +627,23 @@ void ApiManagerInternal::close(uint64_t postId, OpHandle handle,
   for (auto context : contexts) {
     context->updateClose(handle, callback);
     triggerEvent(*context, EVENT_CLOSE);
+  }
+}
+
+void ApiManagerInternal::cancelRead(uint64_t postId, OpHandle handle,
+                               std::function<void(ApiStatus)> callback) {
+  TRACE_METHOD(postId, handle);
+
+  auto contexts = getContexts(handle);
+  if (contexts.size() != 1) {
+    helper::logError(logPrefix + "Invalid handle passed to cancelRead");
+    callback(ApiStatus::INTERNAL_ERROR);
+    callback = {};
+  }
+
+  for (auto context : contexts) {
+    triggerEvent(*context, EVENT_CANCELLED);
+    callback(ApiStatus::OK);
   }
 }
 

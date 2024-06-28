@@ -109,7 +109,6 @@ std::string apiStatusToString(const ApiStatus status) {
   }
 }
 
-
 Conduit::Conduit(std::shared_ptr<Core> core, OpHandle handle,
                  ConduitProperties properties)
   : core(core), handle(handle), properties(properties) {}
@@ -212,6 +211,24 @@ ApiStatus Conduit::close() {
   }
 
   auto response = core->getApiManager().close(
+      handle, [&promise](ApiStatus status) { promise.set_value(status); });
+  if (response.status != SDK_OK) {
+    return ApiStatus::INTERNAL_ERROR;
+  }
+
+  this->handle = NULL_RACE_HANDLE;
+  return future.get();
+}
+
+ApiStatus Conduit::cancelRead() {
+  TRACE_METHOD();
+  std::promise<ApiStatus> promise;
+  auto future = promise.get_future();
+  if (core == nullptr) {
+    return ApiStatus::INVALID_ARGUMENT;
+  }
+
+  auto response = core->getApiManager().cancelRead(
       handle, [&promise](ApiStatus status) { promise.set_value(status); });
   if (response.status != SDK_OK) {
     return ApiStatus::INTERNAL_ERROR;

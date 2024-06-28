@@ -125,6 +125,7 @@ public:
   ApiStatus write(std::vector<uint8_t> message);
   ApiStatus write_str(const std::string &message);
   ApiStatus close();
+  ApiStatus cancelRead();
   ConduitProperties getConduitProperties();
 
   static const int BLOCKING_READ = 0;

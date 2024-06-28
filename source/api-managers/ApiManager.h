@@ -120,6 +120,8 @@ public:
                      std::function<void(ApiStatus)> callback);
   virtual void close(uint64_t postId, OpHandle handle,
                      std::function<void(ApiStatus)> callback);
+  virtual void cancelRead(uint64_t postId, OpHandle handle,
+                     std::function<void(ApiStatus)> callback);
   virtual void
   cancelEvent(uint64_t postId, OpHandle handle,
              std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
@@ -321,6 +323,8 @@ public:
                             std::function<void(ApiStatus)> callback);
   virtual SdkResponse close(OpHandle handle,
                             std::function<void(ApiStatus)> callback);
+  virtual SdkResponse cancelRead(OpHandle handle,
+                                 std::function<void(ApiStatus)> callback);
 
   // State machine callbacks
   // These are queued on the work thread queue to prevent stack issues
