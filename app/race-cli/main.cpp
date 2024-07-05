@@ -26,11 +26,6 @@
 #include "race/Race.h"
 #include "race/common/RaceLog.h"
 
-// #include <boost/asio.hpp>
-// #include <boost/bind.hpp>
-// #include <boost/shared_ptr.hpp>
-// #include <boost/enable_shared_from_this.hpp>
-
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -255,7 +250,6 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       try {
         // convert from seconds to milliseconds
         opts.timeout_ms = static_cast<int>(ceil(std::stod(optarg) * 1000));
-        // opts.timeout_ms = static_cast<int>(std::stod(optarg));
         fprintf(stdout, "timeout %d\n", opts.timeout_ms);
       } catch (std::exception &e) {
         fprintf(stderr, "%s: received invalid argument for timeout %s\n",
@@ -1088,12 +1082,10 @@ void client_connection_loop(int server_sock,
           printf("Exited relay_data_loop_client\n");
           printf("connect.getHandle() %lu\n", connection->getHandle());
           if (connection->getHandle() != NULL_RACE_HANDLE) {
-          // TODO: need to add a timer to call conduit->close() if it times out before another client gets accepted
             std::thread stale_conduit_timeout_thread([client_sock, connection, currentTimeoutTs]() {
               int sleepTime = currentTimeoutTs - now();
-              printf("SLEEPING %d in timeout thread\n", sleepTime);
+              printf("sleeping %d in timeout thread\n", sleepTime);
               sleep(static_cast<uint>(std::max(0, sleepTime)));
-              printf("Checking client_sock to close stale conduit");
               if (client_sock->load() == 0) {
                 printf("Closing stale conduit from timeout thread");
                 connection->close();

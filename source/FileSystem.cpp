@@ -125,7 +125,7 @@ bool FileSystem::FileSystem::writeFile(const fs::path &filePath,
 
 fs::path FileSystem::makePluginFilePath(const fs::path &filePath,
                                         const std::string &pluginId) {
-  fs::path path = pluginsInstallPath / "usr" /
+  fs::path path = pluginsInstallPath /
                   pluginId; // throws exception if pluginId empty
   if (!filePath.empty()) {  // would throw exception otherwise
     path = path / filePath;

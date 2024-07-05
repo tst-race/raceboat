@@ -55,8 +55,10 @@ COPY build/LINUX_arm64-v8a/app/bridge-distro/bridge-distro/ /usr/local/bin/bridg
 # preserve include structure assumed by go SWIG
 RUN mkdir -p /linux/arm64-v8a/include/race/common
 COPY racesdk/package/LINUX_arm64-v8a/include /linux/arm64-v8a/include/race/common
+COPY racesdk/package/LINUX_arm64-v8a/include /linux/arm64-v8a/include/
 RUN cp /linux/arm64-v8a/include/race/common/Race.h /linux/arm64-v8a/include/race/
 COPY racesdk/package/LINUX_arm64-v8a/go /usr/local/go
+RUN cp /usr/local/go/src/shims/comm/* /usr/local/go/src/shims/
 
 
 FROM ${TARGETARCH}-linux
