@@ -82,7 +82,7 @@ std::string bootstrapConnectionOptionsToString(const BootstrapConnectionOptions 
   ss << "init_recv_role: '" << bootstrapConnectionOptions.init_recv_role << "', ";
   ss << "final_send_role: '" << bootstrapConnectionOptions.final_send_role << "', ";
   ss << "final_recv_role: '" << bootstrapConnectionOptions.final_recv_role << "', ";
-  ss << "timeout_seconds: '" << bootstrapConnectionOptions.timeout_seconds << "'}";
+  ss << "timeout_seconds: '" << bootstrapConnectionOptions.timeout_ms << "'}";
   return ss.str();
 }
 
@@ -102,13 +102,12 @@ std::string apiStatusToString(const ApiStatus status) {
       return "PLUGIN_ERROR";
     case ApiStatus::INTERNAL_ERROR:
       return "INTERNAL_ERROR";
-    case ApiStatus::TIMEOUT:
-      return "TIMEOUT";
+    case ApiStatus::CANCELLED:
+      return "CANCELLED";
     default:
     return "UNKNOWN";
   }
 }
-
 
 Conduit::Conduit(std::shared_ptr<Core> core, OpHandle handle,
                  ConduitProperties properties)
@@ -118,6 +117,7 @@ Conduit::Conduit(const Conduit &that) {
   handle = that.handle;
   properties = that.properties;
 }
+Conduit::~Conduit() {}
 
 OpHandle Conduit::getHandle() { 
   return handle; 
@@ -147,7 +147,7 @@ std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read(int timeoutSeconds) {
   if (timeoutSeconds != BLOCKING_READ) { 
     if(std::future_status::ready != future.wait_for(std::chrono::seconds(timeoutSeconds))) {
       helper::logDebug(logPrefix + "timed out");
-      return {ApiStatus::TIMEOUT, {}};
+      return {ApiStatus::CANCELLED, {}};
     } else {
       return future.get();  
     }
@@ -200,6 +200,24 @@ ApiStatus Conduit::close() {
   }
 
   auto response = core->getApiManager().close(
+      handle, [&promise](ApiStatus status) { promise.set_value(status); });
+  if (response.status != SDK_OK) {
+    return ApiStatus::INTERNAL_ERROR;
+  }
+
+  this->handle = NULL_RACE_HANDLE;
+  return future.get();
+}
+
+ApiStatus Conduit::cancelRead() {
+  TRACE_METHOD();
+  std::promise<ApiStatus> promise;
+  auto future = promise.get_future();
+  if (core == nullptr) {
+    return ApiStatus::INVALID_ARGUMENT;
+  }
+
+  auto response = core->getApiManager().cancelRead(
       handle, [&promise](ApiStatus status) { promise.set_value(status); });
   if (response.status != SDK_OK) {
     return ApiStatus::INTERNAL_ERROR;

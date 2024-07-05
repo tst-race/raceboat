@@ -50,6 +50,7 @@ enum ApiManagerEvent : EventType {
   EVENT_SATISFIED,
   EVENT_NEEDS_SEND,
   EVENT_NEEDS_RECV,
+  EVENT_CANCELLED,
 };
 
 std::string eventToString(EventType event);

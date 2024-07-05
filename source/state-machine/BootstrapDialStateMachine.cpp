@@ -46,7 +46,7 @@ void ApiBootstrapDialContext::updateReceiveEncPkg(
 void ApiBootstrapDialContext::updateConnStateMachineConnected(RaceHandle contextHandle,
                                                      ConnectionID connId,
                                                      std::string linkAddress) {
-  helper::logInfo(" Received ConnStateMachineConnected for handle " + std::to_string(contextHandle) + " and ConnID: " + connId);
+  helper::logDebug(" Received ConnStateMachineConnected for handle " + std::to_string(contextHandle) + " and ConnID: " + connId);
   if (this->initRecvConnSMHandle == contextHandle) {
     this->initRecvConnId = connId;
     this->initRecvLinkAddress = linkAddress;
@@ -86,6 +86,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
 
     // SPECIAL CASE: we are going to need to create this link and then transmit the address out-of-band to the listener before they run listen
     if (create) {
+      helper::logError(logPrefix + " creating initial send link on the client is not yet supported (required for channel: " + ctx.opts.init_send_channel + ")");
       // TODO
     }
     // Normal case: we are provided an address from out-of-band to load
@@ -162,7 +163,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
 
     // If we are NOT creating then we have to wait for the server to create and send us the address as a hello-response
     if (create) {
-      helper::logInfo(logPrefix + " Creating final-send link on " + ctx.opts.final_send_channel);
+      helper::logDebug(logPrefix + " Creating final-send link on " + ctx.opts.final_send_channel);
       bool sending = true;
       ctx.finalSendConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
@@ -179,7 +180,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
       ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
     } else {
       // Explicitly do not expect this connection until the server response
-      helper::logInfo(logPrefix + " waiting on server to provide final-send link");
+      helper::logDebug(logPrefix + " waiting on server to provide final-send link");
       // ctx.finalSendConnSMHandle = NULL_RACE_HANDLE;
     }
   
@@ -194,7 +195,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
 
       // If we are NOT creating then we are waiting for the server to create and send the address as a hello-response
       if (create) {
-        helper::logInfo(logPrefix + " Creating final-recv link on " + ctx.opts.final_recv_channel);
+        helper::logDebug(logPrefix + " Creating final-recv link on " + ctx.opts.final_recv_channel);
         bool sending = false;
         ctx.finalRecvConnSMHandle = ctx.manager.
           startConnStateMachine(ctx.handle,
@@ -212,7 +213,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
         ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
       } else {
         // Explicitly do not expect this connection until the server response
-        helper::logInfo(logPrefix + " waiting on server to provide final-recv link");
+        helper::logDebug(logPrefix + " waiting on server to provide final-recv link");
         // ctx.finalRecvConnSMHandle = NULL_RACE_HANDLE;
       }
     }
@@ -263,10 +264,12 @@ struct StateBootstrapDialSendHello : public BootstrapDialState {
     // ctx.manager.registerId(ctx, ctx.recvConnId);
 
     // TODO: There's better ways to encode than base64 inside json
+    helper::logDebug(logPrefix + "encoding packageId");
     nlohmann::json json = {
         {"packageId", base64::encode(std::vector<uint8_t>(
                           ctx.packageId.begin(), ctx.packageId.end()))},
     };
+    helper::logDebug(logPrefix + "Creating links");
 
     //
     if (ctx.shouldCreateReceiver(ctx.opts.init_recv_channel) and !ctx.initRecvLinkAddress.empty()) {
@@ -274,26 +277,32 @@ struct StateBootstrapDialSendHello : public BootstrapDialState {
         json["initSendLinkAddress"] = ctx.initRecvLinkAddress;
         json["initSendChannel"] = ctx.opts.init_recv_channel;
     }
+    helper::logDebug(logPrefix + " sendlink");
     if (!ctx.finalSendLinkAddress.empty()) {
       // Json name is relative to the recipient, so this is a "recv" link for them
         json["finalRecvLinkAddress"] = ctx.finalSendLinkAddress;
         json["finalRecvChannel"] = ctx.opts.final_send_channel;
     }
+    helper::logDebug(logPrefix + " recvLink");
     if (!ctx.finalRecvLinkAddress.empty()) {
       // Json name is relative to the recipient, so this is a "send" link for them
         json["finalSendLinkAddress"] = ctx.finalRecvLinkAddress;
         json["finalSendChannel"] = ctx.opts.final_recv_channel;
     }
 
+    helper::logDebug(logPrefix + "encoding hello");
     std::string dataB64 = base64::encode(std::move(ctx.helloData));
     json["message"] = dataB64;
     ctx.helloData.clear();
+    helper::logDebug(logPrefix + "converting packageId to bytes");
 
+    helper::logDebug(logPrefix + " json.dump");
     std::string message = std::string(packageIdLen, '\0') + json.dump();
     std::vector<uint8_t> bytes(message.begin(), message.end());
 
     EncPkg pkg(0, 0, bytes);
     RaceHandle pkgHandle = ctx.manager.getCore().generateHandle();
+    helper::logDebug(logPrefix + " send package");
     SdkResponse response =
         plugin.sendPackage(pkgHandle, ctx.initSendConnId, pkg, 0, 0);
     ctx.manager.registerHandle(ctx, pkgHandle);

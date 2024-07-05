@@ -120,6 +120,11 @@ public:
                      std::function<void(ApiStatus)> callback);
   virtual void close(uint64_t postId, OpHandle handle,
                      std::function<void(ApiStatus)> callback);
+  virtual void cancelRead(uint64_t postId, OpHandle handle,
+                     std::function<void(ApiStatus)> callback);
+  virtual void
+  cancelEvent(uint64_t postId, OpHandle handle,
+             std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
 
   // state machine callbacks
   virtual ActivateChannelStatusCode activateChannel(ApiContext &context,
@@ -213,6 +218,7 @@ public:
                                  const ConnectionID &connId,
                                  const std::string &id);
   virtual void unregisterHandle(ApiContext &context, RaceHandle handle);
+  virtual void removeLinkConn(ApiContext &/*context*/, std::string channelId, std::string linkAddress);
 
   void dumpContexts(std::string context="");  // debug
   using Contexts = std::unordered_set<ApiContext *>;
@@ -311,11 +317,14 @@ public:
 
   virtual SdkResponse
   read(OpHandle handle,
-       std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
+       std::function<void(ApiStatus, std::vector<uint8_t>)> callback,
+       int timeoutSeconds=BLOCKING_READ);
   virtual SdkResponse write(OpHandle handle, std::vector<uint8_t> bytes,
                             std::function<void(ApiStatus)> callback);
   virtual SdkResponse close(OpHandle handle,
                             std::function<void(ApiStatus)> callback);
+  virtual SdkResponse cancelRead(OpHandle handle,
+                                 std::function<void(ApiStatus)> callback);
 
   // State machine callbacks
   // These are queued on the work thread queue to prevent stack issues
@@ -358,6 +367,8 @@ public:
 
   // For testing
   void waitForCallbacks();
+
+  static const int BLOCKING_READ = -1;
 
 protected:
   template <typename T, typename... Args>

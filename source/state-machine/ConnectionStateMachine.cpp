@@ -280,6 +280,7 @@ struct StateConnConnectionClosed : public ConnState {
       return EventResult::NOT_SUPPORTED;
     }
 
+    ctx.manager.removeLinkConn(ctx, ctx.channelId, ctx.linkAddress);
     ctx.manager.registerHandle(ctx, destroyLinkHandle);
 
     return EventResult::SUCCESS;

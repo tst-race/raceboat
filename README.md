@@ -1,6 +1,17 @@
 # RACE communications libraries
 This repository contains a library that can be used to communicate with another user of the library over RACE Comms channels.
 
+## Building
+
+```bash
+docker run -it --rm --name=build-pt \
+       -e MAKEFLAGS="-j" \
+       -v $(pwd)/:/code/ \
+       -w /code \
+       ghcr.io/tst-race/race-images/race-compile:main \
+       ./build.sh
+```
+
 ## Creating `raceboat` docker image
 Build, create package, and build the docker image.  Use a `race-compile` container to build and create the package.  The following demonstrates building for an aarch64 target platform.  The flags will need to change for other target platforms, and is documented in the scripts.  
 

@@ -230,7 +230,9 @@ ApiManager::accept(OpHandle handle,
 
 SdkResponse ApiManager::read(
     OpHandle handle,
-    std::function<void(ApiStatus, std::vector<uint8_t>)> callback) {
+    std::function<void(ApiStatus, std::vector<uint8_t>)> callback,
+    int // timeoutSeconds
+                             ) {
   TRACE_METHOD();
 
   if (!callback) {
@@ -239,6 +241,7 @@ SdkResponse ApiManager::read(
 
   auto response = post(logPrefix, &ApiManagerInternal::read, handle, callback);
   handler.unblock_queue("");  // in case of timeout
+
   return response;
 }
 
@@ -263,6 +266,17 @@ SdkResponse ApiManager::close(OpHandle handle,
   }
 
   return post(logPrefix, &ApiManagerInternal::close, handle, callback);
+}
+
+SdkResponse ApiManager::cancelRead(OpHandle handle,
+                              std::function<void(ApiStatus)> callback) {
+  TRACE_METHOD();
+
+  if (!callback) {
+    return SDK_INVALID_ARGUMENT;
+  }
+
+  return post(logPrefix, &ApiManagerInternal::cancelRead, handle, callback);
 }
 
 // internal callbacks
@@ -601,6 +615,39 @@ void ApiManagerInternal::close(uint64_t postId, OpHandle handle,
   for (auto context : contexts) {
     context->updateClose(handle, callback);
     triggerEvent(*context, EVENT_CLOSE);
+  }
+}
+
+void ApiManagerInternal::cancelRead(uint64_t postId, OpHandle handle,
+                               std::function<void(ApiStatus)> callback) {
+  TRACE_METHOD(postId, handle);
+
+  auto contexts = getContexts(handle);
+  if (contexts.size() != 1) {
+    helper::logError(logPrefix + "Invalid handle passed to cancelRead");
+    callback(ApiStatus::INTERNAL_ERROR);
+    callback = {};
+  }
+
+  for (auto context : contexts) {
+    triggerEvent(*context, EVENT_CANCELLED);
+    callback(ApiStatus::OK);
+  }
+}
+
+void ApiManagerInternal::cancelEvent(
+  uint64_t postId, OpHandle handle,
+  std::function<void(ApiStatus, std::vector<uint8_t>)>) {
+    TRACE_METHOD(postId, handle);
+
+  auto contexts = getContexts(handle);
+  if (contexts.size() != 1) {
+    helper::logDebug(logPrefix + "Invalid handle - has " + std::to_string(contexts.size()) + " contexts");
+  }
+
+  for (auto context : contexts) {
+    // allow state machine to call the previously set callback to unblock futures, etc.
+    triggerEvent(*context, EVENT_CANCELLED);
   }
 }
 
@@ -1047,13 +1094,6 @@ RaceHandle ApiManagerInternal::startBootstrapPreConduitStateMachine(
                          " START BOOTSTRAP PRECONN OBJECT being called");
   // create a connection context and copy information from the send/recv context
   auto context = newBootstrapPreConduitContext();
-  // auto listenContextIt = activeContexts.find(contextHandle);
-  // if (listenContextIt == activeContexts.end()) {
-  //   return NULL_RACE_HANDLE;
-  // }
-
-  // This may need to be a reinterpret_cast - don't want to lose the extended link info
-  // ApiBootstrapListenContext listenContext = static_cast<ApiBootstrapListenContext>(*listenContextIt->second);
   context->updateBootstrapPreConduitStateMachineStart(contextHandle,
                                                       listenContext,
                                                       packageId, recvMessages);
@@ -1307,6 +1347,18 @@ ApiManagerInternal::getContexts(RaceHandle handle, const std::string &id) {
   return contexts;
 }
 
+void ApiManagerInternal::removeLinkConn(ApiContext &/*context*/, std::string channelId, std::string linkAddress){
+  TRACE_METHOD(channelId, linkAddress);
+  if (linkAddress != "") {
+    std::string normalized_address = nlohmann::json::parse(linkAddress).dump();
+    auto connContextIt = linkConnMap.find(channelId + normalized_address);
+    if (connContextIt != linkConnMap.end()) {
+      helper::logDebug(logPrefix + "removing entry for $" + channelId + "$ $" + normalized_address + "$ in the linkConnMap with ConnID=" + connContextIt->second.second);
+      linkConnMap.erase(connContextIt);
+    }
+  }
+}
+  
 void ApiManagerInternal::removeContext(ApiContext &context) {
   TRACE_METHOD();
   for (auto pairIt = handleContextMap.begin();
