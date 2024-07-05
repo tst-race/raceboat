@@ -136,17 +136,6 @@ std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read(int timeoutSeconds) {
     return {ApiStatus::INVALID, {}};
   }
 
-  // auto response = core->getApiManager().read(
-  //     handle, [&promise](ApiStatus status, std::vector<uint8_t> bytes) {
-  //       if(promise.get_future().valid()) {
-  //         promise.set_value({status, std::move(bytes)});
-  //       }
-  //     }, timeoutSeconds);
-  // if (response.status != SDK_OK) {
-  //   return {ApiStatus::INVALID_ARGUMENT, {}};
-  // }
-  // return future.get();
-  
   auto response = core->getApiManager().read(
       handle, [&promise](ApiStatus status, std::vector<uint8_t> bytes) {
         promise.set_value({status, std::move(bytes)});

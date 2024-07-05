@@ -239,18 +239,6 @@ SdkResponse ApiManager::read(
     return SDK_INVALID_ARGUMENT;
   }
 
-  // if (timeoutSeconds != BLOCKING_READ) { 
-  //   helper::logDebug(logPrefix + " NON-BLOCKING READ");
-  //   std::thread timeout_thread([this, handle, callback, logPrefix, timeoutSeconds]() {
-  //     std::promise<std::pair<ApiStatus, std::vector<uint8_t>>> promise;
-  //     auto future = promise.get_future();
-  //     if(std::future_status::ready != future.wait_for(std::chrono::seconds(timeoutSeconds))) {
-  //           post(logPrefix, &ApiManagerInternal::cancelEvent, handle, nullptr);
-  //         }
-  //   });
-  //   timeout_thread.detach();
-  // }
-
   auto response = post(logPrefix, &ApiManagerInternal::read, handle, callback);
   handler.unblock_queue("");  // in case of timeout
 
@@ -1106,13 +1094,6 @@ RaceHandle ApiManagerInternal::startBootstrapPreConduitStateMachine(
                          " START BOOTSTRAP PRECONN OBJECT being called");
   // create a connection context and copy information from the send/recv context
   auto context = newBootstrapPreConduitContext();
-  // auto listenContextIt = activeContexts.find(contextHandle);
-  // if (listenContextIt == activeContexts.end()) {
-  //   return NULL_RACE_HANDLE;
-  // }
-
-  // This may need to be a reinterpret_cast - don't want to lose the extended link info
-  // ApiBootstrapListenContext listenContext = static_cast<ApiBootstrapListenContext>(*listenContextIt->second);
   context->updateBootstrapPreConduitStateMachineStart(contextHandle,
                                                       listenContext,
                                                       packageId, recvMessages);
