@@ -140,6 +140,7 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
         return EventResult::NOT_SUPPORTED;
       } else {
         bool sending = true;
+        helper::logInfo(logPrefix + "Loading init-send link on " +ctx.opts.init_send_channel + " with address: " + ctx.initSendLinkAddress);
         ctx.initSendConnSMHandle = ctx.manager.
           startConnStateMachine(ctx.handle,
                                 ctx.opts.init_send_channel,
@@ -164,6 +165,7 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
     // We are creating, we will create and then send this address in a hello response
     if (create) {
       bool sending = true;
+      helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_send_channel);
       ctx.finalSendConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
                               ctx.opts.final_send_channel,
@@ -183,6 +185,7 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
       return EventResult::NOT_SUPPORTED;
     } else {
     bool sending = true;
+    helper::logInfo(logPrefix + "Loading final-send link on " + ctx.opts.final_send_channel + " with address: " + ctx.finalSendLinkAddress);
     ctx.finalSendConnSMHandle = ctx.manager.
       startConnStateMachine(ctx.handle,
                             ctx.opts.final_send_channel,
@@ -205,6 +208,7 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
     // We are creating, we will create and then send this address in a hello response
     if (create) {
       bool sending = false;
+      helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_recv_channel);
       ctx.finalRecvConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
                               ctx.opts.final_recv_channel,
@@ -224,6 +228,7 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
     return EventResult::NOT_SUPPORTED;
   } else {
     bool sending = false;
+    helper::logInfo(logPrefix + "Loading final-recv link on " + ctx.opts.final_recv_channel + " with address: " + ctx.finalRecvLinkAddress);
     ctx.finalRecvConnSMHandle = ctx.manager.
       startConnStateMachine(ctx.handle,
                             ctx.opts.final_recv_channel,
