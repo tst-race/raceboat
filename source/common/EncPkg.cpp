@@ -18,8 +18,8 @@
 
 #include <cstring> // memcpy
 
-const size_t TRACE_ID_LENGTH = sizeof(uint64_t);    // using 64 bit trace id
-const size_t SPAN_ID_LENGTH = sizeof(uint64_t);     // using 64 bit span id
+const size_t TRACE_ID_LENGTH = sizeof(0);    // using 64 bit trace id
+const size_t SPAN_ID_LENGTH = sizeof(0);     // using 64 bit span id
 const size_t PACKAGE_TYPE_LENGTH = sizeof(uint8_t); // using 8 bit package type
 
 EncPkg::EncPkg(uint64_t _traceId, uint64_t _spanId, const RawData &_cipherText)
@@ -34,8 +34,10 @@ EncPkg::EncPkg(RawData rawData)
   if (rawData.size() >=
       (TRACE_ID_LENGTH + SPAN_ID_LENGTH + PACKAGE_TYPE_LENGTH)) {
     // TODO: endianness
-    std::memcpy(&traceId, rawData.data(), TRACE_ID_LENGTH);
-    std::memcpy(&spanId, rawData.data() + TRACE_ID_LENGTH, SPAN_ID_LENGTH);
+    // std::memcpy(&traceId, rawData.data(), TRACE_ID_LENGTH);
+    // std::memcpy(&spanId, rawData.data() + TRACE_ID_LENGTH, SPAN_ID_LENGTH);
+    traceId = 0;
+    spanId = 0;
     std::memcpy(&packageType,
                 rawData.data() + (TRACE_ID_LENGTH + SPAN_ID_LENGTH),
                 PACKAGE_TYPE_LENGTH);
@@ -48,10 +50,10 @@ EncPkg::EncPkg(RawData rawData)
 RawData EncPkg::getRawData() const {
   RawData rawData;
   // TODO: endianness
-  rawData.insert(rawData.end(), reinterpret_cast<const uint8_t *>(&traceId),
-                 reinterpret_cast<const uint8_t *>(&traceId) + sizeof(traceId));
-  rawData.insert(rawData.end(), reinterpret_cast<const uint8_t *>(&spanId),
-                 reinterpret_cast<const uint8_t *>(&spanId) + sizeof(spanId));
+  // rawData.insert(rawData.end(), reinterpret_cast<const uint8_t *>(&traceId),
+  //                reinterpret_cast<const uint8_t *>(&traceId) + sizeof(traceId));
+  // rawData.insert(rawData.end(), reinterpret_cast<const uint8_t *>(&spanId),
+  //                reinterpret_cast<const uint8_t *>(&spanId) + sizeof(spanId));
   rawData.insert(rawData.end(), reinterpret_cast<const uint8_t *>(&packageType),
                  reinterpret_cast<const uint8_t *>(&packageType) +
                      sizeof(packageType));
