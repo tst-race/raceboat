@@ -50,6 +50,8 @@ if(NOT ANDROID)
     add_subdirectory(test/common/DecomposedTestStub EXCLUDE_FROM_ALL)
     add_subdirectory(test/common/plugins/DecomposedTestImplementation EXCLUDE_FROM_ALL)
     add_subdirectory(test/source EXCLUDE_FROM_ALL)
+else()
+    add_subdirectory(android/app/src/main/cpp)
 endif()
 
 # Create this after all subdirectories have been added
