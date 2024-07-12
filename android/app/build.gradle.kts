@@ -19,7 +19,11 @@ android {
         externalNativeBuild {
             cmake {
                 arguments += "-DBUILD_VERSION=dev"
+                arguments += "-DPYTHON_INCLUDE_DIR=$projectDir/src/main/python/python-3.7.16-3-android-arm64-v8a/include/python3.7m"
+                arguments += "-DPYTHON_LIBRARY=$projectDir/src/main/jniLibs/arm64-v8a/libpython3.7m.so"
+                arguments += "-DPYTHON_EXECUTABLE=$projectDir/src/main/jniLibs/arm64-v8a/python3.7m"
                 cppFlags += "-std=c++17"
+                cppFlags += "-I$projectDir/src/main/cpp/include"
             }
         }
         //ndk{
