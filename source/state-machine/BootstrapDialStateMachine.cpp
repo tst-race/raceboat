@@ -91,7 +91,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
     }
     // Normal case: we are provided an address from out-of-band to load
     else {
-      helper::logInfo(logPrefix + " Loading initial-send link on " + ctx.opts.init_send_channel);
+      helper::logInfo(logPrefix + "Loading init-send link on " + ctx.opts.init_send_channel + " with address: " + ctx.opts.init_send_address);
       if (ctx.opts.init_send_address.empty()) {
         // Need an address to load
         helper::logError(logPrefix +
@@ -127,9 +127,9 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
       create = ctx.shouldCreateReceiver(ctx.opts.init_recv_channel);
       // No special cases here: if we are loading we should have a recv_address, if we are creating we will send the address in the hello message
       if (create) {
-        helper::logInfo(logPrefix + " Creating init-recv link on " + ctx.opts.init_recv_channel);
+        helper::logInfo(logPrefix + "Creating init-recv link on " + ctx.opts.init_recv_channel + (ctx.opts.init_recv_address.empty() ? "" : " from address: " + ctx.opts.init_recv_address));
       } else {
-        helper::logInfo(logPrefix + " Loading init-recv link on " + ctx.opts.init_recv_channel);
+        helper::logInfo(logPrefix + "Loading init-recv link on " + ctx.opts.init_recv_channel + " with address: " + ctx.opts.init_recv_address);
         if (ctx.opts.init_recv_address.empty()) {
           // Need an address to load
           helper::logError(logPrefix +
@@ -163,7 +163,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
 
     // If we are NOT creating then we have to wait for the server to create and send us the address as a hello-response
     if (create) {
-      helper::logDebug(logPrefix + " Creating final-send link on " + ctx.opts.final_send_channel);
+      helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_send_channel + (ctx.opts.init_recv_address.empty() ? "" : " from address: " + ctx.opts.init_recv_address));
       bool sending = true;
       ctx.finalSendConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
@@ -195,7 +195,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
 
       // If we are NOT creating then we are waiting for the server to create and send the address as a hello-response
       if (create) {
-        helper::logDebug(logPrefix + " Creating final-recv link on " + ctx.opts.final_recv_channel);
+        helper::logInfo(logPrefix + "Creating final-recv link on " + ctx.opts.final_recv_channel);
         bool sending = false;
         ctx.finalRecvConnSMHandle = ctx.manager.
           startConnStateMachine(ctx.handle,
@@ -360,7 +360,7 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
         if (ctx.finalSendConnId.empty()) {
           LinkAddress finalSendLinkAddress = json.at("finalSendLinkAddress");
           std::string finalSendChannel = json.at("finalSendChannel");
-          helper::logInfo(logPrefix + "loading finalSendLink: " + ctx.opts.final_send_channel + " " + finalSendLinkAddress);
+          helper::logInfo(logPrefix + "Loading final-send link: " + ctx.opts.final_send_channel + " " + finalSendLinkAddress);
           if (ctx.opts.final_send_channel != finalSendChannel) {
             helper::logError(logPrefix + "Requested final channel does not match specified final channel: " + finalSendChannel + " vs. " + ctx.opts.final_send_channel);
             continue;
@@ -387,6 +387,7 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
         if (ctx.finalRecvConnId.empty()) {
           LinkAddress finalRecvLinkAddress = json.at("finalRecvLinkAddress");
           std::string finalRecvChannel = json.at("finalRecvChannel");
+          helper::logInfo(logPrefix + "Loading final-recv-link: " + ctx.opts.final_recv_channel + " " + finalRecvLinkAddress);
           if (ctx.opts.final_recv_channel != finalRecvChannel) {
             helper::logError(logPrefix + "Requested final channel does not match specified final channel: " + finalRecvChannel + " vs. " + ctx.opts.final_recv_channel);
             continue;
