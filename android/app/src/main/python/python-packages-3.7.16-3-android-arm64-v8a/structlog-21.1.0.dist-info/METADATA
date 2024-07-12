@@ -1,0 +1,239 @@
+Metadata-Version: 2.1
+Name: structlog
+Version: 21.1.0
+Summary: Structured Logging for Python
+Home-page: https://www.structlog.org/
+Author: Hynek Schlawack
+Author-email: hs@ox.cx
+Maintainer: Hynek Schlawack
+Maintainer-email: hs@ox.cx
+License: MIT or Apache License, Version 2.0
+Project-URL: Documentation, https://www.structlog.org/
+Project-URL: Bug Tracker, https://github.com/hynek/structlog/issues
+Project-URL: Source Code, https://github.com/hynek/structlog
+Project-URL: Funding, https://github.com/sponsors/hynek
+Project-URL: Tidelift, https://tidelift.com/subscription/pkg/pypi-structlog?utm_source=pypi-structlog&utm_medium=pypi
+Keywords: logging,structured,structure,log
+Platform: UNKNOWN
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Natural Language :: English
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.6
+Description-Content-Type: text/x-rst
+Requires-Dist: typing-extensions ; python_version < "3.8"
+Provides-Extra: dev
+Requires-Dist: coverage[toml] ; extra == 'dev'
+Requires-Dist: freezegun (>=0.2.8) ; extra == 'dev'
+Requires-Dist: pretend ; extra == 'dev'
+Requires-Dist: pytest-asyncio ; extra == 'dev'
+Requires-Dist: pytest-randomly ; extra == 'dev'
+Requires-Dist: pytest (>=6.0) ; extra == 'dev'
+Requires-Dist: simplejson ; extra == 'dev'
+Requires-Dist: furo ; extra == 'dev'
+Requires-Dist: sphinx ; extra == 'dev'
+Requires-Dist: sphinx-toolbox ; extra == 'dev'
+Requires-Dist: twisted ; extra == 'dev'
+Requires-Dist: pre-commit ; extra == 'dev'
+Provides-Extra: docs
+Requires-Dist: furo ; extra == 'docs'
+Requires-Dist: sphinx ; extra == 'docs'
+Requires-Dist: sphinx-toolbox ; extra == 'docs'
+Requires-Dist: twisted ; extra == 'docs'
+Provides-Extra: tests
+Requires-Dist: coverage[toml] ; extra == 'tests'
+Requires-Dist: freezegun (>=0.2.8) ; extra == 'tests'
+Requires-Dist: pretend ; extra == 'tests'
+Requires-Dist: pytest-asyncio ; extra == 'tests'
+Requires-Dist: pytest-randomly ; extra == 'tests'
+Requires-Dist: pytest (>=6.0) ; extra == 'tests'
+Requires-Dist: simplejson ; extra == 'tests'
+
+==============================================
+``structlog``: : Structured Logging for Python
+==============================================
+
+
+``structlog`` makes logging in Python faster, less painful, and more powerful by adding structure to your log entries.
+
+It's up to you whether you want ``structlog`` to take care about the **output** of your log entries or whether you prefer to **forward** them to an existing logging system like the standard library's ``logging`` module.
+
+.. -end-short-
+
+Once you feel inspired to try it out, check out our friendly `Getting Started tutorial <https://www.structlog.org/en/stable/getting-started.html>`_ that also contains detailed installation instructions!
+
+.. -begin-spiel-
+
+If you prefer videos over reading, check out this DjangoCon Europe 2019 talk by `Markus Holtermann <https://twitter.com/m_holtermann>`_: "`Logging Rethought 2: The Actions of Frank Taylor Jr. <https://www.youtube.com/watch?v=Y5eyEgyHLLo>`_".
+
+
+Easier Logging
+==============
+
+You can stop writing prose and start thinking in terms of an event that happens in the context of key/value pairs:
+
+.. code-block:: pycon
+
+   >>> from structlog import get_logger
+   >>> log = get_logger()
+   >>> log.info("key_value_logging", out_of_the_box=True, effort=0)
+   2020-11-18 09:17.09 [info     ] key_value_logging              effort=0 out_of_the_box=True
+
+Each log entry is a meaningful dictionary instead of an opaque string now!
+
+
+Data Binding
+============
+
+Since log entries are dictionaries, you can start binding and re-binding key/value pairs to your loggers to ensure they are present in every following logging call:
+
+.. code-block:: pycon
+
+   >>> log = log.bind(user="anonymous", some_key=23)
+   >>> log = log.bind(user="hynek", another_key=42)
+   >>> log.info("user.logged_in", happy=True)
+   2020-11-18 09:18.28 [info     ] user.logged_in                 another_key=42 happy=True some_key=23 user=hynek
+
+Powerful Pipelines
+==================
+
+Each log entry goes through a `processor pipeline <https://www.structlog.org/en/stable/processors.html>`_ that is just a chain of functions that receive a dictionary and return a new dictionary that gets fed into the next function.
+That allows for simple but powerful data manipulation:
+
+.. code-block:: python
+
+   def timestamper(logger, log_method, event_dict):
+       """Add a timestamp to each log entry."""
+       event_dict["timestamp"] = time.time()
+       return event_dict
+
+There are `plenty of processors <https://www.structlog.org/en/stable/api.html#module-structlog.processors>`_ for most common tasks coming with ``structlog``:
+
+- Collectors of `call stack information <https://www.structlog.org/en/stable/api.html#structlog.processors.StackInfoRenderer>`_ ("How did this log entry happen?"),
+- …and `exceptions <https://www.structlog.org/en/stable/api.html#structlog.processors.format_exc_info>`_ ("What happened‽").
+- Unicode encoders/decoders.
+- Flexible `timestamping <https://www.structlog.org/en/stable/api.html#structlog.processors.TimeStamper>`_.
+
+
+
+Formatting
+==========
+
+``structlog`` is completely flexible about *how* the resulting log entry is emitted.
+Since each log entry is a dictionary, it can be formatted to **any** format:
+
+- A colorful key/value format for `local development <https://www.structlog.org/en/stable/development.html>`_,
+- `JSON <https://www.structlog.org/en/stable/api.html#structlog.processors.JSONRenderer>`_ for easy parsing,
+- or some standard format you have parsers for like nginx or Apache httpd.
+
+Internally, formatters are processors whose return value (usually a string) is passed into loggers that are responsible for the output of your message.
+``structlog`` comes with multiple useful formatters out-of-the-box.
+
+
+Output
+======
+
+``structlog`` is also very flexible with the final output of your log entries:
+
+- A **built-in** lightweight printer like in the examples above.
+  Easy to use and fast.
+- Use the **standard library**'s or **Twisted**'s logging modules for compatibility.
+  In this case ``structlog`` works like a wrapper that formats a string and passes them off into existing systems that won't ever know that ``structlog`` even exists.
+  Or the other way round: ``structlog`` comes with a ``logging`` formatter that allows for processing third party log records.
+- Don't format it to a string at all!
+  ``structlog`` passes you a dictionary and you can do with it whatever you want.
+  Reported uses cases are sending them out via network or saving them in a database.
+
+.. -end-spiel-
+
+.. -begin-meta-
+
+Getting Help
+============
+
+Please use the ``structlog`` tag on `StackOverflow <https://stackoverflow.com/questions/tagged/structlog>`_ to get help.
+
+Answering questions of your fellow developers is also a great way to help the project!
+
+
+Project Information
+===================
+
+``structlog`` is dual-licensed under `Apache License, version 2 <https://choosealicense.com/licenses/apache/>`_ and `MIT <https://choosealicense.com/licenses/mit/>`_, available from `PyPI <https://pypi.org/project/structlog/>`_, the source code can be found on `GitHub <https://github.com/hynek/structlog>`_, the documentation at https://www.structlog.org/.
+
+We collect useful third party extension in `our wiki <https://github.com/hynek/structlog/wiki/Third-party-Extensions>`_.
+
+``structlog`` targets Python 3.6 and newer, and PyPy3.
+
+If you need support for older Python versions, the last release with support for Python 2.7 and 3.5 was `20.1.0 <https://pypi.org/project/structlog/20.1.0/>`_.
+The package meta data should ensure that you get the correct version.
+
+
+``structlog`` for Enterprise
+----------------------------
+
+Available as part of the Tidelift Subscription.
+
+The maintainers of structlog and thousands of other packages are working with Tidelift to deliver commercial support and maintenance for the open source packages you use to build your applications. Save time, reduce risk, and improve code health, while paying the maintainers of the exact packages you use.
+`Learn more. <https://tidelift.com/subscription/pkg/pypi-structlog?utm_source=pypi-structlog&utm_medium=referral&utm_campaign=readme>`_
+
+
+Release Information
+===================
+
+21.1.0 (2021-02-18)
+-------------------
+
+
+Backward-incompatible changes:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*none*
+
+
+Deprecations:
+^^^^^^^^^^^^^
+
+*none*
+
+
+Changes:
+^^^^^^^^
+
+- ``structlog.threadlocal.wrap_dict()`` now has a correct type annotation.
+  `#290 <https://github.com/hynek/structlog/pull/290>`_
+- Fix isolation in ``structlog.contextvars``.
+  `#302 <https://github.com/hynek/structlog/pull/302>`_
+- The default configuration and loggers are pickleable again.
+  `#301 <https://github.com/hynek/structlog/pull/301>`_
+- ``structlog.dev.ConsoleRenderer`` will now look for a ``logger_name`` key if no
+  ``logger`` key is set.
+  `#295 <https://github.com/hynek/structlog/pull/295>`_
+
+`Full changelog <https://www.structlog.org/en/stable/changelog.html>`_.
+
+Authors
+=======
+
+``structlog`` is written and maintained by `Hynek Schlawack <https://hynek.me/>`_.
+It’s inspired by previous work done by `Jean-Paul Calderone <https://as.ynchrono.us/>`_ and `David Reid <https://dreid.org/>`_.
+
+The development is kindly supported by `Variomedia AG <https://www.variomedia.de/>`_.
+
+A full list of contributors can be found on GitHub’s `overview <https://github.com/hynek/structlog/graphs/contributors>`_.
+Some of them disapprove of the addition of thread local context data. :)
+
+The ``structlog`` logo has been contributed by `Russell Keith-Magee <https://github.com/freakboy3742>`_.
+
+

@@ -1,0 +1,207 @@
+Detailed tests of git.py
+========================
+
+Some initial imports:
+
+    >>> from zest.releaser import git
+    >>> from zest.releaser.utils import execute_command, execute_commands
+    >>> import os
+
+Project name
+------------
+
+The prepared git project has a setup.py, so the name in there is used:
+
+    >>> os.chdir(gitsourcedir)
+    >>> checkout = git.Git()
+    >>> checkout.name
+    'tha.example'
+
+When the setup.py doesn't exist or doesn't return a proper name, we fall back
+to the directory name.
+
+    >>> orig = checkout.get_setup_py_name
+    >>> checkout.get_setup_py_name= lambda: None  # Hack
+    >>> checkout.name
+    'tha.example-git'
+    >>> checkout.get_setup_py_name = orig  # Restore hack
+
+
+Diff and commit
+---------------
+
+Make a change:
+
+    >>> setup_py = os.path.join(gitsourcedir, 'setup.py')
+    >>> with open(setup_py, 'a') as f:
+    ...    _ = f.write('\na = 2\n')
+    >>> cmd = checkout.cmd_diff()
+    >>> cmd
+    ['git', 'diff']
+    >>> print(execute_command(cmd))
+    diff --git a/setup.py b/setup.py
+    index 9c14143..54fa3b9 100644
+    --- a/setup.py
+    +++ b/setup.py
+    @@ -42,3 +42,5 @@ setup(name='tha.example',
+               'console_scripts': [
+               ]},
+           )
+    +
+    +a = 2
+
+Commit it:
+
+    >>> cmd = checkout.cmd_commit('small tweak')
+    >>> cmd
+    ['git', 'commit', '-a', '-m', 'small tweak', '-n']
+
+In some cases we get this output:
+``[main ...] small tweak``
+and in other this:
+``Created commit ...: small tweak``
+
+    >>> print('dummy %s' % execute_command(cmd))
+    dummy...small tweak
+     1 file changed, 2 insertions(+)
+
+
+
+Tags
+----
+
+Originally there are no tags:
+
+    >>> checkout.available_tags()
+    []
+
+Create a tag and it will show up:
+
+    >>> cmd = checkout.cmd_create_tag('0.1', 'Creating tag 0.1')
+    >>> cmd
+    ['git', 'tag', '0.1', '-m', 'Creating tag 0.1']
+    >>> dont_care = execute_command(cmd)
+    >>> checkout.available_tags()
+    ['0.1']
+
+We could have signed the tag, too (though we won't execute the actual command
+as it would need gpg setup on the test machine):
+
+    >>> cmd = checkout.cmd_create_tag('0.1', 'Creating tag 0.1', sign=True)
+    >>> cmd
+    ['git', 'tag', '0.1', '-m', 'Creating tag 0.1', '--sign']
+
+
+A specific tag url is important for subversion, but nonsensical for
+git.  We just return the version as-is:
+
+    >>> checkout.tag_url('holadijee')
+    'holadijee'
+
+Make and commit a small change:
+
+    >>> with open(setup_py, 'a') as f:
+    ...    _ = f.write('\nb = 3\n')
+    >>> cmd = checkout.cmd_commit('small second tweak')
+    >>> print('dummy %s' % execute_command(cmd))
+    dummy...small second tweak
+     1 file changed, 2 insertions(+)
+
+Now we can request the changes since a specific tag:
+
+    >>> cmd = checkout.cmd_diff_last_commit_against_tag('0.1')
+    >>> cmd
+    ['git', 'diff', '0.1']
+    >>> print(execute_command(cmd))
+    diff --git a/setup.py b/setup.py
+    index 9c14143..54fa3b9 100644
+    --- a/setup.py
+    +++ b/setup.py
+    @@ -44,3 +44,5 @@ setup(name='tha.example',
+           )
+    <BLANKLINE>
+     a = 2
+    +
+    +b = 3
+
+
+Making a tag checkout
+---------------------
+
+With git, we make a clone of the repository in a tempdir and
+afterwards switch ("checkout") that directory to the tag.
+
+Since version 6.6.3 we create a shallow clone, which only contains the
+last commit.  And since 6.6.4 this works properly. :-) For that to
+work, we switch back to the tag first, otherwise the shallow copy will
+not contain the tag checkout that we need.  In other words: you need
+to be on the tag when you create a release, and that is true for the
+other version control systems too.
+
+So we first switch back to the tag.
+
+    >>> cmd = checkout.cmd_checkout_from_tag('0.1', gitsourcedir)
+    >>> print(execute_commands(cmd))
+    RED Note: ...0.1...
+    RED HEAD is now at ... small tweak
+
+Prepare the checkout directory with the clone of the local repository.
+
+    >>> temp = checkout.prepare_checkout_dir('somename')
+    >>> temp
+    'TMPDIR/somename...'
+    >>> os.path.isdir(temp)
+    True
+
+The checked out clone is really a clone and not an empty directory.
+
+    >>> sorted(os.listdir(temp))
+    ['.git', '.gitignore', 'CHANGES.txt', ...]
+    >>> with open(os.path.join(temp, 'setup.py')) as f:
+    ...     print(f.read())
+    from setuptools import setup, find_packages
+    ...
+    a = 2
+
+For git, we have to change to that directory!  Git doesn't work with paths.
+
+    >>> cmd = checkout.cmd_checkout_from_tag('0.1', temp)
+    Traceback (most recent call last):
+    ...
+    RuntimeError: SYSTEM EXIT (code=1)
+
+Change to the directory.  Verify that we can checkout the tag, even
+though we are already at the correct tag.
+
+    >>> os.chdir(temp)
+    >>> cmd = checkout.cmd_checkout_from_tag('0.1', temp)
+    >>> cmd
+    [['git', 'checkout', '0.1'],
+     ['git', 'submodule', 'update', '--init', '--recursive']]
+    >>> print(execute_commands(cmd))
+    RED HEAD is now at ... small tweak
+
+The tempdir should be at tag 0.1.  The last line ought to be "a = 2"
+
+    >>> with open(os.path.join(temp, 'setup.py')) as f:
+    ...     print(f.read())
+    from setuptools import setup, find_packages
+    ...
+    a = 2
+
+Change back to the source directory and return to the main branch.
+
+    >>> os.chdir(gitsourcedir)
+    >>> cmd = [['git', 'checkout', 'main'],
+    ... ['git', 'submodule', 'update', '--init', '--recursive']]
+    >>> print(execute_commands(cmd))
+    RED Previous HEAD position was ... small tweak
+    RED Switched to branch 'main'
+
+Pushing changes
+---------------
+
+For git, committing isn't enough. We need to push changes to the server:
+
+    >>> checkout.push_commands()
+    [['git', 'push'], ['git', 'push', '--tags']]

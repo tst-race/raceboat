@@ -1,0 +1,16 @@
+[server-login]
+username:bdfl
+password:secret
+
+[distutils]
+index-servers =
+  pypi
+  local
+  unknown
+
+[pypi]
+password:verysecret
+
+[local]
+repository = http://localhost:8080/test/products
+username = knight
