@@ -22,7 +22,7 @@ docker run -it --rm --name=build-pt \
 
 ## **Running**
 
-The following commands run the different Raceboat modes using a simple TCP socket called `twoSixDirectCpp` provided by `PluginCommsTwoSixStub` and assumes you have downloaded or built that plugin and placed it in a `kits` directory that is volume-mounted into the docker container (this is the easiest development process for testing your own plugins/channels). 
+The following commands run the different Raceboat modes using a simple TCP socket called `twoSixDirectCpp` provided by `PluginCommsTwoSixStub` and assumes you have downloaded or built that plugin and placed it in a `kits` directory that is volume-mounted into the docker container (this is the easiest development process for testing your own plugins/channels). _You can get a copy of some prebuilt kits for both arm64-v8a and x86_64 processors [here](https://github.com/tst-race/raceboat/releases/download/pets24/kits.tgz).
 
 In each case, you need to run two raceboat instances, we conventionally refer to these as a "client" and a "server"; generally the server should be started first (this isn't _necessary_ for some channels, but _is_ necessary when using a direct IP connection like `twoSixDirectCpp`). 
 
