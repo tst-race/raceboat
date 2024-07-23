@@ -18,8 +18,8 @@
 
 #include <cstring> // memcpy
 
-const size_t TRACE_ID_LENGTH = sizeof(0);    // using 64 bit trace id
-const size_t SPAN_ID_LENGTH = sizeof(0);     // using 64 bit span id
+const size_t TRACE_ID_LENGTH = 0;    // using 64 bit trace id
+const size_t SPAN_ID_LENGTH = 0;     // using 64 bit span id
 const size_t PACKAGE_TYPE_LENGTH = sizeof(uint8_t); // using 8 bit package type
 
 EncPkg::EncPkg(uint64_t _traceId, uint64_t _spanId, const RawData &_cipherText)
