@@ -18,6 +18,8 @@ android {
 
         externalNativeBuild {
             cmake {
+                arguments += "-DANDROID=1"
+                arguments += "-DANDROID_ALLOW_UNDEFINED_SYMBOLS=1"
                 arguments += "-DBUILD_VERSION=dev"
                 arguments += "-DPYTHON_INCLUDE_DIR=$projectDir/src/main/python/python-3.7.16-3-android-arm64-v8a/include/python3.7m"
                 arguments += "-DPYTHON_LIBRARY=$projectDir/src/main/jniLibs/arm64-v8a/libpython3.7m.so"

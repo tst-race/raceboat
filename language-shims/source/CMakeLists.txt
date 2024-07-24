@@ -92,29 +92,29 @@ target_include_directories(commsPluginBindings PUBLIC ${PYTHON_INCLUDE_PATH})
 target_link_options(commsPluginBindings PUBLIC -Wl,--no-undefined)
 swig_link_libraries(commsPluginBindings ${PYTHON_LIBRARIES} language-shims-headers raceSdkCommon)
 
+# ################################################################################
+# # Golang Comms
+# ################################################################################
+  
+set_source_files_properties(commsPluginBindings.golang.i PROPERTIES
+  TYPE MODULE
+  CPLUSPLUS ON
+  SWIG_FLAGS "-intgosize;64;-package;commsShims"
+)
+swig_add_library(commsPluginBindingsGolang TYPE SHARED
+  LANGUAGE go
+  SOURCES commsPluginBindings.golang.i
+  OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/include/src/shims"
+)
+add_dependencies(commsPluginBindingsGolang raceSdkCommon)
+set_target_properties(commsPluginBindingsGolang PROPERTIES
+  SWIG_USE_TARGET_INCLUDE_DIRECTORIES TRUE
+  COMPILE_OPTIONS "-Wno-error" # Clear warnings set globally via add_compile_options
+)
+  
+swig_link_libraries(commsPluginBindingsGolang language-shims-headers raceSdkCommon)
+
 if(NOT ANDROID)
-  # ################################################################################
-  # # Golang Comms
-  # ################################################################################
-  
-  set_source_files_properties(commsPluginBindings.golang.i PROPERTIES
-    TYPE MODULE
-    CPLUSPLUS ON
-    SWIG_FLAGS "-intgosize;64;-package;commShims"
-  )
-  swig_add_library(commsPluginBindingsGolang TYPE SHARED
-    LANGUAGE go
-    SOURCES commsPluginBindings.golang.i
-    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/include/src/shims"
-  )
-  add_dependencies(commsPluginBindingsGolang raceSdkCommon)
-  set_target_properties(commsPluginBindingsGolang PROPERTIES
-    SWIG_USE_TARGET_INCLUDE_DIRECTORIES TRUE
-    COMPILE_OPTIONS "-Wno-error" # Clear warnings set globally via add_compile_options
-  )
-  
-  swig_link_libraries(commsPluginBindingsGolang language-shims-headers raceSdkCommon)
-  
   # ################################################################################
   # # Golang Core
   # ################################################################################
@@ -153,17 +153,17 @@ install(
   DESTINATION lib/python
 )
 
+# Comm Golang bindings
+install(
+  TARGETS commsPluginBindingsGolang
+  LIBRARY DESTINATION lib
+)
+install(
+  FILES ${CMAKE_CURRENT_BINARY_DIR}/include/src/shims/commsPluginBindingsGolang.go
+  DESTINATION go/src/shims/comm
+)
+
 if(NOT ANDROID)
-  # Comm Golang bindings
-  install(
-    TARGETS commsPluginBindingsGolang
-    LIBRARY DESTINATION lib
-  )
-  install(
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/src/shims/commsPluginBindingsGolang.go
-    DESTINATION go/src/shims/comm
-  )
-  
   # Core Golang bindings
   install(
     TARGETS corePluginBindingsGolang
