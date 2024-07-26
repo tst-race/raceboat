@@ -83,6 +83,7 @@ public class RaceboatService extends Service {
         notificationManager.createNotificationChannel(channel);
 
         extractPythonPackages();
+        extractPlugins();
     }
 
     private void extractPythonPackages() {
@@ -92,7 +93,7 @@ public class RaceboatService extends Service {
             return; // Already extracted
         }
         try {
-            Log.d(TAG, "Beginning extraction of python pacakges");
+            Log.d(TAG, "Beginning extraction of python packages");
             AndroidFileSystemHelpers.extractTar(
                     "python-packages-3.7.16-3-android-arm64-v8a.tar",
                     pythonDir.getAbsolutePath() + "/",
@@ -101,6 +102,15 @@ public class RaceboatService extends Service {
             Log.d(TAG, "Completed extraction of python packages");
         } catch (Exception e) {
             Log.e(TAG, "Error extracting python packages", e);
+        }
+    }
+
+    private void extractPlugins() {
+        try {
+            Log.d(TAG, "Beginning extraction of plugins");
+            AndroidFileSystemHelpers.copyAssetDir("plugins", getApplicationContext());
+        } catch (Exception e) {
+            Log.e(TAG, "Error extracting plugins", e);
         }
     }
 
