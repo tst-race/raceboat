@@ -100,6 +100,9 @@ public class RaceboatService extends Service {
                     getApplicationContext()
             );
             Log.d(TAG, "Completed extraction of python packages");
+
+            Log.d(TAG, "Beginning extraction of python bindings");
+            AndroidFileSystemHelpers.copyAssetDir("python", "python3.7", getApplicationContext());
         } catch (Exception e) {
             Log.e(TAG, "Error extracting python packages", e);
         }

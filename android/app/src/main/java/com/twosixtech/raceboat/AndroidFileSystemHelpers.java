@@ -110,38 +110,46 @@ public class AndroidFileSystemHelpers {
      * Purpose: Copy directory from assets
      *
      * @param dir directory to copy (relative to assets dir)
-     * @param context application context to get app specific info (/data/data/com.twosix.race)
+     * @param context application context to get app specific info
      */
     public static void copyAssetDir(String dir, Context context) {
-        String dest = context.getApplicationInfo().dataDir + "/";
-        File destDir = new File(dest);
-        File topDir = new File(dest + "/" + dir);
+        copyAssetDir(dir, dir, context);
+    }
+
+    /**
+     * Purpose: Copy directory from assets
+     *
+     * @param src directory to copy (relative to assets dir)
+     * @param dest directory to write (relative to app data dir)
+     * @param context application context to get app specific info
+     */
+    public static void copyAssetDir(String src, String dest, Context context) {
+        String dataDir = context.getApplicationInfo().dataDir + "/";
+        File destDir = new File(dataDir + dest);
         Log.d(TAG, "copyAssetDir destDir: " + destDir.toString());
-        Log.d(TAG, "copyAssetDir topDir: " + topDir.toString());
 
         // create top level dir to copy into
-        createDir(topDir);
+        createDir(destDir);
 
         // copy contents
         AssetManager assetManager = context.getAssets();
         try {
             List<String> dirContents = new ArrayList<>();
-            listDirContents(assetManager, dir, dirContents);
+            listDirContents(assetManager, src, dirContents);
             for (String item : dirContents) {
+                File outFile = new File(dataDir + item.replace(src, dest));
                 try {
                     InputStream in = assetManager.open(item);
-                    File outFile = new File(dest + item);
                     OutputStream out = new FileOutputStream(outFile);
                     copyFile(in, out);
                     in.close();
                     out.close();
                 } catch (FileNotFoundException f) {
-                    File outFile = new File(dest + item);
                     outFile.mkdir();
                 }
             }
         } catch (IOException e) {
-            Log.e(TAG, "copyAssetDir error copying " + dir, e);
+            Log.e(TAG, "copyAssetDir error copying " + src + " to " + dest, e);
         }
     }
 

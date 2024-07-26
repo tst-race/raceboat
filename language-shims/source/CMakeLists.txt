@@ -96,18 +96,15 @@ if(CMAKE_ANDROID_ASSETS_DIRECTORIES)
   add_custom_command(
     TARGET commsPluginBindings
     POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+          "${CMAKE_ANDROID_ASSETS_DIRECTORIES}/python"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
           "$<TARGET_FILE:commsPluginBindings>"
-          "${CMAKE_ANDROID_ASSETS_DIRECTORIES}/$<TARGET_FILE_NAME:commsPluginBindings>"
-    COMMENT "Copy commsPluginBindings lib to assets"
-  )
-  add_custom_command(
-    TARGET commsPluginBindings
-    POST_BUILD
+          "${CMAKE_ANDROID_ASSETS_DIRECTORIES}/python/$<TARGET_FILE_NAME:commsPluginBindings>"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
           "${CMAKE_CURRENT_BINARY_DIR}/commsPluginBindings.py"
-          "${CMAKE_ANDROID_ASSETS_DIRECTORIES}/commsPluginBindings.py"
-    COMMENT "Copy commsPluginBindings.py to assets"
+          "${CMAKE_ANDROID_ASSETS_DIRECTORIES}/python/commsPluginBindings.py"
+    COMMENT "Copy commsPluginBindings to assets"
   )
 endif()
 
