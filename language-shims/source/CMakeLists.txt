@@ -92,6 +92,25 @@ target_include_directories(commsPluginBindings PUBLIC ${PYTHON_INCLUDE_PATH})
 target_link_options(commsPluginBindings PUBLIC -Wl,--no-undefined)
 swig_link_libraries(commsPluginBindings ${PYTHON_LIBRARIES} language-shims-headers raceSdkCommon)
 
+if(CMAKE_ANDROID_ASSETS_DIRECTORIES)
+  add_custom_command(
+    TARGET commsPluginBindings
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "$<TARGET_FILE:commsPluginBindings>"
+          "${CMAKE_ANDROID_ASSETS_DIRECTORIES}/$<TARGET_FILE_NAME:commsPluginBindings>"
+    COMMENT "Copy commsPluginBindings lib to assets"
+  )
+  add_custom_command(
+    TARGET commsPluginBindings
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "${CMAKE_CURRENT_BINARY_DIR}/commsPluginBindings.py"
+          "${CMAKE_ANDROID_ASSETS_DIRECTORIES}/commsPluginBindings.py"
+    COMMENT "Copy commsPluginBindings.py to assets"
+  )
+endif()
+
 # ################################################################################
 # # Golang Comms
 # ################################################################################
