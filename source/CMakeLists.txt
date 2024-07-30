@@ -118,7 +118,7 @@ target_compile_definitions(raceSdkCommon PRIVATE PYTHON_PLUGIN_SUPPORT=1)
 if(ANDROID)
     target_link_libraries(raceSdkCommon
         PRIVATE
-            language-shims-headers
+            python-shims-headers
             ${PYTHON_LIBRARIES}
             ${CMAKE_DL_LIBS} # Contains dlopen and dlclose for dynamically loading plugins.
             log
@@ -129,7 +129,7 @@ else()
     # Default to Linux
     target_link_libraries(raceSdkCommon
         PRIVATE
-            language-shims-headers
+            python-shims-headers
             ${PYTHON_LIBRARIES}
             ${CMAKE_DL_LIBS} # Contains dlopen and dlclose for dynamically loading plugins.
         PUBLIC

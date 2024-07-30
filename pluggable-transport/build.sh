@@ -42,7 +42,7 @@ done
 if [ -z "$CORE_BINDINGS_GOLANG_BINARY_DIR" ]
 then
     echo "path: $CORE_BINDINGS_GOLANG_BINARY_DIR"
-    echo "ERROR: golang install path required (eg ./build.sh -p build/LINUX/language-shims/source/include/src)"
+    echo "ERROR: golang install path required (eg ./build.sh -p build/LINUX/language-shims/golang/include/src)"
     exit 1
 else
     CMAKE_ARGS="-DCORE_BINDINGS_GOLANG_BINARY_DIR="$CORE_BINDINGS_GOLANG_BINARY_DIR

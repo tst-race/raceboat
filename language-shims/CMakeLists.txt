@@ -15,7 +15,8 @@
 # limitations under the License.
 # 
 
-add_subdirectory(source)
+add_subdirectory(golang)
+add_subdirectory(python)
 
 if(NOT ANDROID)
     add_subdirectory(tests EXCLUDE_FROM_ALL)

@@ -48,10 +48,10 @@ fi
 
 if [ -z "$CORE_BINDINGS_GOLANG_BINARY_DIR" ]
 then
-    DEFAULT_GOLANG_PATH="/code/build/LINUX_${ARCH}/language-shims/source/include/src/core"
+    DEFAULT_GOLANG_PATH="/code/build/LINUX_${ARCH}/language-shims/golang/include/src/core"
     echo "INFO: No -p argument, assuming golang install path is: ${DEFAULT_GOLANG_PATH}"
     CMAKE_ARGS="-DCORE_BINDINGS_GOLANG_BINARY_DIR=${DEFAULT_GOLANG_PATH}"
-    # echo "ERROR: golang install path required (eg ./build.sh -p build/LINUX/language-shims/source/include/src)"
+    # echo "ERROR: golang install path required (eg ./build.sh -p build/LINUX/language-shims/golang/include/src)"
 else
     # CMAKE_ARGS="-DCORE_BINDINGS_GOLANG_BINARY_DIR=${CORE_BINDINGS_GOLANG_BINARY_DIR} -D CMAKE_LIBRARY_PATH=/code/racesdk/package/LINUX_x86_64/lib/"
     echo "path: $CORE_BINDINGS_GOLANG_BINARY_DIR"

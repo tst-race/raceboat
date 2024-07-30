@@ -28,7 +28,7 @@ Building results in several libraries.  Two of which are suitable for real-world
 `./racesdk/package/LINUX*/lib/libraceboat.so`
     - mandatory core functionality with C++ APIs
     - could be copied to /usr/local/lib/ or somewhere in `$PATH`
-`./build/LINUX*/language-shims/source/_commsPluginBindings.so`
+`./build/LINUX*/language-shims/python/_commsPluginBindings.so`
     - optional library with python bindings
     - should go into shims path (see `FileSystem::makeShimsPath()`)
     - see [Using Plugin Bindings](./language-shims/README.md#using-python-bindings)

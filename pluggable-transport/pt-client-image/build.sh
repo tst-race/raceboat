@@ -30,6 +30,6 @@ docker run -it --rm \
        -v $(pwd)/../..:/code \
        -w /code/pluggable-transport \
        raceboat \
-       ./build.sh -p=/code/build/LINUX_x86_64/language-shims/source/include/src/core
+       ./build.sh -p=/code/build/LINUX_x86_64/language-shims/golang/include/src/core
  
 docker build . -t pt-client

@@ -15,14 +15,14 @@
 # 
 
 
-set (CORE_SHIM_PATH ${CMAKE_CURRENT_BINARY_DIR}/language-shims/source/include/src/core)
+set (CORE_SHIM_PATH ${CMAKE_CURRENT_BINARY_DIR}/language-shims/golang/include/src/core)
 message("initializing go core shims for use in other projects in ${CORE_SHIM_PATH}")
 execute_process(
     COMMAND go mod init corePluginBindingsGolang.go
     WORKING_DIRECTORY ${CORE_SHIM_PATH}
 )
 
-set (COMM_SHIM_PATH ${CMAKE_CURRENT_BINARY_DIR}/language-shims/source/include/src/shims)
+set (COMM_SHIM_PATH ${CMAKE_CURRENT_BINARY_DIR}/language-shims/golang/include/src/shims)
 message("initializing go comm shims for use in other projects in ${COMM_SHIM_PATH}")
 execute_process(
     COMMAND go mod init commsPluginBindingsGolang.go
