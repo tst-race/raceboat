@@ -15,10 +15,9 @@
 # limitations under the License.
 # 
 
-add_subdirectory(golang)
-add_subdirectory(java)
-add_subdirectory(python)
+add_subdirectory(ShimsJava)
+add_subdirectory(ShimsCpp/source)
 
-if(NOT ANDROID)
-    add_subdirectory(tests EXCLUDE_FROM_ALL)
-endif()
+#if(NOT ANDROID)
+#    add_subdirectory(tests EXCLUDE_FROM_ALL)
+#endif()

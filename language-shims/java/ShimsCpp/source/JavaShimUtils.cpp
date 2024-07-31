@@ -17,7 +17,7 @@
 
 #include "JavaShimUtils.h"
 
-#include <RaceLog.h>
+#include <race/common/RaceLog.h>
 #include <pthread.h>
 
 #include <cstring>
@@ -527,19 +527,19 @@ jobject JavaShimUtils::channelStatusToJobject(JNIEnv *env, ChannelStatus status)
                                        static_cast<jint>(status));
 }
 
-PluginStatus JavaShimUtils::jobjectToPluginStatus(JNIEnv *env, jobject &jPluginStatus) {
-    if (jPluginStatus == nullptr) {
-        return PLUGIN_UNDEF;
-    }
-    return static_cast<PluginStatus>(static_cast<std::int32_t>(
-        env->GetIntField(jPluginStatus, JavaIds::jPluginStatusValueFieldId)));
-}
-
-jobject JavaShimUtils::pluginStatusToJobject(JNIEnv *env, PluginStatus status) {
-    return env->CallStaticObjectMethod(JavaIds::jPluginStatusClassId,
-                                       JavaIds::jPluginStatusValueOfStaticMethodId,
-                                       static_cast<jint>(status));
-}
+//PluginStatus JavaShimUtils::jobjectToPluginStatus(JNIEnv *env, jobject &jPluginStatus) {
+//    if (jPluginStatus == nullptr) {
+//        return PLUGIN_UNDEF;
+//    }
+//    return static_cast<PluginStatus>(static_cast<std::int32_t>(
+//        env->GetIntField(jPluginStatus, JavaIds::jPluginStatusValueFieldId)));
+//}
+//
+//jobject JavaShimUtils::pluginStatusToJobject(JNIEnv *env, PluginStatus status) {
+//    return env->CallStaticObjectMethod(JavaIds::jPluginStatusClassId,
+//                                       JavaIds::jPluginStatusValueOfStaticMethodId,
+//                                       static_cast<jint>(status));
+//}
 
 jobject JavaShimUtils::pluginResponseToJobject(JNIEnv *env, PluginResponse pluginResponse) {
     return env->CallStaticObjectMethod(JavaIds::jPluginResponseClassId,
@@ -587,46 +587,46 @@ PluginConfig JavaShimUtils::jobjectToPluginConfig(JNIEnv *env, jobject &jPluginC
     return pluginConfig;
 }
 
-jobject JavaShimUtils::messageStatusToJobject(JNIEnv *env, MessageStatus status) {
-    return env->CallStaticObjectMethod(JavaIds::jMessageStatusClassId,
-                                       JavaIds::jMessageStatusValueOfStaticMethodId,
-                                       static_cast<jint>(status));
-}
+//jobject JavaShimUtils::messageStatusToJobject(JNIEnv *env, MessageStatus status) {
+//    return env->CallStaticObjectMethod(JavaIds::jMessageStatusClassId,
+//                                       JavaIds::jMessageStatusValueOfStaticMethodId,
+//                                       static_cast<jint>(status));
+//}
+//
+//MessageStatus JavaShimUtils::jobjectToMessageStatus(JNIEnv *env, jobject &jMessageStatus) {
+//    if (jMessageStatus == nullptr) {
+//        return MS_UNDEF;
+//    }
+//    return static_cast<MessageStatus>(static_cast<std::int32_t>(
+//        env->GetIntField(jMessageStatus, JavaIds::jMessageStatusValueFieldId)));
+//}
 
-MessageStatus JavaShimUtils::jobjectToMessageStatus(JNIEnv *env, jobject &jMessageStatus) {
-    if (jMessageStatus == nullptr) {
-        return MS_UNDEF;
-    }
-    return static_cast<MessageStatus>(static_cast<std::int32_t>(
-        env->GetIntField(jMessageStatus, JavaIds::jMessageStatusValueFieldId)));
-}
-
-jobject JavaShimUtils::deviceInfoToJobject(JNIEnv *env, DeviceInfo deviceInfo) {
-    jobject jPluginConfig =
-        env->NewObject(JavaIds::jDeviceInfoClassId, JavaIds::jDeviceInfoConstructorMethodId,
-                       env->NewStringUTF(deviceInfo.platform.c_str()),
-                       env->NewStringUTF(deviceInfo.architecture.c_str()),
-                       env->NewStringUTF(deviceInfo.nodeType.c_str()));
-    return jPluginConfig;
-}
-
-DeviceInfo JavaShimUtils::jobjectToDeviceInfo(JNIEnv *env, jobject &jDeviceInfo) {
-    if (jDeviceInfo == nullptr) {
-        return {};
-    }
-
-    DeviceInfo deviceInfo;
-    deviceInfo.platform =
-        jstring2string(env, static_cast<jstring>(env->GetObjectField(
-                                jDeviceInfo, JavaIds::jDeviceInfoPlatformFieldId)));
-    deviceInfo.architecture =
-        jstring2string(env, static_cast<jstring>(env->GetObjectField(
-                                jDeviceInfo, JavaIds::jDeviceInfoArchitectureFieldId)));
-    deviceInfo.nodeType =
-        jstring2string(env, static_cast<jstring>(env->GetObjectField(
-                                jDeviceInfo, JavaIds::jDeviceInfoNodeTypeFieldId)));
-    return deviceInfo;
-}
+//jobject JavaShimUtils::deviceInfoToJobject(JNIEnv *env, DeviceInfo deviceInfo) {
+//    jobject jPluginConfig =
+//        env->NewObject(JavaIds::jDeviceInfoClassId, JavaIds::jDeviceInfoConstructorMethodId,
+//                       env->NewStringUTF(deviceInfo.platform.c_str()),
+//                       env->NewStringUTF(deviceInfo.architecture.c_str()),
+//                       env->NewStringUTF(deviceInfo.nodeType.c_str()));
+//    return jPluginConfig;
+//}
+//
+//DeviceInfo JavaShimUtils::jobjectToDeviceInfo(JNIEnv *env, jobject &jDeviceInfo) {
+//    if (jDeviceInfo == nullptr) {
+//        return {};
+//    }
+//
+//    DeviceInfo deviceInfo;
+//    deviceInfo.platform =
+//        jstring2string(env, static_cast<jstring>(env->GetObjectField(
+//                                jDeviceInfo, JavaIds::jDeviceInfoPlatformFieldId)));
+//    deviceInfo.architecture =
+//        jstring2string(env, static_cast<jstring>(env->GetObjectField(
+//                                jDeviceInfo, JavaIds::jDeviceInfoArchitectureFieldId)));
+//    deviceInfo.nodeType =
+//        jstring2string(env, static_cast<jstring>(env->GetObjectField(
+//                                jDeviceInfo, JavaIds::jDeviceInfoNodeTypeFieldId)));
+//    return deviceInfo;
+//}
 
 bool JavaShimUtils::getEnv(JNIEnv **env, JavaVM *jvm) {
     (void)pthread_once(&key_once, make_key);
@@ -711,45 +711,45 @@ std::string JavaShimUtils::getMessageFromJthrowable(JNIEnv *env, jthrowable &thr
     return message;
 }
 
-ClrMsg JavaShimUtils::jClrMsg_to_ClrMsg(JNIEnv *env, jobject jClrMsg) {
-    const std::string plainMsg = jstring2string(
-        env, static_cast<jstring>(env->GetObjectField(jClrMsg, JavaIds::jClrMsgPlainMsgFieldId)));
-    const std::string fromPersona = jstring2string(
-        env,
-        static_cast<jstring>(env->GetObjectField(jClrMsg, JavaIds::jClrMsgFromPersonaFieldId)));
-    const std::string toPersona = jstring2string(
-        env, static_cast<jstring>(env->GetObjectField(jClrMsg, JavaIds::jClrMsgToPersonaFieldId)));
-    const long createTime =
-        static_cast<long>(env->GetLongField(jClrMsg, JavaIds::jClrMsgcreateTimeFieldId));
-    const std::int32_t nonce =
-        static_cast<std::int32_t>(env->GetIntField(jClrMsg, JavaIds::jClrMsgNonceFieldId));
-    const std::int32_t ampIndex =
-        static_cast<std::int32_t>(env->GetIntField(jClrMsg, JavaIds::jClrMsgAmpIndexFieldId));
-    const long traceId =
-        static_cast<long>(env->GetLongField(jClrMsg, JavaIds::jClrMsgTraceIdFieldId));
-    const long spanId =
-        static_cast<long>(env->GetLongField(jClrMsg, JavaIds::jClrMsgSpanIdFieldId));
-
-    ClrMsg msg(plainMsg, fromPersona, toPersona, static_cast<std::int64_t>(createTime), nonce,
-               ampIndex, static_cast<std::uint64_t>(traceId), static_cast<std::uint64_t>(spanId));
-    return msg;
-}
-
-jobject JavaShimUtils::clrMsg_to_jClrMsg(JNIEnv *env, const ClrMsg &clrMsg) {
-    jstring jPlainMsg = env->NewStringUTF(clrMsg.getMsg().c_str());
-    jstring jFromPersona = env->NewStringUTF(clrMsg.getFrom().c_str());
-    jstring jToPersona = env->NewStringUTF(clrMsg.getTo().c_str());
-    jlong jCreateTime = static_cast<jlong>(clrMsg.getTime());
-    jint jNonce = static_cast<jint>(clrMsg.getNonce());
-    jbyte jAmpIndex = static_cast<jbyte>(clrMsg.getAmpIndex());
-    jlong jTraceId = static_cast<jlong>(clrMsg.getTraceId());
-    jlong jSpanId = static_cast<jlong>(clrMsg.getSpanId());
-
-    jobject jClrMsg =
-        env->NewObject(JavaIds::jClrMsgClassId, JavaIds::jClrMsgConstructorMethodId, jPlainMsg,
-                       jFromPersona, jToPersona, jCreateTime, jNonce, jAmpIndex, jTraceId, jSpanId);
-    return jClrMsg;
-}
+//ClrMsg JavaShimUtils::jClrMsg_to_ClrMsg(JNIEnv *env, jobject jClrMsg) {
+//    const std::string plainMsg = jstring2string(
+//        env, static_cast<jstring>(env->GetObjectField(jClrMsg, JavaIds::jClrMsgPlainMsgFieldId)));
+//    const std::string fromPersona = jstring2string(
+//        env,
+//        static_cast<jstring>(env->GetObjectField(jClrMsg, JavaIds::jClrMsgFromPersonaFieldId)));
+//    const std::string toPersona = jstring2string(
+//        env, static_cast<jstring>(env->GetObjectField(jClrMsg, JavaIds::jClrMsgToPersonaFieldId)));
+//    const long createTime =
+//        static_cast<long>(env->GetLongField(jClrMsg, JavaIds::jClrMsgcreateTimeFieldId));
+//    const std::int32_t nonce =
+//        static_cast<std::int32_t>(env->GetIntField(jClrMsg, JavaIds::jClrMsgNonceFieldId));
+//    const std::int32_t ampIndex =
+//        static_cast<std::int32_t>(env->GetIntField(jClrMsg, JavaIds::jClrMsgAmpIndexFieldId));
+//    const long traceId =
+//        static_cast<long>(env->GetLongField(jClrMsg, JavaIds::jClrMsgTraceIdFieldId));
+//    const long spanId =
+//        static_cast<long>(env->GetLongField(jClrMsg, JavaIds::jClrMsgSpanIdFieldId));
+//
+//    ClrMsg msg(plainMsg, fromPersona, toPersona, static_cast<std::int64_t>(createTime), nonce,
+//               ampIndex, static_cast<std::uint64_t>(traceId), static_cast<std::uint64_t>(spanId));
+//    return msg;
+//}
+//
+//jobject JavaShimUtils::clrMsg_to_jClrMsg(JNIEnv *env, const ClrMsg &clrMsg) {
+//    jstring jPlainMsg = env->NewStringUTF(clrMsg.getMsg().c_str());
+//    jstring jFromPersona = env->NewStringUTF(clrMsg.getFrom().c_str());
+//    jstring jToPersona = env->NewStringUTF(clrMsg.getTo().c_str());
+//    jlong jCreateTime = static_cast<jlong>(clrMsg.getTime());
+//    jint jNonce = static_cast<jint>(clrMsg.getNonce());
+//    jbyte jAmpIndex = static_cast<jbyte>(clrMsg.getAmpIndex());
+//    jlong jTraceId = static_cast<jlong>(clrMsg.getTraceId());
+//    jlong jSpanId = static_cast<jlong>(clrMsg.getSpanId());
+//
+//    jobject jClrMsg =
+//        env->NewObject(JavaIds::jClrMsgClassId, JavaIds::jClrMsgConstructorMethodId, jPlainMsg,
+//                       jFromPersona, jToPersona, jCreateTime, jNonce, jAmpIndex, jTraceId, jSpanId);
+//    return jClrMsg;
+//}
 
 EncPkg JavaShimUtils::jobjectToEncPkg(JNIEnv *env, jobject jEncPkg) {
     jlong jTraceId = static_cast<long>(env->GetLongField(jEncPkg, JavaIds::jEncPkgTraceIdFieldId));
@@ -783,30 +783,30 @@ jobject JavaShimUtils::encPkgToJobject(JNIEnv *env, const EncPkg &encPkg) {
     return jEncPkg;
 }
 
-RaceEnums::NodeType JavaShimUtils::jobjectToNodeType(JNIEnv *env, jobject javaNodeType) {
-    const jint value = env->CallIntMethod(javaNodeType, JavaIds::jNodeTypeOrdinalMethodId);
-    return static_cast<RaceEnums::NodeType>(value);
-}
+//RaceEnums::NodeType JavaShimUtils::jobjectToNodeType(JNIEnv *env, jobject javaNodeType) {
+//    const jint value = env->CallIntMethod(javaNodeType, JavaIds::jNodeTypeOrdinalMethodId);
+//    return static_cast<RaceEnums::NodeType>(value);
+//}
+//
+//jobject JavaShimUtils::nodeTypeToJNodeType(JNIEnv *env, RaceEnums::NodeType nodeType) {
+//    return env->CallStaticObjectMethod(JavaIds::jNodeTypeClassId,
+//                                       JavaIds::jNodeTypeValueOfStaticMethodId,
+//                                       static_cast<jint>(nodeType));
+//}
 
-jobject JavaShimUtils::nodeTypeToJNodeType(JNIEnv *env, RaceEnums::NodeType nodeType) {
-    return env->CallStaticObjectMethod(JavaIds::jNodeTypeClassId,
-                                       JavaIds::jNodeTypeValueOfStaticMethodId,
-                                       static_cast<jint>(nodeType));
-}
-
-RaceEnums::StorageEncryptionType JavaShimUtils::jobjectToStorageEncryptionType(
-    JNIEnv *env, jobject javaStorageEncryptionType) {
-    const jint value = env->CallIntMethod(javaStorageEncryptionType,
-                                          JavaIds::jStorageEncryptionTypeOrdinalMethodId);
-    return static_cast<RaceEnums::StorageEncryptionType>(value);
-}
-
-jobject JavaShimUtils::StorageEncryptionTypeToJStorageEncryptionType(
-    JNIEnv *env, RaceEnums::StorageEncryptionType storageEncryptionType) {
-    return env->CallStaticObjectMethod(JavaIds::jStorageEncryptionTypeClassId,
-                                       JavaIds::jStorageEncryptionTypeValueOfStaticMethodId,
-                                       static_cast<jint>(storageEncryptionType));
-}
+//RaceEnums::StorageEncryptionType JavaShimUtils::jobjectToStorageEncryptionType(
+//    JNIEnv *env, jobject javaStorageEncryptionType) {
+//    const jint value = env->CallIntMethod(javaStorageEncryptionType,
+//                                          JavaIds::jStorageEncryptionTypeOrdinalMethodId);
+//    return static_cast<RaceEnums::StorageEncryptionType>(value);
+//}
+//
+//jobject JavaShimUtils::StorageEncryptionTypeToJStorageEncryptionType(
+//    JNIEnv *env, RaceEnums::StorageEncryptionType storageEncryptionType) {
+//    return env->CallStaticObjectMethod(JavaIds::jStorageEncryptionTypeClassId,
+//                                       JavaIds::jStorageEncryptionTypeValueOfStaticMethodId,
+//                                       static_cast<jint>(storageEncryptionType));
+//}
 
 RaceEnums::UserDisplayType JavaShimUtils::jobjectToUserDisplayType(JNIEnv *env,
                                                                    jobject javaUserDisplayType) {
@@ -836,85 +836,85 @@ jobject JavaShimUtils::bootstrapActionTypeToJBootstrapActionType(
                                        static_cast<jint>(bootstrapActionType));
 }
 
-AppConfig JavaShimUtils::jAppConfigToAppConfig(JNIEnv *env, jobject jAppConfig) {
-    AppConfig config = AppConfig();
-    config.persona = getStringFieldFromClassObject(env, jAppConfig, "persona");
-    config.appDir = getStringFieldFromClassObject(env, jAppConfig, "appDir");
-    config.pluginArtifactsBaseDir =
-        getStringFieldFromClassObject(env, jAppConfig, "pluginArtifactsBaseDir");
-    config.platform = getStringFieldFromClassObject(env, jAppConfig, "platform");
-    config.architecture = getStringFieldFromClassObject(env, jAppConfig, "architecture");
-    config.environment = getStringFieldFromClassObject(env, jAppConfig, "environment");
-    // Config Files
-    config.configTarPath = getStringFieldFromClassObject(env, jAppConfig, "configTarPath");
-    config.baseConfigPath = getStringFieldFromClassObject(env, jAppConfig, "baseConfigPath");
-    // Testing specific files (user-responses.json, jaeger-config.json, voa.json)
-    config.etcDirectory = getStringFieldFromClassObject(env, jAppConfig, "etcDirectory");
-    config.voaConfigPath = getStringFieldFromClassObject(env, jAppConfig, "voaConfigPath");
-    config.jaegerConfigPath = getStringFieldFromClassObject(env, jAppConfig, "jaegerConfigPath");
-    config.userResponsesFilePath =
-        getStringFieldFromClassObject(env, jAppConfig, "userResponsesFilePath");
-    // Bootstrap dirs
-    config.bootstrapFilesDirectory =
-        getStringFieldFromClassObject(env, jAppConfig, "bootstrapFilesDirectory");
-    config.bootstrapCacheDirectory =
-        getStringFieldFromClassObject(env, jAppConfig, "bootstrapCacheDirectory");
-    // Others
-    config.sdkFilePath = getStringFieldFromClassObject(env, jAppConfig, "sdkFilePath");
-
-    config.tmpDirectory = getStringFieldFromClassObject(env, jAppConfig, "tmpDirectory");
-    config.logDirectory = getStringFieldFromClassObject(env, jAppConfig, "logDirectory");
-    config.logFilePath = getStringFieldFromClassObject(env, jAppConfig, "logFilePath");
-    config.appPath = getStringFieldFromClassObject(env, jAppConfig, "appPath");
-
-    jobject nodeType = env->GetObjectField(jAppConfig, JavaIds::jAppConfigNodeTypeFieldId);
-    config.nodeType = jobjectToNodeType(env, nodeType);
-
-    jobject encryptionType =
-        env->GetObjectField(jAppConfig, JavaIds::jAppConfigEncryptionTypeFieldId);
-    config.encryptionType = jobjectToStorageEncryptionType(env, encryptionType);
-
-    return config;
-}
-
-jobject JavaShimUtils::appConfigToJobject(JNIEnv *env, const AppConfig &appConfig) {
-    jobject jAppConfig =
-        env->NewObject(JavaIds::jAppConfigClassId, JavaIds::jAppConfigConstructorMethodId);
-
-    setStringFieldFromClassObject(env, jAppConfig, "persona", appConfig.persona);
-    setStringFieldFromClassObject(env, jAppConfig, "appDir", appConfig.appDir);
-    setStringFieldFromClassObject(env, jAppConfig, "pluginArtifactsBaseDir",
-                                  appConfig.pluginArtifactsBaseDir);
-    setStringFieldFromClassObject(env, jAppConfig, "platform", appConfig.platform);
-    setStringFieldFromClassObject(env, jAppConfig, "architecture", appConfig.architecture);
-    setStringFieldFromClassObject(env, jAppConfig, "environment", appConfig.environment);
-    // Config Files
-    setStringFieldFromClassObject(env, jAppConfig, "configTarPath", appConfig.configTarPath);
-    setStringFieldFromClassObject(env, jAppConfig, "baseConfigPath", appConfig.baseConfigPath);
-    // Testing specific files (user-responses.json, jaeger-config.json, voa.json)
-    setStringFieldFromClassObject(env, jAppConfig, "etcDirectory", appConfig.etcDirectory);
-    setStringFieldFromClassObject(env, jAppConfig, "jaegerConfigPath", appConfig.jaegerConfigPath);
-    setStringFieldFromClassObject(env, jAppConfig, "userResponsesFilePath",
-                                  appConfig.userResponsesFilePath);
-    setStringFieldFromClassObject(env, jAppConfig, "voaConfigPath", appConfig.voaConfigPath);
-    // Bootstrap Directories
-    setStringFieldFromClassObject(env, jAppConfig, "bootstrapFilesDirectory",
-                                  appConfig.bootstrapFilesDirectory);
-    setStringFieldFromClassObject(env, jAppConfig, "bootstrapCacheDirectory",
-                                  appConfig.bootstrapCacheDirectory);
-    // Others
-    setStringFieldFromClassObject(env, jAppConfig, "sdkFilePath", appConfig.sdkFilePath);
-
-    setStringFieldFromClassObject(env, jAppConfig, "tmpDirectory", appConfig.tmpDirectory);
-    setStringFieldFromClassObject(env, jAppConfig, "logDirectory", appConfig.logDirectory);
-    setStringFieldFromClassObject(env, jAppConfig, "logFilePath", appConfig.logFilePath);
-    setStringFieldFromClassObject(env, jAppConfig, "appPath", appConfig.appPath);
-
-    // TODO: what about .nodeType and .encryptionType? set these using the setter methods in
-    // AppConfigs
-
-    return jAppConfig;
-}
+//AppConfig JavaShimUtils::jAppConfigToAppConfig(JNIEnv *env, jobject jAppConfig) {
+//    AppConfig config = AppConfig();
+//    config.persona = getStringFieldFromClassObject(env, jAppConfig, "persona");
+//    config.appDir = getStringFieldFromClassObject(env, jAppConfig, "appDir");
+//    config.pluginArtifactsBaseDir =
+//        getStringFieldFromClassObject(env, jAppConfig, "pluginArtifactsBaseDir");
+//    config.platform = getStringFieldFromClassObject(env, jAppConfig, "platform");
+//    config.architecture = getStringFieldFromClassObject(env, jAppConfig, "architecture");
+//    config.environment = getStringFieldFromClassObject(env, jAppConfig, "environment");
+//    // Config Files
+//    config.configTarPath = getStringFieldFromClassObject(env, jAppConfig, "configTarPath");
+//    config.baseConfigPath = getStringFieldFromClassObject(env, jAppConfig, "baseConfigPath");
+//    // Testing specific files (user-responses.json, jaeger-config.json, voa.json)
+//    config.etcDirectory = getStringFieldFromClassObject(env, jAppConfig, "etcDirectory");
+//    config.voaConfigPath = getStringFieldFromClassObject(env, jAppConfig, "voaConfigPath");
+//    config.jaegerConfigPath = getStringFieldFromClassObject(env, jAppConfig, "jaegerConfigPath");
+//    config.userResponsesFilePath =
+//        getStringFieldFromClassObject(env, jAppConfig, "userResponsesFilePath");
+//    // Bootstrap dirs
+//    config.bootstrapFilesDirectory =
+//        getStringFieldFromClassObject(env, jAppConfig, "bootstrapFilesDirectory");
+//    config.bootstrapCacheDirectory =
+//        getStringFieldFromClassObject(env, jAppConfig, "bootstrapCacheDirectory");
+//    // Others
+//    config.sdkFilePath = getStringFieldFromClassObject(env, jAppConfig, "sdkFilePath");
+//
+//    config.tmpDirectory = getStringFieldFromClassObject(env, jAppConfig, "tmpDirectory");
+//    config.logDirectory = getStringFieldFromClassObject(env, jAppConfig, "logDirectory");
+//    config.logFilePath = getStringFieldFromClassObject(env, jAppConfig, "logFilePath");
+//    config.appPath = getStringFieldFromClassObject(env, jAppConfig, "appPath");
+//
+//    jobject nodeType = env->GetObjectField(jAppConfig, JavaIds::jAppConfigNodeTypeFieldId);
+//    config.nodeType = jobjectToNodeType(env, nodeType);
+//
+//    jobject encryptionType =
+//        env->GetObjectField(jAppConfig, JavaIds::jAppConfigEncryptionTypeFieldId);
+//    config.encryptionType = jobjectToStorageEncryptionType(env, encryptionType);
+//
+//    return config;
+//}
+//
+//jobject JavaShimUtils::appConfigToJobject(JNIEnv *env, const AppConfig &appConfig) {
+//    jobject jAppConfig =
+//        env->NewObject(JavaIds::jAppConfigClassId, JavaIds::jAppConfigConstructorMethodId);
+//
+//    setStringFieldFromClassObject(env, jAppConfig, "persona", appConfig.persona);
+//    setStringFieldFromClassObject(env, jAppConfig, "appDir", appConfig.appDir);
+//    setStringFieldFromClassObject(env, jAppConfig, "pluginArtifactsBaseDir",
+//                                  appConfig.pluginArtifactsBaseDir);
+//    setStringFieldFromClassObject(env, jAppConfig, "platform", appConfig.platform);
+//    setStringFieldFromClassObject(env, jAppConfig, "architecture", appConfig.architecture);
+//    setStringFieldFromClassObject(env, jAppConfig, "environment", appConfig.environment);
+//    // Config Files
+//    setStringFieldFromClassObject(env, jAppConfig, "configTarPath", appConfig.configTarPath);
+//    setStringFieldFromClassObject(env, jAppConfig, "baseConfigPath", appConfig.baseConfigPath);
+//    // Testing specific files (user-responses.json, jaeger-config.json, voa.json)
+//    setStringFieldFromClassObject(env, jAppConfig, "etcDirectory", appConfig.etcDirectory);
+//    setStringFieldFromClassObject(env, jAppConfig, "jaegerConfigPath", appConfig.jaegerConfigPath);
+//    setStringFieldFromClassObject(env, jAppConfig, "userResponsesFilePath",
+//                                  appConfig.userResponsesFilePath);
+//    setStringFieldFromClassObject(env, jAppConfig, "voaConfigPath", appConfig.voaConfigPath);
+//    // Bootstrap Directories
+//    setStringFieldFromClassObject(env, jAppConfig, "bootstrapFilesDirectory",
+//                                  appConfig.bootstrapFilesDirectory);
+//    setStringFieldFromClassObject(env, jAppConfig, "bootstrapCacheDirectory",
+//                                  appConfig.bootstrapCacheDirectory);
+//    // Others
+//    setStringFieldFromClassObject(env, jAppConfig, "sdkFilePath", appConfig.sdkFilePath);
+//
+//    setStringFieldFromClassObject(env, jAppConfig, "tmpDirectory", appConfig.tmpDirectory);
+//    setStringFieldFromClassObject(env, jAppConfig, "logDirectory", appConfig.logDirectory);
+//    setStringFieldFromClassObject(env, jAppConfig, "logFilePath", appConfig.logFilePath);
+//    setStringFieldFromClassObject(env, jAppConfig, "appPath", appConfig.appPath);
+//
+//    // TODO: what about .nodeType and .encryptionType? set these using the setter methods in
+//    // AppConfigs
+//
+//    return jAppConfig;
+//}
 
 LinkProperties JavaShimUtils::jLinkPropertiesToLinkProperties(JNIEnv *env, jobject jLinkProps) {
     LinkProperties linkProperties;

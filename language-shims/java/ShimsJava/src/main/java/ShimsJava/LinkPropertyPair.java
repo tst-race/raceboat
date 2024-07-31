@@ -1,4 +1,3 @@
-
 //
 // Copyright 2023 Two Six Technologies
 //
@@ -15,17 +14,19 @@
 // limitations under the License.
 //
 
-#include "ShimsJava_AppConfig.h"
+package ShimsJava;
 
-#include "JavaShimUtils.h"
+public class LinkPropertyPair {
+    public LinkPropertySet send;
+    public LinkPropertySet receive;
 
-/**
- * @brief Create Java AppConfig from default initialized C++ App Config
- *
- * @param env JNIEnv passed in by JNI, used to do JNI conversions
- * @param jclass This is passed in by JNI but we don't use it.
- */
-JNIEXPORT jobject JNICALL Java_ShimsJava_AppConfig_create(JNIEnv *env, jclass) {
-    AppConfig config;
-    return JavaShimUtils::appConfigToJobject(env, config);
+    public LinkPropertyPair() {
+        send = new LinkPropertySet();
+        receive = new LinkPropertySet();
+    }
+
+    public LinkPropertyPair(LinkPropertySet send, LinkPropertySet receive) {
+        this.send = send;
+        this.receive = receive;
+    }
 }

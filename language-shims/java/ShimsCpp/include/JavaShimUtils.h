@@ -18,21 +18,22 @@
 #ifndef _Java_Shim_Utils
 #define _Java_Shim_Utils
 
-#include <AppConfig.h>
-#include <ChannelProperties.h>
-#include <ChannelStatus.h>
-#include <ClrMsg.h>
-#include <ConnectionStatus.h>
-#include <DeviceInfo.h>
-#include <EncPkg.h>
-#include <LinkProperties.h>
-#include <LinkStatus.h>
-#include <MessageStatus.h>
-#include <PackageStatus.h>
-#include <PluginConfig.h>
-#include <PluginResponse.h>
-#include <PluginStatus.h>
-#include <SdkResponse.h>
+//#include <AppConfig.h>
+#include <race/common/ChannelProperties.h>
+#include <race/common/ChannelStatus.h>
+//#include <ClrMsg.h>
+#include <race/common/ConnectionStatus.h>
+//#include <DeviceInfo.h>
+#include <race/common/EncPkg.h>
+#include <race/common/LinkProperties.h>
+#include <race/common/LinkStatus.h>
+//#include <MessageStatus.h>
+#include <race/common/PackageStatus.h>
+#include <race/common/PluginConfig.h>
+#include <race/common/PluginResponse.h>
+//#include <PluginStatus.h>
+#include <race/common/RaceEnums.h>
+#include <race/unified/SdkResponse.h>
 #include <jni.h>
 
 #include <map>
@@ -52,7 +53,7 @@ namespace JavaShimUtils {
  * @param jClrMsg Java ClrMsg to convert
  * @return ClrMsg
  */
-ClrMsg jClrMsg_to_ClrMsg(JNIEnv *env, jobject jClrMsg);
+//ClrMsg jClrMsg_to_ClrMsg(JNIEnv *env, jobject jClrMsg);
 
 /**
  * @brief Convert C++ ClrMsg to Java ClrMsg
@@ -61,7 +62,7 @@ ClrMsg jClrMsg_to_ClrMsg(JNIEnv *env, jobject jClrMsg);
  * @param ClrMsg C++ ClrMsg to convert
  * @return jClrMsg
  */
-jobject clrMsg_to_jClrMsg(JNIEnv *env, const ClrMsg &clrMsg);
+//jobject clrMsg_to_jClrMsg(JNIEnv *env, const ClrMsg &clrMsg);
 
 /**
  * @brief Convert Java EncPkg to C++ EncPkg
@@ -88,7 +89,7 @@ jobject encPkgToJobject(JNIEnv *env, const EncPkg &encPkg);
  * @param javaNodeType Java NodeType to convert
  * @return NodeType
  */
-RaceEnums::NodeType jobjectToNodeType(JNIEnv *env, jobject javaNodeType);
+//RaceEnums::NodeType jobjectToNodeType(JNIEnv *env, jobject javaNodeType);
 
 /**
  * @brief Convert C++ NodeType to Java NodeType
@@ -97,7 +98,7 @@ RaceEnums::NodeType jobjectToNodeType(JNIEnv *env, jobject javaNodeType);
  * @param nodeType C++ NodeType to convert
  * @return NodeType
  */
-jobject nodeTypeToJNodeType(JNIEnv *env, RaceEnums::NodeType nodeType);
+//jobject nodeTypeToJNodeType(JNIEnv *env, RaceEnums::NodeType nodeType);
 
 /**
  * @brief Convert Java StorageEncryptionType to C++ StorageEncryptionType
@@ -106,8 +107,8 @@ jobject nodeTypeToJNodeType(JNIEnv *env, RaceEnums::NodeType nodeType);
  * @param javaStorageEncryptionType Java StorageEncryptionType to convert
  * @return StorageEncryptionType
  */
-RaceEnums::StorageEncryptionType jobjectToStorageEncryptionType(JNIEnv *env,
-                                                                jobject javaStorageEncryptionType);
+//RaceEnums::StorageEncryptionType jobjectToStorageEncryptionType(JNIEnv *env,
+//                                                                jobject javaStorageEncryptionType);
 
 /**
  * @brief Convert C++ StorageEncryptionType to Java StorageEncryptionType
@@ -116,8 +117,8 @@ RaceEnums::StorageEncryptionType jobjectToStorageEncryptionType(JNIEnv *env,
  * @param storageEncryptionType C++ StorageEncryptionType to convert
  * @return StorageEncryptionType
  */
-jobject StorageEncryptionTypeToJStorageEncryptionType(
-    JNIEnv *env, RaceEnums::StorageEncryptionType storageEncryptionType);
+//jobject StorageEncryptionTypeToJStorageEncryptionType(
+//    JNIEnv *env, RaceEnums::StorageEncryptionType storageEncryptionType);
 
 /**
  * @brief Convert Java UserDisplayType to C++ UserDisplayType
@@ -164,7 +165,7 @@ jobject bootstrapActionTypeToJBootstrapActionType(
  * @param jobject Java AppConfig to convert
  * @return AppConfig
  */
-AppConfig jAppConfigToAppConfig(JNIEnv *env, jobject jAppConfig);
+//AppConfig jAppConfigToAppConfig(JNIEnv *env, jobject jAppConfig);
 
 /**
  * @brief Convert C++ AppConfig to Java AppConfig
@@ -173,7 +174,7 @@ AppConfig jAppConfigToAppConfig(JNIEnv *env, jobject jAppConfig);
  * @param appConfig C++ AppConfig to convert
  * @return Java AppConfig
  */
-jobject appConfigToJobject(JNIEnv *env, const AppConfig &appConfig);
+//jobject appConfigToJobject(JNIEnv *env, const AppConfig &appConfig);
 
 /**
  * @brief Convert Java LinkProperties to C++ LinkProperties
@@ -552,7 +553,7 @@ jobject channelStatusToJobject(JNIEnv *env, ChannelStatus status);
  * @param status C++ PluginStatus to convert
  * @return Java PluginStatus
  */
-PluginStatus jobjectToPluginStatus(JNIEnv *env, jobject &jPluginStatus);
+//PluginStatus jobjectToPluginStatus(JNIEnv *env, jobject &jPluginStatus);
 
 /**
  * @brief Convert C++ PluginStatus to Java PluginStatus
@@ -561,7 +562,7 @@ PluginStatus jobjectToPluginStatus(JNIEnv *env, jobject &jPluginStatus);
  * @param status C++ PluginStatus to convert
  * @return Java PluginStatus
  */
-jobject pluginStatusToJobject(JNIEnv *env, PluginStatus status);
+//jobject pluginStatusToJobject(JNIEnv *env, PluginStatus status);
 
 /**
  * @brief Convert Java ChannelStatus to C++ ChannelStatus
@@ -615,7 +616,7 @@ PluginConfig jobjectToPluginConfig(JNIEnv *env, jobject &jPluginConfig);
  * @param status C++ MessageStatus to convert
  * @return Java MessageStatus
  */
-jobject messageStatusToJobject(JNIEnv *env, MessageStatus status);
+//jobject messageStatusToJobject(JNIEnv *env, MessageStatus status);
 
 /**
  * @brief Convert Java MessageStatus to C++ MessageStatus
@@ -624,7 +625,7 @@ jobject messageStatusToJobject(JNIEnv *env, MessageStatus status);
  * @param jMessageStatus Java MessageStatus to convert
  * @return C++ MessageStatus
  */
-MessageStatus jobjectToMessageStatus(JNIEnv *env, jobject &jMessageStatus);
+//MessageStatus jobjectToMessageStatus(JNIEnv *env, jobject &jMessageStatus);
 
 /**
  * @brief Convert Java byte array to C++ RawData
@@ -651,7 +652,7 @@ jbyteArray rawDataToJByteArray(JNIEnv *env, const RawData &data);
  * @param deviceInfo C++ DeviceInfo to convert
  * @return Java DeviceInfo
  */
-jobject deviceInfoToJobject(JNIEnv *env, DeviceInfo deviceInfo);
+//jobject deviceInfoToJobject(JNIEnv *env, DeviceInfo deviceInfo);
 
 /**
  * @brief Convert Java DeviceInfo to C++ DeviceInfo
@@ -660,7 +661,7 @@ jobject deviceInfoToJobject(JNIEnv *env, DeviceInfo deviceInfo);
  * @param jDeviceInfo Java DeviceInfo to convert
  * @return C++ DeviceInfo
  */
-DeviceInfo jobjectToDeviceInfo(JNIEnv *env, jobject &jDeviceInfo);
+//DeviceInfo jobjectToDeviceInfo(JNIEnv *env, jobject &jDeviceInfo);
 
 /****
  * Get fields from Java
