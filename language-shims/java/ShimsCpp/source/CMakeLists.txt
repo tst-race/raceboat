@@ -85,6 +85,12 @@ else()
   )
 endif()
 
+install(
+  TARGETS RaceJavaShims
+  LIBRARY DESTINATION lib
+)
+
+
 # TODO enable performance-* and readability-* checks (needs fixes)
 setup_clang_tidy_for_target(TARGET RaceJavaShims)
 setup_cppcheck_for_target(TARGET RaceJavaShims CHECKS warning style)
