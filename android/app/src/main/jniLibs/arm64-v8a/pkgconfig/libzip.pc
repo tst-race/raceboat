@@ -1,0 +1,15 @@
+prefix=/android/arm64-v8a
+exec_prefix=${prefix}
+bindir=/android/arm64-v8a/bin
+libdir=/android/arm64-v8a/lib
+includedir=/android/arm64-v8a/include
+
+zipcmp=/android/arm64-v8a/bin/zipcmp
+
+Name: libzip
+Description: library for handling zip archives
+Version: 1.8.0
+Libs:  -L${libdir} -lzip
+Libs.private:  -lz
+Cflags: -I${includedir}
+
