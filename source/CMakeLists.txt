@@ -48,6 +48,7 @@ add_library(raceSdkCommon SHARED
     decomposed/ComponentWrappers.cpp
     decomposed/MimeTypes.cpp
     decomposed/SdkWrappers.cpp
+    unified/RacePluginRegistry.cpp
     unified/SdkResponse.cpp
     plugin-loading/ComponentPlugin.cpp
     plugin-loading/CompositeWrapper.cpp
