@@ -27,8 +27,14 @@ bool initPython(std::string pythonHome, std::string pluginPath,
   if (!called) {
     called = true;
     if (!pythonHome.empty()) {
+      helper::logInfo(logPrefix + "Setting python home to " + pythonHome);
       std::wstring widePythonHome(pythonHome.begin(), pythonHome.end());
       Py_SetPythonHome(widePythonHome.c_str());
+
+      auto pythonPath = pythonHome + ":" + pythonHome + "/lib-dynload/";
+      helper::logInfo(logPrefix + "Setting python path to " + pythonPath);
+      std::wstring widePythonPath(pythonPath.begin(), pythonPath.end());
+      Py_SetPath(widePythonPath.c_str());
     }
     Py_Initialize();
 

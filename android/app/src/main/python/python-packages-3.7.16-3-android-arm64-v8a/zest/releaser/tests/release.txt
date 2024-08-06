@@ -1,0 +1,117 @@
+Detailed tests of release.py
+============================
+
+Some initial imports:
+
+    >>> from zest.releaser import release
+    >>> from zest.releaser import utils
+    >>> import os
+    >>> utils.TESTMODE = True
+
+
+Check availability on pypi
+--------------------------
+
+"Testing" means "don't really poll pypi", so the test setup does some
+monkeypatching for us:
+
+    >>> from urllib import request
+    >>> request.urlopen
+    <function ..._mock_urlopen at ...>
+
+There's a mock list of packages that our mock pypi provides:
+
+    >>> mock_pypi_available
+    []
+
+Search a non-existing package:
+
+    >>> release.package_in_pypi('zest.releaser')
+    False
+
+Now search for an "existing" package:
+
+    >>> mock_pypi_available.append('zest.releaser')
+    >>> release.package_in_pypi('zest.releaser')
+    True
+
+
+Version grabbing
+----------------
+
+    >>> os.chdir(gitsourcedir)
+    >>> releaser = release.Releaser()
+
+Grab the version:
+
+    >>> releaser._grab_version()
+    >>> releaser.data['version']
+    '0.1.dev0'
+
+If, by some weird twist of fate, there's no release: we exit.
+
+    >>> releaser.vcs.get_setup_py_version = lambda: None
+    >>> releaser._grab_version()
+    Traceback (most recent call last):
+    ...
+    RuntimeError: SYSTEM EXIT (code=1)
+
+
+Check tag existence
+-------------------
+
+We automatically check if a tag already exists.  First set the version to 0.1:
+
+    >>> releaser = release.Releaser()
+    >>> releaser.vcs.version = '0.1'
+    >>> releaser.prepare()
+    >>> releaser.data['tag_already_exists']
+    False
+
+If the tag doesn't exist yet, no safety question is asked:
+
+    >>> releaser._info_if_tag_already_exists()
+
+Mock that the tag exists and we get a question:
+
+    >>> releaser.data['tag_already_exists'] = True
+    >>> utils.test_answer_book.set_answers(['n'])
+    >>> utils.AUTO_RESPONSE
+    False
+    >>> releaser._info_if_tag_already_exists()
+    Question: There is already a tag 0.1, show if there are differences? (Y/n)?
+    Our reply: n
+    >>> utils.test_answer_book.set_answers(['y'])
+    >>> releaser._info_if_tag_already_exists()
+    Question: There is already a tag 0.1, show if there are differences? (Y/n)?
+    Our reply: y
+    git diff 0.1
+    RED fatal: ambiguous argument '0.1': unknown revision or path not in the working tree.
+    ...
+
+Note: the diff itself fails as we mocked its existence.
+
+
+Making tags
+-----------
+
+If the tag doesn't exist yet, we can make one.  The actual tag creation is
+tested already, here we test that you get a sys.exit if you refuse to run the
+tag command:
+
+    >>> releaser = release.Releaser()
+    >>> releaser.data['tag_already_exists'] = False
+    >>> releaser.data['version'] = '0.1'
+    >>> releaser.data['tag'] = '0.1'
+    >>> releaser.data['tag-message'] = 'Tagging {version}'
+    >>> releaser.data['tag-signing'] = False
+    >>> utils.test_answer_book.set_answers(['n'])
+    >>> releaser._make_tag()
+    Traceback (most recent call last):
+    ...
+    RuntimeError: SYSTEM EXIT (code=1)
+
+If the the tag already exists, we just return without doing anything.
+
+    >>> releaser.data['tag_already_exists'] = True
+    >>> releaser._make_tag()
