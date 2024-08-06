@@ -1,0 +1,41 @@
+Detailed tests of choose.py
+===========================
+
+Some initial imports:
+
+    >>> from zest.releaser import choose
+    >>> import os
+    >>> from zest.releaser import utils
+    >>> utils.TESTMODE = True
+
+Choose makes the choice between version control systems.
+
+Git:
+
+    >>> os.chdir(gitsourcedir)
+    >>> choose.version_control()
+    <Git at TESTTEMP/tha.example-git .>
+
+It works when we are in a sub directory too:
+
+    >>> os.chdir(gitsourcedir)
+    >>> os.chdir('src')
+    >>> utils.test_answer_book.set_answers(['n'])
+    >>> choose.version_control()
+    Question: You are NOT in the root of the repository. Do you want to go there? (y/N)?
+    Our reply: n
+    <Git at TESTTEMP/tha.example-git src>
+    >>> utils.test_answer_book.set_answers(['y'])
+    >>> choose.version_control()
+    Question: You are NOT in the root of the repository. Do you want to go there? (y/N)?
+    Our reply: y
+    <Git at TESTTEMP/tha.example-git .>
+
+When no version control system is found, zest.releaser exits (with a log
+message, but we don't test those yet):
+
+    >>> os.chdir(tempdir)
+    >>> choose.version_control()
+    Traceback (most recent call last):
+    ...
+    RuntimeError: SYSTEM EXIT (code=1)

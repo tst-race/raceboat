@@ -1,0 +1,406 @@
+Detailed tests of pypi.py
+=========================
+
+Note on test setup: we don't use the "big" setup/teardown methods here.
+
+    >>> from zest.releaser import pypi
+    >>> import pkg_resources
+
+
+Parsing the configuration file
+------------------------------
+
+For pypi uploads and uploads to multiple servers, a configuration file
+needs to be available:
+
+    >>> pypi.DIST_CONFIG_FILE
+    '.pypirc'
+
+This is the default.  For testing purposes, you *can* pass in a config file's
+name yourself.  We'll do that in the rest of these tests.
+
+A missing file doesn't lead to an error:
+
+    >>> pypiconfig = pypi.PypiConfig(config_filename='non/existing', use_setup_cfg=False)
+    >>> pypiconfig.config is None
+    True
+
+There are two styles of ``.pypirc`` files.  The old one just for pypi:
+
+    >>> pypirc_old = pkg_resources.resource_filename(
+    ...     'zest.releaser.tests', 'pypirc_old.txt')
+    >>> with open(pypirc_old) as pypifile:
+    ...    print(pypifile.read())
+    [server-login]
+    username:pipo_de_clown
+    password:asjemenou
+    <BLANKLINE>
+    [zest.releaser]
+    extra-message = [ci skip]
+    prefix-message = [TAG]
+    >>> pypiconfig = pypi.PypiConfig(config_filename=pypirc_old)
+    >>> pypiconfig.distutils_servers()
+    ['pypi']
+
+And the new format that allows multiple uploads:
+
+    >>> pypirc_new = pkg_resources.resource_filename(
+    ...     'zest.releaser.tests', 'pypirc_new.txt')
+    >>> with open(pypirc_new) as pypifile:
+    ...    print(pypifile.read())
+    [distutils]
+    index-servers =
+        pypi
+        plone.org
+        mycompany
+    <BLANKLINE>
+    [pypi]
+    username:user
+    password:password
+    <BLANKLINE>
+    [plone.org]
+    repository:http://plone.org/products
+    username:ploneuser
+    password:password
+    <BLANKLINE>
+    [mycompany]
+    repository:http://my.company/products
+    username:user
+    password:password
+    <BLANKLINE>
+    [zest.releaser]
+    extra-message = [ci skip]
+    prefix-message = [TAG]
+    >>> pypiconfig = pypi.PypiConfig(config_filename=pypirc_new)
+    >>> from pprint import pprint
+    >>> pprint(sorted(pypiconfig.distutils_servers()))
+    ['mycompany', 'plone.org', 'pypi']
+
+A file with both is also possible.  The old server-login section is
+used to contain the username and password that are shared among
+servers.  Any servers that have no corresponding section are ignored:
+
+    >>> pypirc_both = pkg_resources.resource_filename(
+    ...     'zest.releaser.tests', 'pypirc_both.txt')
+    >>> with open(pypirc_both) as pypifile:
+    ...    print(pypifile.read())
+    [server-login]
+    username:bdfl
+    password:secret
+    <BLANKLINE>
+    [distutils]
+    index-servers =
+      pypi
+      local
+      unknown
+    <BLANKLINE>
+    [pypi]
+    password:verysecret
+    <BLANKLINE>
+    [local]
+    repository = http://localhost:8080/test/products
+    username = knight
+    >>> pypiconfig = pypi.PypiConfig(config_filename=pypirc_both)
+    >>> pprint(sorted(pypiconfig.distutils_servers()))
+    ['local', 'pypi']
+
+A simple file with just a pypi section is also possible:
+
+    >>> pypirc_simple = pkg_resources.resource_filename(
+    ...     'zest.releaser.tests', 'pypirc_simple.txt')
+    >>> with open(pypirc_simple) as pypifile:
+    ...    print(pypifile.read())
+    [pypi]
+    username:bdfl
+    password:secret
+    >>> pypiconfig = pypi.PypiConfig(config_filename=pypirc_simple)
+    >>> pprint(sorted(pypiconfig.distutils_servers()))
+    ['pypi']
+
+
+Asking for making a release or not
+----------------------------------
+
+Some people hardly ever want to make a full release of a package to
+pypi; a git tag may be enough.  They can tell zest.releaser to
+use a different default answer when it asks to make a checkout for a
+release.  This means you can usually just press Enter on all questions
+that zest.releaser asks.
+
+We try to read a [zest.releaser] section, either in pypirc or
+setup.cfg and look  for a ``release`` option.  We can
+ask for the result like this, which by default is True:
+
+    >>> pypiconfig = pypi.PypiConfig(config_filename=pypirc_both)
+    >>> pypiconfig.want_release()
+    True
+
+We have a pypirc for this:
+
+    >>> pypirc_no_release = pkg_resources.resource_filename(
+    ...     'zest.releaser.tests', 'pypirc_no_release.txt')
+    >>> pypiconfig = pypi.PypiConfig(config_filename=pypirc_no_release)
+    >>> pypiconfig.want_release()
+    False
+
+We can also specify to always do that checkout during a release:
+
+    >>> pypirc_yes_release = pkg_resources.resource_filename(
+    ...     'zest.releaser.tests', 'pypirc_yes_release.txt')
+    >>> pypiconfig = pypi.PypiConfig(config_filename=pypirc_yes_release)
+    >>> pypiconfig.want_release()
+    True
+
+
+Creating a wheel
+----------------
+
+When the ``wheel`` package is installed, we could create shiny new
+Python wheels, next to the standard old-style source distributions.
+In 2023 this seems good for most packages, so since version 8.0.0a2 this is by default true.
+
+If the package is installed, we set a constant:
+
+    >>> from zest.releaser.pypi import USE_WHEEL
+    >>> USE_WHEEL
+    True
+
+We try to read a [zest.releaser] section, either in pypirc or
+setup.cfg and check for a ``create-wheel`` option.  In this case we
+explicitly disable checking for a setup.cfg, because when running the
+tests with ``tox`` the current directory is the base directory of
+zest.releaser, which now contains a setup.cfg.
+
+We can ask for the result like this, which by default is True:
+
+    >>> pypiconfig = pypi.PypiConfig(config_filename=pypirc_both, use_setup_cfg=False)
+    >>> pypiconfig.create_wheel()
+    True
+
+We can also specify to not create the wheel, even when (universal) wheels could be created:
+
+    >>> pypirc_yes_release = pkg_resources.resource_filename(
+    ...     'zest.releaser.tests', 'pypirc_universal_nocreate.txt')
+    >>> pypiconfig = pypi.PypiConfig(config_filename=pypirc_yes_release, use_setup_cfg=False)
+    >>> pypiconfig.create_wheel()
+    False
+
+Fixing setup.cfg
+----------------
+
+A setup.cfg file can be used to influence the release process.  This
+may contain options that are not advisable in the released package but
+should only be used during development.  We can clean that up.  First
+we prepare a directory.
+
+    >>> pypi.SETUP_CONFIG_FILE
+    'setup.cfg'
+    >>> import os
+    >>> import shutil
+    >>> import tempfile
+    >>> tempdir = tempfile.mkdtemp()
+    >>> os.chdir(tempdir)
+
+Without a setup.cfg there is no config:
+
+    >>> setup_config = pypi.SetupConfig()
+    >>> setup_config.config is None
+    True
+    >>> setup_config.has_bad_commands()
+    False
+    >>> setup_config.fix_config()
+    >>> os.path.exists(pypi.SETUP_CONFIG_FILE)
+    False
+
+Now we add a setup.cfg with some good and some bad commands:
+
+    >>> SETUP_CFG = """
+    ... [zest.releaser]
+    ... release = no
+    ...
+    ... [egg_info]
+    ... tag_build = dev
+    ... tag_svn_revision = true"""
+    >>> with open(pypi.SETUP_CONFIG_FILE, 'w') as f:
+    ...     _ = f.write(SETUP_CFG)
+    >>> setup_config = pypi.SetupConfig()
+    >>> setup_config.has_bad_commands()
+    True
+
+Fixing the config also prints the new config:
+
+    >>> setup_config.fix_config()
+    [zest.releaser]
+    release = no
+    <BLANKLINE>
+    [egg_info]
+    tag_build =
+    tag_svn_revision = false
+    >>> os.path.exists(pypi.SETUP_CONFIG_FILE)
+    True
+    >>> with open(pypi.SETUP_CONFIG_FILE) as pypifile:
+    ...    print(''.join(pypifile.readlines()))
+    [zest.releaser]
+    release = no
+    <BLANKLINE>
+    [egg_info]
+    tag_build =
+    tag_svn_revision = false
+
+We try that again with this fixed up config file as input:
+
+    >>> setup_config = pypi.SetupConfig()
+    >>> setup_config.has_bad_commands()
+    False
+    >>> setup_config.fix_config()
+    >>> os.path.exists(pypi.SETUP_CONFIG_FILE)
+    True
+    >>> with open(pypi.SETUP_CONFIG_FILE) as pypifile:
+    ...    print(''.join(pypifile.readlines()))
+    [zest.releaser]
+    release = no
+    <BLANKLINE>
+    [egg_info]
+    tag_build =
+    tag_svn_revision = false
+
+Formatting release tags
+----------------------
+
+``zest.releaser`` by default tags releases in the project version control. The
+format of the tag name can be customized by the ``tag-format`` setting.
+
+By default the tag format is just the version itself:
+
+    >>> version = '1.2.3'
+    >>> os.remove(pypi.SETUP_CONFIG_FILE)
+    >>> pypiconfig = pypi.PypiConfig()
+    >>> pypiconfig.tag_format(version)
+    '1.2.3'
+
+But it can be customized with a format string, as long as it contains
+the string ``{version}``:
+
+    >>> SETUP_CFG = """
+    ... [zest.releaser]
+    ... tag-format = mytag-{version}
+    ... """
+    >>> with open(pypi.SETUP_CONFIG_FILE, 'w') as f:
+    ...     _ = f.write(SETUP_CFG)
+    >>> pypiconfig = pypi.PypiConfig()
+    >>> pypiconfig.tag_format(version)
+    'mytag-1.2.3'
+
+Or, for backward compatibility, a Python % interpolation format:
+
+    >>> SETUP_CFG = """
+    ... [zest.releaser]
+    ... tag-format = yourtag-%(version)s
+    ... """
+    >>> with open(pypi.SETUP_CONFIG_FILE, 'w') as f:
+    ...     _ = f.write(SETUP_CFG)
+    >>> pypiconfig = pypi.PypiConfig()
+    >>> pypiconfig.tag_format(version)
+    `tag-format` contains deprecated `%(version)s` format. Please change to:
+    <BLANKLINE>
+    [zest.releaser]
+    tag-format = yourtag-{version}
+    'yourtag-1.2.3'
+
+
+Notice, however, that a ``setup.cfg`` like the one above doesn't work for
+distutils, as ``ConfigParser`` tries to recursively interpolate all
+``%(values)s`` until there are none left. Which is why we emit a warning.
+
+
+Formatting release tag messages
+-----------------------------------
+
+The commit message to be used when tagging can be customized by the
+``tag-message`` setting.
+
+By default the tag message is ``Tagging`` plus the version:
+
+    >>> version = '1.2.3'
+    >>> os.remove(pypi.SETUP_CONFIG_FILE)
+    >>> pypiconfig = pypi.PypiConfig()
+    >>> pypiconfig.tag_message(version)
+    'Tagging 1.2.3'
+
+But it can be customized with a message string, as long as it contains
+the string ``{version}``:
+
+    >>> SETUP_CFG = """
+    ... [zest.releaser]
+    ... tag-message = Creating v{version} tag.
+    ... """
+    >>> with open(pypi.SETUP_CONFIG_FILE, 'w') as f:
+    ...     _ = f.write(SETUP_CFG)
+    >>> pypiconfig = pypi.PypiConfig()
+    >>> pypiconfig.tag_message(version)
+    'Creating v1.2.3 tag.'
+
+
+No-input mode
+-------------
+
+In some cases you want no questions asked. Zest.releaser should just do its
+job without asking for versions or confirmations. You can enable this
+behaviour with a ``--no-input`` commandline option, but also by adding
+``no-input = yes`` to the ``[zest.releaser]`` section in ``.pypirc`` or
+``setup.cfg``.
+
+The default is False:
+
+    >>> pypiconfig = pypi.PypiConfig(config_filename=pypirc_yes_release, use_setup_cfg=False)
+    >>> pypiconfig.no_input()
+    False
+
+Enable the option in ``.pypirc``:
+
+    >>> pypirc_no_input = pkg_resources.resource_filename(
+    ...     'zest.releaser.tests', 'pypirc_no_input.txt')
+    >>> pypiconfig = pypi.PypiConfig(config_filename=pypirc_no_input)
+
+Now the option should be set to True:
+
+    >>> pypiconfig.no_input()
+    True
+
+Let's enable the option also in setup.cfg:
+
+    >>> SETUP_CFG = """
+    ... [zest.releaser]
+    ... no-input = yes
+    ... """
+    >>> with open(pypi.SETUP_CONFIG_FILE, 'w') as f:
+    ...     _ = f.write(SETUP_CFG)
+    >>> pypiconfig = pypi.PypiConfig()
+
+The option should be set to True here as well:
+
+    >>> pypiconfig.no_input()
+    True
+
+
+Python version file pointer
+---------------------------
+
+In some cases you want to point at a Python file with a ``__version__`` marker
+in it. For that, there's the ``python-file-with-version`` option.
+
+The default is None:
+
+    >>> setup_config.python_file_with_version()
+
+Enable the option:
+
+    >>> SETUP_CFG = """
+    ... [zest.releaser]
+    ... python-file-with-version = reinout/maurits.py
+    ... """
+    >>> with open(pypi.SETUP_CONFIG_FILE, 'w') as f:
+    ...    _ = f.write(SETUP_CFG)
+    >>> setup_config = pypi.SetupConfig()
+    >>> setup_config.python_file_with_version()
+    'reinout/maurits.py'
