@@ -127,6 +127,11 @@ set_target_properties(commsPluginBindingsGolang PROPERTIES
   SWIG_USE_TARGET_INCLUDE_DIRECTORIES TRUE
   COMPILE_OPTIONS "-Wno-error" # Clear warnings set globally via add_compile_options
 )
+target_include_directories(commsPluginBindingsGolang PUBLIC
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/race/common>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/race/decomposed>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/race/unified>
+)
   
 swig_link_libraries(commsPluginBindingsGolang language-shims-headers raceSdkCommon)
 
