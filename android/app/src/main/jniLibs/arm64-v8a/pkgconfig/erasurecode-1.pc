@@ -1,0 +1,15 @@
+# erasurecode pkg-config source file
+
+prefix=/
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: erasurecode
+Description: C library with pluggable erasure code backends
+Version: 1.6.2
+Requires:
+Conflicts:
+Libs: -L${libdir} -lerasurecode -ldl
+Libs.private: @ERASURECODE_STATIC_LIBS@ -lz
+Cflags: -I${includedir}/ -I${includedir}/liberasurecode

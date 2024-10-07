@@ -1,0 +1,26 @@
+threadloop<2,>=1
+thrift
+tornado>=4.3
+opentracing<3.0,>=2.1
+
+[:python_version<"3"]
+futures
+
+[tests]
+mock==1.0.1
+pycurl<8,>=7.43
+pytest<3.8.0,>=3.7.0
+pytest-cov==2.5.1
+coverage<4.4
+pytest-timeout==1.3.1
+pytest-tornado
+pytest-benchmark[histogram]<3.2,>=3.0.0rc1
+pytest-localserver
+flake8
+flake8-quotes
+codecov
+opentracing_instrumentation<4,>=3
+prometheus_client==0.3.1
+
+[tests:python_version == "2.7"]
+tchannel>=0.27

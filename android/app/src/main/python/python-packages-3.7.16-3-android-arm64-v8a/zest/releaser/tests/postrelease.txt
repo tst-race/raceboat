@@ -1,0 +1,304 @@
+Detailed tests of postrelease.py
+================================
+
+Several items are prepared for us.
+
+A git checkout of a project:
+
+    >>> gitsourcedir
+    'TESTTEMP/tha.example-git'
+    >>> import os
+    >>> os.chdir(gitsourcedir)
+
+The version is at 0.1.dev0:
+
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '0.1.dev0'
+
+Asking input on the prompt is not unittestable unless we use the prepared
+testing hack in utils.py:
+
+    >>> from zest.releaser import utils
+    >>> utils.TESTMODE = True
+
+Run the postrelease script:
+
+    >>> utils.test_answer_book.set_answers(['', '', 'n'])
+    >>> from zest.releaser import postrelease
+    >>> postrelease.main()
+    Current version is 0.1
+    Question: Enter new development version ('.dev0' will be appended) [0.2]:
+    Our reply: <ENTER>
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+    Question: OK to push commits to the server? (Y/n)?
+    Our reply: n
+
+The changelog and setup.py are at 0.2 and indicate dev mode:
+
+    >>> githead('CHANGES.txt')
+    Changelog of tha.example
+    ========================
+    <BLANKLINE>
+    0.2 (unreleased)
+    ----------------
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '0.2.dev0'
+
+Now we set the version to something that does not end in a number and
+is not recognized as development version (with setuptools 8 or higher
+the version is actually reported with a zero at the end):
+
+    >>> from zest.releaser.git import Git
+    >>> vcs = Git()
+    >>> vcs.version
+    '0.2.dev0'
+    >>> vcs.version = '0.1b'
+    >>> vcs.version
+    '0.1b0'
+    >>> commit_all_changes()
+
+Run the postrelease script.  Since the version number does not end
+with a number, the script cannot make a suggestion, except when the
+number is normalized by setuptools already:
+
+    >>> utils.test_answer_book.set_answers(['0.2', '', 'n'])
+    >>> from zest.releaser import postrelease
+    >>> postrelease.main()
+    Current version is 0.1b0
+    Question: Enter new development version ('.dev0' will be appended) [0.1b1]:
+    Our reply: 0.2
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+    Question: OK to push commits to the server? (Y/n)?
+    Our reply: n
+
+The changelog and setup.py are at 0.2 and indicate dev mode:
+
+    >>> githead('CHANGES.txt')
+    Changelog of tha.example
+    ========================
+    <BLANKLINE>
+    0.2 (unreleased)
+    ----------------
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '0.2.dev0'
+
+The prerelease part would complain when the changelog still contains
+'- Nothing changed yet.'  So change it.
+
+    >>> add_changelog_entry()
+
+To check some corner cases we switch back and forth between prerelease
+and postrelease.  The next version after 0.2.19 should not be 0.2.110
+but 0.2.20:
+
+    >>> from zest.releaser import prerelease
+    >>> utils.test_answer_book.set_answers(['', '', '0.2.19', ''])
+    >>> prerelease.main()
+    Question...
+    Question: Enter version [0.2]:
+    Our reply: 0.2.19
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+    >>> utils.test_answer_book.set_answers(['', '', 'n'])
+    >>> postrelease.main()
+    Current version is 0.2.19
+    Question: Enter new development version ('.dev0' will be appended) [0.2.20]:
+    Our reply: <ENTER>
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+    Question: OK to push commits to the server? (Y/n)?
+    Our reply: n
+
+Releases without numbers at the end should not fluster us even when we
+cannot suggest a reasonable number. We'll ask for a version until we get one.
+This this case it is not a canonical version so we have an extra question about this:
+
+    >>> add_changelog_entry()
+    >>> utils.test_answer_book.set_answers(['', '', '0.3beta', ''])
+    >>> prerelease.main()
+    Question...
+    Question: Enter version [0.2.20]:
+    Our reply: 0.3beta
+    Question: Do you want to use this version anyway? (Y/n)?
+    Our reply: <ENTER>
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+    >>> utils.test_answer_book.set_answers(['0.3rc0', '', 'n'])
+    >>> postrelease.main()
+    Current version is 0.3b0
+    Question: Enter new development version ('.dev0' will be appended) [0.3b1]:
+    Our reply: 0.3rc0
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+    Question: OK to push commits to the server? (Y/n)?
+    Our reply: n
+
+Numbers and characters can be combined:
+
+    >>> add_changelog_entry()
+    >>> utils.test_answer_book.set_answers(['', '', '1.0a1', ''])
+    >>> prerelease.main()
+    Question...
+    Question: Enter version [0.3rc0]:
+    Our reply: 1.0a1
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+    >>> utils.test_answer_book.set_answers(['', '', 'n'])
+    >>> postrelease.main()
+    Current version is 1.0a1
+    Question: Enter new development version ('.dev0' will be appended) [1.0a2]:
+    Our reply: <ENTER>
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+    Question: OK to push commits to the server? (Y/n)?
+    Our reply: n
+
+If there's an empty history file, it gets a fresh header.
+
+    >>> add_changelog_entry()
+    >>> utils.test_answer_book.set_answers(['', '', '1.0', ''])
+    >>> prerelease.main()
+    Question: ...
+    >>> with open('CHANGES.txt', 'w') as f:
+    ...     _ = f.write('')
+    >>> commit_all_changes()
+    >>> utils.test_answer_book.set_answers(['', '', 'n'])
+    >>> postrelease.main()
+    Current ...
+    >>> with open('CHANGES.txt') as f:
+    ...     print(f.read())
+    1.1 (unreleased)
+    ----------------
+    <BLANKLINE>
+    - Nothing changed yet.
+
+If there is no history file, we get no errors and a new history file is not
+created:
+
+    >>> add_changelog_entry()
+    >>> utils.test_answer_book.set_answers(['', '', '', ''])
+    >>> prerelease.main()
+    Question: ...
+    >>> os.remove('CHANGES.txt')
+    >>> utils.test_answer_book.set_answers(['8.2', ''])
+    >>> postrelease.main() # The setup.py complains and quits. Our test setup catches this.
+    Traceback (most recent call last):
+    ...
+    RuntimeError: SYSTEM EXIT (code=1)
+    >>> with open('CHANGES.txt') as f:  # Nope, doesn't exist.
+    ...     print(f.read())
+    Traceback (most recent call last):
+    ...
+    FileNotFoundError: [Errno 2] No such file or directory: 'CHANGES.txt'
+
+Re-instate the history file again, but omit the restructuredtext header line:
+
+    >>> with open('CHANGES.txt', 'w') as f:
+    ...    _ = f.write('1.0 (1972-12-25)\n\n- hello\n')
+    >>> commit_all_changes()
+    >>> utils.test_answer_book.set_answers(['', '', '1.3', ''])
+    >>> prerelease.main()
+    Question: ...
+    >>> utils.test_answer_book.set_answers(['', '', 'n'])
+    >>> postrelease.main()
+    Current ...
+
+No errors are raised and an ``----`` underline is assumed for the new header.
+The old one is left untouched:
+
+    >>> with open('CHANGES.txt') as f:
+    ...     print(f.read())
+    1.4 (unreleased)
+    ----------------
+    <BLANKLINE>
+    - Nothing changed yet.
+    <BLANKLINE>
+    <BLANKLINE>
+    1.0 (1972-12-25)
+    <BLANKLINE>
+    - hello
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '1.4.dev0'
+
+Let's try some options by simply calling postrelease a few times without calling prerelease or release.
+First prepare a bugfix release.
+
+    >>> utils.test_answer_book.set_answers(['1.5.1', '', 'n'])
+    >>> postrelease.main()
+    Current version is 1.4
+    Question: Enter new development version ('.dev0' will be appended) [1.5]:
+    Our reply: 1.5.1
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+    Question: OK to push commits to the server? (Y/n)?
+    Our reply: n
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '1.5.1.dev0'
+
+Now say that the next version should be a feature release:
+
+    >>> utils.test_answer_book.set_answers(['', '', 'n'])
+    >>> import sys
+    >>> sys.argv[1:] = ['--feature']
+    >>> postrelease.main()
+    Current version is 1.5.1
+    Question: Enter new development version ('.dev0' will be appended) [1.6.0]:
+    Our reply: <ENTER>
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+    Question: OK to push commits to the server? (Y/n)?
+    Our reply: n
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '1.6.0.dev0'
+
+Now say that the next version should be a breaking release, but make it an alpha:
+
+    >>> utils.test_answer_book.set_answers(['2.0.0a1', '', 'n'])
+    >>> sys.argv[1:] = ['--breaking']
+    >>> postrelease.main()
+    Current version is 1.6.0
+    Question: Enter new development version ('.dev0' will be appended) [2.0.0]:
+    Our reply: 2.0.0a1
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+    Question: OK to push commits to the server? (Y/n)?
+    Our reply: n
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '2.0.0a1.dev0'
+
+Now say that the next version is a final release.
+
+    >>> utils.test_answer_book.set_answers(['', '', 'n'])
+    >>> sys.argv[1:] = ['--final']
+    >>> postrelease.main()
+    Current version is 2.0.0a1
+    Question: Enter new development version ('.dev0' will be appended) [2.0.0]:
+    Our reply: <ENTER>
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+    Question: OK to push commits to the server? (Y/n)?
+    Our reply: n
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '2.0.0.dev0'

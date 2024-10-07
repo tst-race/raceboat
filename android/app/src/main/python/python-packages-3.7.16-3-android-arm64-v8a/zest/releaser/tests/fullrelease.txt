@@ -1,0 +1,127 @@
+Fullrelease process with --no-input
+===================================
+
+Several items are prepared for us.
+
+A git checkout of a project:
+
+    >>> gitsourcedir
+    'TESTTEMP/tha.example-git'
+    >>> import os
+    >>> os.chdir(gitsourcedir)
+
+The version is at 0.1.dev0:
+
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '0.1.dev0'
+
+Asking input on the prompt is not unittestable unless we use the prepared
+testing hack in utils.py:
+
+    >>> from zest.releaser import utils
+    >>> utils.TESTMODE = True
+
+Run the whole process without asking for input. For that we pass the
+``--no-input`` option:
+
+    >>> import sys
+    >>> sys.argv[1:] = ['--no-input']
+    >>> utils.parse_options()
+    Namespace(auto_response=True, verbose=False)
+    >>> utils.AUTO_RESPONSE
+    True
+
+Now run the fullrelease:
+
+    >>> from zest.releaser import fullrelease
+    >>> fullrelease.main()
+    lists of files in version control and sdist match
+    Changelog entries for version 0.1:
+    <BLANKLINE>
+    0.1 (unreleased)
+    ----------------
+    <BLANKLINE>
+    - Initial library skeleton created by thaskel.  [your name]
+    <BLANKLINE>
+    Checking data dict
+    Checking data dict
+    Tag needed ...
+
+The changelog and setup.py are at 0.2.dev0:
+
+    >>> githead('CHANGES.txt')
+    Changelog of tha.example
+    ========================
+    <BLANKLINE>
+    0.2 (unreleased)
+    ----------------
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '0.2.dev0'
+
+An alternative is to set a ``no-input`` option in the ``.pypirc`` or
+``setup.cfg`` file:
+
+    >>> sys.argv[1:] = []
+    >>> from zest.releaser import utils
+    >>> utils.parse_options()
+    Namespace(auto_response=False, verbose=False)
+    >>> utils.AUTO_RESPONSE
+    False
+    >>> cfg = """
+    ... [zest.releaser]
+    ... no-input = true
+    ... """
+    >>> with open('setup.cfg', 'w') as f:
+    ...    _ = f.write(cfg)
+
+The prerelease part would complain when the changelog still contains
+'- Nothing changed yet.'  So change it.
+
+    >>> add_changelog_entry()
+
+Now run the fullrelease:
+
+    >>> from zest.releaser import fullrelease
+    >>> fullrelease.main()
+    lists of files in version control and sdist match
+    Changelog entries for version 0.2:
+    <BLANKLINE>
+    0.2 (unreleased)
+    ----------------
+    <BLANKLINE>
+    - Brown bag release.
+    <BLANKLINE>
+    <BLANKLINE>
+    0.1 (1972-12-25)
+    ----------------
+    Checking data dict
+    Checking data dict
+    Tag needed ...
+
+Yes, the no-input was detected:
+
+    >>> utils.AUTO_RESPONSE
+    True
+
+The changelog and setup.py are at 0.3.dev0 now:
+
+    >>> githead('CHANGES.txt')
+    Changelog of tha.example
+    ========================
+    <BLANKLINE>
+    0.3 (unreleased)
+    ----------------
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '0.3.dev0'
+
+When you do some commits, but forget to update the changelog,
+prerelease (or fullrelease) will warn you, as indicated earlier:
+
+    >>> from zest.releaser import prerelease
+    >>> prerelease.main()
+    Traceback (most recent call last):
+    ...
+    RuntimeError: SYSTEM EXIT (code=1)
