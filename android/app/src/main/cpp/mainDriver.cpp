@@ -171,7 +171,7 @@ struct RaceboatOptions {
     RaceLog::LogLevel log_level;
     std::vector<std::pair<std::string, std::string>> params;
 
-    std::string plugin_path = "/data/data/com.example.raceboat/files/";
+    std::string plugin_path = "/data/data/com.example.raceboat/plugins/";
 
     ChannelId recv_channel;
     std::string recv_role = "default";

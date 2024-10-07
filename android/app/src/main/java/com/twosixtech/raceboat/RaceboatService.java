@@ -4,8 +4,11 @@ import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.res.AssetManager;
 import android.os.IBinder;
 import android.util.Log;
+
+import java.io.File;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import android.app.NotificationChannel;
@@ -79,6 +82,39 @@ public class RaceboatService extends Service {
                         SERVICE_CHANNEL_ID, "Raceboat Service", NotificationManager.IMPORTANCE_MIN);
         notificationManager.createNotificationChannel(channel);
 
+        extractPythonPackages();
+        extractPlugins();
+    }
+
+    private void extractPythonPackages() {
+        File appDataDir = getDataDir();
+        File pythonDir = new File(appDataDir, "python3.7");
+        if (pythonDir.isDirectory()) {
+            return; // Already extracted
+        }
+        try {
+            Log.d(TAG, "Beginning extraction of python packages");
+            AndroidFileSystemHelpers.extractTar(
+                    "python-packages-3.7.16-3-android-arm64-v8a.tar",
+                    pythonDir.getAbsolutePath() + "/",
+                    getApplicationContext()
+            );
+            Log.d(TAG, "Completed extraction of python packages");
+
+            Log.d(TAG, "Beginning extraction of python bindings");
+            AndroidFileSystemHelpers.copyAssetDir("python", "python3.7", getApplicationContext());
+        } catch (Exception e) {
+            Log.e(TAG, "Error extracting python packages", e);
+        }
+    }
+
+    private void extractPlugins() {
+        try {
+            Log.d(TAG, "Beginning extraction of plugins");
+            AndroidFileSystemHelpers.copyAssetDir("plugins", getApplicationContext());
+        } catch (Exception e) {
+            Log.e(TAG, "Error extracting plugins", e);
+        }
     }
 
     @Override

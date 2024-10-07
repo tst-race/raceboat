@@ -20,6 +20,7 @@ android {
             cmake {
                 arguments += "-DANDROID=1"
                 arguments += "-DANDROID_ALLOW_UNDEFINED_SYMBOLS=1"
+                arguments += "-DCMAKE_ANDROID_ASSETS_DIRECTORIES=${android.sourceSets["main"].assets.srcDirs.first()}"
                 arguments += "-DBUILD_VERSION=dev"
                 arguments += "-DPYTHON_INCLUDE_DIR=$projectDir/src/main/python/python-3.7.16-3-android-arm64-v8a/include/python3.7m"
                 arguments += "-DPYTHON_LIBRARY=$projectDir/src/main/jniLibs/arm64-v8a/libpython3.7m.so"
@@ -68,6 +69,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.9.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("org.apache.commons:commons-compress:1.26.2")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
