@@ -770,7 +770,7 @@ int await_socket_input(const int socket_fd, int timeout_ms) {
 
 int now() {
   const auto p1 = std::chrono::system_clock::now();
-  return std::chrono::duration_cast<std::chrono::seconds>(p1.time_since_epoch()).count();
+  return static_cast<int>(std::chrono::duration_cast<std::chrono::seconds>(p1.time_since_epoch()).count());
 }
 
 void forward_local_to_conduit(int local_sock, std::shared_ptr<Raceboat::Conduit> conduit, 
@@ -1151,7 +1151,8 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
   int server_sock;
   printf("CREATING LOCAL SOCKET\n");
   // start server for client app to connect to
-  if ((server_sock = create_listening_socket(local_port)) < 0) {
+  server_sock = create_listening_socket(local_port);
+  if (server_sock < 0) {
     printf("Failed to create local socket\n");
     return -1;
   }
@@ -1203,7 +1204,8 @@ ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_o
     // assume listening local app process is or will be running
     int client_sock = -1;
     while (client_sock < 0) {
-      if ((client_sock = create_client_connection(host, local_port)) < 0) {
+      client_sock = create_client_connection(host, local_port);
+      if (client_sock < 0) {
         printf("Awaiting listening socket \n");
         sleep(5);
       }

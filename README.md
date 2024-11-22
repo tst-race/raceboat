@@ -16,7 +16,7 @@ docker run -it --rm --name=build-pt \
        -e MAKEFLAGS="-j" \
        -v $(pwd)/:/code/ \
        -w /code \
-       ghcr.io/tst-race/race-images/race-compile:main \
+       raceboat-builder:main \
        ./build.sh && docker-image/build_image.sh
 ```
 

@@ -28,6 +28,7 @@ bool initPython(std::string pythonHome, std::string pluginPath,
     called = true;
     if (!pythonHome.empty()) {
       std::wstring widePythonHome(pythonHome.begin(), pythonHome.end());
+      #pragma clang diagnostic ignored "-Wdeprecated-declarations"
       Py_SetPythonHome(widePythonHome.c_str());
     }
     Py_Initialize();

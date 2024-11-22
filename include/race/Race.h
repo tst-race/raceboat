@@ -20,6 +20,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <optional>
 
 #include "common/ChannelId.h"
 #include "common/RaceHandle.h"
