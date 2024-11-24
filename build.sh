@@ -60,19 +60,21 @@ else
     echo "golang install path $CORE_BINDINGS_GOLANG_BINARY_DIR"
 fi
 
-
-cmake --preset=$LINUX_PRESET -DBUILD_VERSION="local"
+cmake --preset=$LINUX_PRESET -DBUILD_VERSION="local"  --debug-output -DCXX="clang++ -std=c++17"
 cmake --build -j --preset=$LINUX_PRESET --target install
+
 echo "Packaging ${LINUX_PRESET}"
 cmake --install build/${LINUX_PRESET}/ --component sdk --verbose
 
 if [ "$(uname -m)" == "x86_64" ]
 then
+echo "Building ANDROID x86_64"
     cmake --preset=ANDROID_x86_64 -DBUILD_VERSION="local"
     cmake --build -j --preset=ANDROID_x86_64 --target install
     echo "Packaging ANDROID_x86_64"
     cmake --install build/ANDROID_x86_64/ --component sdk --verbose
 
+echo "Building ANDROID arm64-v8a"
     cmake --preset=ANDROID_arm64-v8a -DBUILD_VERSION="local"
     cmake --build -j --preset=ANDROID_arm64-v8a --target install
     echo "Packaging ANDROID_arm64"
@@ -84,6 +86,8 @@ else
     # cmake --build -j --preset=ANDROID_arm64-v8a --target install
 fi
 
+mkdir -p /usr/local/go
+
 cp -r racesdk/package/${LINUX_PRESET}/lib/* /linux/${ARCH}/lib
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/${ARCH}/lib" 
 mkdir -p /linux/${ARCH}/include/race/common
@@ -93,5 +97,5 @@ cp -r racesdk/package/${LINUX_PRESET}/go/* /usr/local/go/*
 
 pushd pluggable-transport
 cmake --preset=$LINUX_PRESET -DBUILD_VERSION="local" ${CMAKE_ARGS}
-cmake --build -j --preset=$LINUX_PRESET --target install 
+cmake --build -j --preset=$LINUX_PRESET --target install --verbose
 cp -r racesdk/package/${LINUX_PRESET}/lib/race/raceDispatcher ../racesdk/package/${LINUX_PRESET}/lib/raceDispatcher
