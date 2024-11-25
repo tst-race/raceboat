@@ -36,14 +36,29 @@ RUN for OS in linux android; do \
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add - && \
     add-apt-repository "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main"
 
-RUN apt-get install -y \
+RUN apt-get update -y && apt-get install -y \
     cmake \
-    golang-1.23 \
     clang-15 \
     clang-format-15 \
     clang-tidy-15
 
-ENV PATH=$PATH:/usr/lib/go-1.23/bin/
+# Go
+ARG GO_VERSION=1.23.0
+RUN case ${TARGETPLATFORM} in \
+        "linux/amd64") LINUX_ARCH=amd64 ;; \
+        "linux/arm64") LINUX_ARCH=arm64 ;; \
+    esac && \
+    wget \
+        --output-document=/tmp/go${GO_VERSION}.linux-${LINUX_ARCH}.tar.gz \
+        https://go.dev/dl/go${GO_VERSION}.linux-${LINUX_ARCH}.tar.gz && \
+    tar --extract \
+        --file=/tmp/go${GO_VERSION}.linux-${LINUX_ARCH}.tar.gz \
+        --directory=/usr/local && \
+    rm /tmp/go*.tar.gz
+ENV GOROOT=/usr/local/go \
+    PATH=/usr/local/go/bin:$PATH
+
+# ENV PATH=$PATH:/usr/lib/go-1.23/bin/
 
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 1 && \
     update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-15 1
