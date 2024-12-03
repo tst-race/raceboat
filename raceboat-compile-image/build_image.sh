@@ -205,4 +205,4 @@ eval DOCKER_BUILDKIT=1 docker buildx build \
     --load \
     --progress=plain \
     $PUSH_OPTION \
-    "${DIR}/../"
+    "${DIR}/"
