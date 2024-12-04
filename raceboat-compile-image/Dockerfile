@@ -47,19 +47,18 @@ RUN cp /usr/local/go/src/shims/comm/* /usr/local/go/src/shims/
 # arm64 linux
 FROM base as arm64-linux
 COPY racesdk/package/LINUX_arm64-v8a/lib /linux/arm64-v8a/lib
-# RUN ln -s /linux/arm64-v8a/lib/libraceboat.so /linux/arm64-v8a/lib/libraceSdkCommon.so 
-ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/arm64-v8a/lib"
-COPY build/LINUX_arm64-v8a/app/race-cli/race-cli/ /usr/local/bin/race-cli
-COPY build/LINUX_arm64-v8a/app/bridge-distro/bridge-distro/ /usr/local/bin/bridge-distro
+# RUN ln -s /linux/arm64-v8a/lib/libraceboat.so /linux/arm64-v8a/lib/libraceSdkCommon.so
+ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/arm64-v8a/lib" 
+COPY build/LINUX_arm64-v8a/app/race-cli/race-cli /usr/local/bin/race-cli
+COPY build/LINUX_arm64-v8a/app/bridge-distro/bridge-distro /usr/local/bin/bridge-distro
 
 # preserve include structure assumed by go SWIG
 RUN mkdir -p /linux/arm64-v8a/include/race/common
 COPY racesdk/package/LINUX_arm64-v8a/include /linux/arm64-v8a/include/race/common
 COPY racesdk/package/LINUX_arm64-v8a/include /linux/arm64-v8a/include/
-RUN cp /linux/arm64-v8a/include/race/common/Race.h /linux/arm64-v8a/include/race/
+RUN cp /linux/arm64-v8a/include/race/common/*.h /linux/arm64-v8a/include/race/
 COPY racesdk/package/LINUX_arm64-v8a/go /usr/local/go
 RUN cp /usr/local/go/src/shims/comm/* /usr/local/go/src/shims/
-
 
 FROM ${TARGETARCH}-linux
 COPY race-cmake-modules /opt/race/race-cmake-modules
