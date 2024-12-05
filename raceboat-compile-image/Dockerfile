@@ -14,8 +14,8 @@
 # limitations under the License.
 # 
 
-# TODO: from race-compile:main once arm platform supported
-FROM --platform=$TARGETPLATFORM ghcr.io/tst-race/raceboat/raceboat-builder:latest as base
+# FROM --platform=$TARGETPLATFORM ghcr.io/tst-race/raceboat/raceboat-builder:latest as base
+FROM --platform=$TARGETPLATFORM raceboat-builder:latest as base
 LABEL maintainer="Two Six Labs <race@twosixlabs.com>"
 
 ARG TARGETARCH
@@ -35,12 +35,7 @@ COPY racesdk/package/LINUX_x86_64/lib /linux/x86_64/lib
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/x86_64/lib" 
 COPY build/LINUX_x86_64/app/race-cli/race-cli /usr/local/bin/race-cli
 COPY build/LINUX_x86_64/app/bridge-distro/bridge-distro /usr/local/bin/bridge-distro
-
-# preserve include structure assumed by go SWIG
-RUN mkdir -p /linux/x86_64/include/race/common
-COPY racesdk/package/LINUX_x86_64/include /linux/x86_64/include/race/common
 COPY racesdk/package/LINUX_x86_64/include /linux/x86_64/include/
-RUN cp /linux/x86_64/include/race/common/*.h /linux/x86_64/include/race/
 COPY racesdk/package/LINUX_x86_64/go /usr/local/go
 RUN cp /usr/local/go/src/shims/comm/* /usr/local/go/src/shims/
 
@@ -51,12 +46,7 @@ COPY racesdk/package/LINUX_arm64-v8a/lib /linux/arm64-v8a/lib
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/arm64-v8a/lib"
 COPY build/LINUX_arm64-v8a/app/race-cli/race-cli/ /usr/local/bin/race-cli
 COPY build/LINUX_arm64-v8a/app/bridge-distro/bridge-distro/ /usr/local/bin/bridge-distro
-
-# preserve include structure assumed by go SWIG
-RUN mkdir -p /linux/arm64-v8a/include/race/common
-COPY racesdk/package/LINUX_arm64-v8a/include /linux/arm64-v8a/include/race/common
 COPY racesdk/package/LINUX_arm64-v8a/include /linux/arm64-v8a/include/
-RUN cp /linux/arm64-v8a/include/race/common/Race.h /linux/arm64-v8a/include/race/
 COPY racesdk/package/LINUX_arm64-v8a/go /usr/local/go
 RUN cp /usr/local/go/src/shims/comm/* /usr/local/go/src/shims/
 

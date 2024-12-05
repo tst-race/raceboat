@@ -79,16 +79,17 @@ RUN case ${TARGETPLATFORM} in \
 
 ENV DEBIAN_FRONTEND=noninteractive
 ARG PYTHON_VERSION=3.12.7
-RUN apt-get update -y && \
+RUN apt update && \
+    apt install software-properties-common -y && \
     add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt-get update -y && \
-    apt-get install -y --no-install-recommends \
-        python3.12=${PYTHON_VERSION}-* \
-        python3.12-dev=${PYTHON_VERSION}-* \
+    apt update && \
+    apt install -y --no-install-recommends \
+        python3.12 \
+        python3.12-dev \
         python3-pip \
         python3-setuptools \
         python3-wheel \
-        python3.12-tk=${PYTHON_VERSION}-* \
+        python3.12-tk \
         python3.12-distutils
         
 RUN apt-get install -y \
@@ -120,6 +121,7 @@ RUN for OS in linux android; do \
     rm /tmp/nlohmann-json-*.tar.gz
 
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/x86_64/lib:/linux/arm64-v8a/lib"
+# ENV LD_LIBRARY_PATH="/opt/homebrew/opt/llvm/lib:/linux/x86_64/lib:/linux/arm64-v8a/lib"
 
 RUN apt-get install -y \
         lsb-release \
@@ -160,6 +162,7 @@ RUN for ARCH in x86_64 arm64-v8a; do \
     done && \
     rm /tmp/python-*.tar.gz
 
+# ./raceboat-compile-image
 
 COPY ./android-x86_64.toolchain.cmake /opt/android/ndk/default/
 COPY ./android-arm64-v8a.toolchain.cmake /opt/android/ndk/default/
