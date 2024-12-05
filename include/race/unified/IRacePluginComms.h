@@ -19,13 +19,13 @@
 
 #include <string>
 
-#include "../common/ChannelProperties.h"
-#include "../common/EncPkg.h"
-#include "../common/LinkProperties.h"
-#include "../common/PluginConfig.h"
-#include "../common/PluginResponse.h"
-#include "../common/RacePluginExports.h"
-#include "../common/constants.h"
+#include "ChannelProperties.h"
+#include "EncPkg.h"
+#include "LinkProperties.h"
+#include "PluginConfig.h"
+#include "PluginResponse.h"
+#include "RacePluginExports.h"
+#include "constants.h"
 #include "IRaceSdkComms.h"
 
 class IRacePluginComms {

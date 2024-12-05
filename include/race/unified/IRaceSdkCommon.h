@@ -23,11 +23,11 @@
 #include <string>
 #include <vector>
 
-#include "../common/ChannelProperties.h"
-#include "../common/EncPkg.h"
-#include "../common/PluginResponse.h"
-#include "../common/constants.h"
-// #include "common/RaceEnums.h"
+#include "ChannelProperties.h"
+#include "EncPkg.h"
+#include "PluginResponse.h"
+#include "constants.h"
+// #include "RaceEnums.h"
 #include "SdkResponse.h"
 
 class IRaceSdkCommon {

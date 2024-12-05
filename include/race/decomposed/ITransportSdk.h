@@ -18,9 +18,9 @@
 #ifndef __I_TRANSPORT_SDK_H__
 #define __I_TRANSPORT_SDK_H__
 
-#include "../common/ChannelProperties.h"
-#include "../common/LinkStatus.h"
-#include "../common/PackageStatus.h"
+#include "ChannelProperties.h"
+#include "LinkStatus.h"
+#include "PackageStatus.h"
 #include "ComponentTypes.h"
 #include "IComponentSdkBase.h"
 

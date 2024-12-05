@@ -19,7 +19,7 @@
 #include <cstdint>
 #include <string>
 
-#include "../common/RaceHandle.h"
+#include "RaceHandle.h"
 
 extern "C" {
 

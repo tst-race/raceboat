@@ -6,10 +6,10 @@
 %{
 #include <utility>
 #include <string>
-#include "race/common/ChannelId.h"
-#include "race/common/RaceHandle.h"
+#include "ChannelId.h"
+#include "RaceHandle.h"
 #include "race/Race.h"
-#include "race/common/RaceLog.h"
+#include "RaceLog.h"
 using namespace Raceboat;
 %}
 

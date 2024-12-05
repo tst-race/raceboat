@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "../common/RaceHandle.h"
+#include "RaceHandle.h"
 
 using LinkID = std::string;
 

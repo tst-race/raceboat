@@ -18,8 +18,8 @@
 #ifndef __I_USER_MODEL_COMPONENT_H__
 #define __I_USER_MODEL_COMPONENT_H__
 
-#include "../common/PluginConfig.h"
-#include "../common/RacePluginExports.h"
+#include "PluginConfig.h"
+#include "RacePluginExports.h"
 #include "ComponentTypes.h"
 #include "IUserModelSdk.h"
 
