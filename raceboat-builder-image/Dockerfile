@@ -77,8 +77,11 @@ RUN case ${TARGETPLATFORM} in \
         --directory=/usr/local && \
     rm /tmp/swig-*.tar.gz
 
+# non-interactive install mode workaround to python prerequisite tzdata
 ENV DEBIAN_FRONTEND=noninteractive
-ARG PYTHON_VERSION=3.12.7
+# RUN apt update && apt install tzdata
+
+# Python 3.12
 RUN apt update && \
     apt install software-properties-common -y && \
     add-apt-repository ppa:deadsnakes/ppa -y && \
@@ -91,7 +94,7 @@ RUN apt update && \
         python3-wheel \
         python3.12-tk \
         python3.12-distutils
-        
+
 RUN apt-get install -y \
     valgrind
 
@@ -121,7 +124,6 @@ RUN for OS in linux android; do \
     rm /tmp/nlohmann-json-*.tar.gz
 
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/x86_64/lib:/linux/arm64-v8a/lib"
-# ENV LD_LIBRARY_PATH="/opt/homebrew/opt/llvm/lib:/linux/x86_64/lib:/linux/arm64-v8a/lib"
 
 RUN apt-get install -y \
         lsb-release \
@@ -161,8 +163,6 @@ RUN for ARCH in x86_64 arm64-v8a; do \
             https://github.com/tst-race/ext-python/releases/download/${ANDROID_PYTHON_VERSION}/python-packages-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz; \
     done && \
     rm /tmp/python-*.tar.gz
-
-# ./raceboat-compile-image
 
 COPY ./android-x86_64.toolchain.cmake /opt/android/ndk/default/
 COPY ./android-arm64-v8a.toolchain.cmake /opt/android/ndk/default/
