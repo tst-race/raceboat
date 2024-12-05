@@ -25,16 +25,17 @@ To build an aarch64 raceboat image locally:
 ```bash
 ./raceboat-builder-image/build_image.sh --platform-arm64
 ./raceboat-compile-image/build_image.sh --platform-arm64
-docker run  -it --rm  -v $(pwd):/code/ -w /code raceboat-builder:latest bash
-export MAKEFLAGS="-j"
-./build_it_all.sh
+docker run  -it --rm  -v $(pwd):/code/ -w /code raceboat-builder:latest bash 
+rm -fr build 
+export MAKEFLAGS="-j" 
+./build_it_all.sh 
 ./create-package.sh --linux-arm64
 exit
 ./docker-image/build_image.sh --platform-arm64
 ```
 
 (Some) host dependencies:
-- golang v1.23.1 (changed in build files if another version is preferred)
+- golang v1.23.1 (change in build files if another version is preferred)
 
 ## **Building Plugins**
 
@@ -42,9 +43,10 @@ Users can compile plugins/channels with the resulting raceboat-compile:<tag>.  F
 
 ```bash
 cd ../race-obfs
-./build_artifacts_in_docker_image.sh -l  -v latest
-cp -fr kit/artifacts/<architecture>-server/PluginObfs ../raceboat/kits
-cp -fr kit/channels/obfs ../raceboat/kits/PluginObfs
+rm -fr build
+rm -fr kit
+./build_artifacts_in_docker_image.sh -l -v latest
+cp -fr kit/artifacts/linux-<arch>-server/PluginObfs ../raceboat/kits
 ```
 
 ## **Running**
