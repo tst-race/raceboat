@@ -14,8 +14,7 @@
 # limitations under the License.
 # 
 
-# FROM --platform=$TARGETPLATFORM ghcr.io/tst-race/raceboat/raceboat-builder:latest as base
-FROM --platform=$TARGETPLATFORM raceboat-builder:latest AS base
+FROM --platform=$TARGETPLATFORM ghcr.io/tst-race/raceboat/raceboat-builder:latest AS base
 LABEL maintainer="Two Six Labs <race@twosixlabs.com>"
 
 ARG TARGETARCH

@@ -14,9 +14,7 @@
 # limitations under the License.
 # 
 
-# TODO: from race-compile:main once arm platform supported
-# FROM --platform=$TARGETPLATFORM ghcr.io/tst-race/race-images/race-runtime-linux:main as base
-FROM --platform=$TARGETPLATFORM raceboat-compile:latest as base
+FROM --platform=$TARGETPLATFORM ghcr.io/tst-race/raceboat/raceboat-compile:latest as base
 LABEL maintainer="Two Six Labs <race@twosixlabs.com>"
 
 ARG TARGETARCH

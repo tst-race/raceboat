@@ -82,9 +82,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 # RUN apt update && apt install tzdata
 
 # Python 3.12
+ARG PYTHON_VERSION=3.12
 RUN apt update && \
-    apt install software-properties-common -y && \
-    add-apt-repository ppa:deadsnakes/ppa -y && \
+    apt install software-properties-common -y --no-install-recommends
+
+RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     apt update && \
     apt install -y --no-install-recommends \
         python3.12 \
@@ -92,8 +94,7 @@ RUN apt update && \
         python3-pip \
         python3-setuptools \
         python3-wheel \
-        python3.12-tk \
-        python3.12-distutils
+        python3.12-tk
 
 RUN apt-get install -y \
     valgrind
