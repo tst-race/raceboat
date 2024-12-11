@@ -13,6 +13,8 @@ permissions:
 
 jobs:
   builder-image:
+    runs-on: ubuntu-latest
+    steps:
       - name: Build and Push raceboat-builder Docker Image
         uses: docker/build-push-action@v4
         with:
