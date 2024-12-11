@@ -12,6 +12,18 @@ permissions:
   packages: read
 
 jobs:
+  builder-image:
+      - name: Build and Push raceboat-builder Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: raceboat-builder-image
+          file: raceboat-builder-image/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: ${{ steps.cache.outputs.cache-from }}
+          cache-to: ${{ steps.cache.outputs.cache-to }}
   build:
     runs-on: ubuntu-latest
     container:
