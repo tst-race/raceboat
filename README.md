@@ -9,15 +9,32 @@ Raceboat provides two different interfaces for censorship circumvention channels
 
 
 ## **Building**
-Raceboat uses a docker-based build process, running the below may take some time to download the compilation image. This build command also creates a `raceboat` docker image with the shared objects and executable built into it for easy testing and execution.  To build a x86_64 image:
+Raceboat uses a docker-based build process, running the below may take some time to download the compilation image. This build command also creates a `raceboat` runtumie docker image with the shared objects and executable built into it for easy testing and execution. **These are all built in GitHub CI and available from the `ghcr.io/tst-race/raceboat` namespace.
+
+- `ghcr.io/tst-race/raceboat/raceboat-builder:main`: an image for building the raceboat framework itself (i.e. the code in this repository)
+
+- `ghcr.io/tst-race/raceboat/raceboat-compile:main`: extension of the raceboat-builder with prebuilt framework binaries, used to compile plugins that provide channels or components for raceboat to use.
+
+- `ghcr.io/tst-race/raceboat/raceboat:main`: runtime image which contains both prebuilt framework binaries and runtime dependencies.
+
+Use the following commands to build a local set of x86_64 images:
 
 ```bash
+pushd raceboat-builder-image && \
+./build_image.sh -n ghcr.io/tst-race/raceboat --platform-x86_64 && \
+popd && \
 docker run -it --rm --name=build-pt \
        -e MAKEFLAGS="-j" \
        -v $(pwd)/:/code/ \
        -w /code \
        raceboat-builder:latest \
-       ./build.sh && docker-image/build_image.sh
+       ./build.sh && \
+pushd raceboat-compile-image && \
+./build_image.sh -n ghcr.io/tst-race/raceboat --platform-x86_64 && \
+popd && \
+pushd runtime-image && \
+./build_image.sh -n ghcr.io/tst-race/raceboat --platform-x86_64 && \
+popd
 ```
 
 To build an aarch64 raceboat image locally:
