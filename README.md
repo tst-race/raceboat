@@ -23,7 +23,6 @@ docker run -it --rm --name=build-pt \
 To build an aarch64 raceboat image locally:
 
 ```bash
-./raceboat-builder-image/build_image.sh --platform-arm64
 ./raceboat-compile-image/build_image.sh --platform-arm64
 docker run  -it --rm  -v $(pwd):/code/ -w /code raceboat-builder:latest bash 
 rm -fr build 

@@ -52,6 +52,9 @@
 // Enable cross-language polymorphism in the SWIG wrapper.
 // It's pretty slow so not enable by default
 %feature("director") IRacePluginComms;
+%feature("director") ITransportComponent;
+%feature("director") IUserModelComponent;
+%feature("director") IEncodingComponent;
 
 // Tell swig to wrap everything in CommsPlugin.h
 %include "stdint.i"
@@ -73,6 +76,8 @@
 //   }
 // }
 
+%template(EncodingParametersVector) std::vector<EncodingParameters>;
+%template(ByteVector) std::vector<uint8_t>;
 
 %include "race/common/constants.h"
 
