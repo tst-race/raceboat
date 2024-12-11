@@ -55,20 +55,28 @@
 %feature("director") ITransportComponent;
 %feature("director") IUserModelComponent;
 %feature("director") IEncodingComponent;
+%feature("director") EncodingParameters;
+%feature("director") Action;
+// %feature("director") ChannelProperties;
+// %feature("director") LinkStatus;
+// %feature("director") LinkParameters;
 
 // Tell swig to wrap everything in CommsPlugin.h
 %include "stdint.i"
 %include "std_string.i"
 %include "std_vector.i"
 
+%template(RaceHandleVector) std::vector<unsigned long>;
 %template(RoleVector) std::vector<ChannelRole>;
 %template(StringVector) std::vector<std::string>;
 %template(ByteVector) std::vector<uint8_t>;
+%template(EncodingParamVector) std::vector<EncodingParameters>;
+%template(ActionVector) std::vector<Action>;
 
 // %typemap(gotype) (std::vector<std::string>) %{[]string%}
 
 // %typemap(in) (std::vector<std::string>) {
-//   printf("swigggg typemap start");
+//   printf("swig typemap start");
 //   $1 = std::vector<std::string>();
 //   for (int i = 0; i < $input.len; ++i) {
 //     _gostring_ *str = static_cast<_gostring_*>($input.array);
@@ -76,8 +84,6 @@
 //   }
 // }
 
-%template(EncodingParametersVector) std::vector<EncodingParameters>;
-%template(ByteVector) std::vector<uint8_t>;
 
 %include "race/common/constants.h"
 
