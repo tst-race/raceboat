@@ -65,10 +65,8 @@ jobs:
           cache-to: ${{ steps.cache.outputs.cache-to }}
   build:
     runs-on: ubuntu-latest
-    env:
-      BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
     container:
-      image: ghcr.io/tst-race/raceboat/raceboat-builder:${{ BRANCH_NAME }}
+      image: ghcr.io/tst-race/raceboat/raceboat-builder:${{ github.head_ref || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
