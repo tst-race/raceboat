@@ -67,9 +67,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/tst-race/raceboat/raceboat-builder:${{ steps.meta.outputs.tags }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
