@@ -69,7 +69,7 @@ jobs:
       image: ghcr.io/tst-race/raceboat/raceboat-builder:${{ github.head_ref || github.ref_name }}
       volumes:
         - ./:/code
-      options
+      options:
         - --workdir=/code
     steps:
       - name: Checkout
