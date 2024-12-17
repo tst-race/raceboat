@@ -75,7 +75,7 @@ jobs:
         run: ./build.sh
 
       - name: Create Build Artifact
-        run: "tar cvf ${{ github.event.repository.name }}.tar.gz -C /code/racesdk/package/ ."
+        run: "tar cvf ${{ github.event.repository.name }}.tar.gz -C /__w/raceboat/raceboat/code/racesdk/package/ ."
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v3
