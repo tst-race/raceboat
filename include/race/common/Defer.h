@@ -14,9 +14,7 @@
 // limitations under the License.
 //
 
-#pragma clang diagnostic ignored "-Wreserved-identifier"
 #ifndef RACE_DEFER_H
-#pragma clang diagnostic ignored "-Wreserved-identifier"
 #define RACE_DEFER_H
 
 #include <utility> // std::move

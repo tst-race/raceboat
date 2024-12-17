@@ -19,24 +19,6 @@
 set -e
 
 CMAKE_ARGS=""
-CORE_BINDINGS_GOLANG_BINARY_DIR=""
-
-for i in "$@"
-do
-    key="$1"
-    echo "key $1"
-    case $key in
-        -p=*)
-        CORE_BINDINGS_GOLANG_BINARY_DIR="${1#*=}"
-        shift
-        ;;
-
-        # echo "unknown argument \"$1\""
-        # exit 1
-        # ;;
-    esac
-done
-
 
 LINUX_PRESET=LINUX_x86_64
 ARCH=x86_64
@@ -44,20 +26,6 @@ if [ "$(uname -m)" == "aarch64" ] || [ "$(uname -m)" == "arm64" ]
 then
     LINUX_PRESET=LINUX_arm64-v8a
     ARCH=arm64-v8a
-fi
-
-if [ -z "$CORE_BINDINGS_GOLANG_BINARY_DIR" ]
-then
-    DEFAULT_GOLANG_PATH="/code/build/LINUX_${ARCH}/language-shims/source/include/src/core"
-    echo "INFO: No -p argument, assuming golang install path is: ${DEFAULT_GOLANG_PATH}"
-    CMAKE_ARGS="-DCORE_BINDINGS_GOLANG_BINARY_DIR=${DEFAULT_GOLANG_PATH}"
-    # echo "ERROR: golang install path required (eg ./build.sh -p build/LINUX/language-shims/source/include/src)"
-else
-    # CMAKE_ARGS="-DCORE_BINDINGS_GOLANG_BINARY_DIR=${CORE_BINDINGS_GOLANG_BINARY_DIR} -D CMAKE_LIBRARY_PATH=/code/racesdk/package/LINUX_x86_64/lib/"
-    echo "path: $CORE_BINDINGS_GOLANG_BINARY_DIR"
-    CMAKE_ARGS="-DCORE_BINDINGS_GOLANG_BINARY_DIR="$CORE_BINDINGS_GOLANG_BINARY_DIR
-
-    echo "golang install path $CORE_BINDINGS_GOLANG_BINARY_DIR"
 fi
 
 cmake --preset=$LINUX_PRESET -DBUILD_VERSION="local"  --debug-output -DCXX="clang++ -std=c++17"
@@ -95,7 +63,3 @@ cp -r racesdk/package/${LINUX_PRESET}/include/* /linux/${ARCH}/include/race/comm
 cp /linux/${ARCH}/include/race/common/Race.h /linux/${ARCH}/include/race/
 cp -r racesdk/package/${LINUX_PRESET}/go/* /usr/local/go/*
 
-pushd pluggable-transport
-cmake --preset=$LINUX_PRESET -DBUILD_VERSION="local" ${CMAKE_ARGS}
-cmake --build -j --preset=$LINUX_PRESET --target install --verbose
-cp -r racesdk/package/${LINUX_PRESET}/lib/race/raceDispatcher ../racesdk/package/${LINUX_PRESET}/lib/raceDispatcher
