@@ -91,6 +91,7 @@ jobs:
           retention-days: 10
 
   compile-image:
+    stage: compile-image
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -136,7 +137,7 @@ jobs:
        - name: untar 
         run: tar xzf "${{ github.event.repository.name }}.tar.gz"
 
-      - name: debug ls
+      - name: debug ls 2
         run: ls -R .
 
       - name: Configure Docker Caching
