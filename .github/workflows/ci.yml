@@ -16,6 +16,7 @@ jobs:
     uses: ./.github/workflow/builder-image.yml
 
   build-framework:
+    needs: [builder-image]
     uses: ././github/workflow/build-framework.yml
   
   # builder-image:

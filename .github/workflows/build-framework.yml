@@ -32,4 +32,3 @@ jobs:
           name: "${{ github.event.repository.name }}.tar.gz"
           path: "${{ github.event.repository.name }}.tar.gz"
           retention-days: 10
-        needs: [builder-image]
