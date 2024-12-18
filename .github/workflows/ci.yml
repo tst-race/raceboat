@@ -152,7 +152,7 @@ jobs:
       - name: Build and Push raceboat-compile Docker Image
         uses: docker/build-push-action@v4
         with:
-          # context: raceboat-compile-image
+          context: raceboat-compile-image
           # context: "{{defaultContext}}:raceboat-compile-image"
           file: raceboat-compile-image/Dockerfile
           platforms: linux/amd64
