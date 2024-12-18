@@ -84,6 +84,21 @@ jobs:
           path: "${{ github.event.repository.name }}-linux-x86_64.tar.gz"
           retention-days: 10
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ghcr.io/${{ github.repository }}/raceboat-compile
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{raw}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+
       - name: Build and Push raceboat-compile Docker Image
         uses: docker/build-push-action@v4
         with:
