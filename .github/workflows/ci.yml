@@ -1,5 +1,9 @@
 name: Continuous Integration
 
+stages:
+  - framework
+  - compile-image
+
 on:
   push:
   pull_request:
