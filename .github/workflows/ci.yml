@@ -79,7 +79,7 @@ jobs:
         run: ./build.sh
 
       - name: Create Build Artifact
-        run: "tar cvf ${{ github.event.repository.name }}.tar.gz -C /__w/raceboat/raceboat/racesdk/package/ ."
+        run: "tar cvf ${{ github.event.repository.name }}.tar.gz -C /__w/raceboat/raceboat/ ./racesdk"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v3
@@ -97,6 +97,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
+      - name: Download Framework Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: "${{ github.event.repository.name }}.tar.gz"
+
+      - name: debug ls
+        run: ls -R .
+
+      - name: untar 
+        run: tar xf ${{ github.event.repository.name }}.tar.gz
+
+      - name: debug ls
+        run: ls -R racesdk
 
       - name: Log in to Container Registry
         if: github.event_name != 'pull_request'
@@ -126,20 +140,6 @@ jobs:
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern=v{{major}}
 
-      - name: Download Framework Artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: "${{ github.event.repository.name }}.tar.gz"
-
-      - name: debug ls
-        run: ls -R .
-
-      - name: untar 
-        run: tar xf ${{ github.event.repository.name }}.tar.gz
-
-      - name: debug ls
-        run: ls -R .
-
       - name: Configure Docker Caching
         id: cache
         uses: int128/docker-build-cache-config-action@v1
@@ -149,9 +149,9 @@ jobs:
       - name: Build and Push raceboat-compile Docker Image
         uses: docker/build-push-action@v4
         with:
-          context: raceboat-compile-image
+          # context: raceboat-compile-image
           file: raceboat-compile-image/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
