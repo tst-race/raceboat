@@ -99,14 +99,17 @@ jobs:
             type=semver,pattern=v{{major}}.{{minor}}
             type=semver,pattern=v{{major}}
 
-      - name: Build and Push raceboat-compile Docker Image
-        uses: docker/build-push-action@v4
-        with:
-          context: raceboat-compile-image
-          file: raceboat-compile-image/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: latest
+      - name: Build
+        run: ./raceboat-compile-image/build_image.sh --platform-x86_64
+
+      # - name: Build and Push raceboat-compile Docker Image
+      #   uses: docker/build-push-action@v4
+      #   with:
+      #     context: raceboat-compile-image
+      #     file: raceboat-compile-image/Dockerfile
+      #     platforms: linux/amd64,linux/arm64
+      #     push: ${{ github.event_name != 'pull_request' }}
+      #     tags: latest
 
   # compile-image:
   #   runs-on: ubuntu-latest
