@@ -93,8 +93,6 @@ jobs:
   compile-image:
     stage: compile-image
     runs-on: ubuntu-latest
-    dependencies:
-      - build-framework
     steps:
       - name: Checkout
         uses: actions/checkout@v3
