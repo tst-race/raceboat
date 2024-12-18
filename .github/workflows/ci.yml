@@ -91,7 +91,6 @@ jobs:
           retention-days: 10
 
   compile-image:
-    stage: compile-image
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
