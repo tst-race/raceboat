@@ -1,0 +1,35 @@
+name: Continuous Integration
+
+on:
+  push:
+  pull_request:
+    branches:
+      - 'main'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-framework:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/tst-race/raceboat/raceboat-builder:${{ github.head_ref || github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Create Build Artifact
+        run: "tar cvf ${{ github.event.repository.name }}.tar.gz -C /__w/raceboat/raceboat/racesdk/package/ ."
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "${{ github.event.repository.name }}.tar.gz"
+          path: "${{ github.event.repository.name }}.tar.gz"
+          retention-days: 10
+        needs: [builder-image]
