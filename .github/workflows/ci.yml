@@ -1,9 +1,5 @@
 name: Continuous Integration
 
-stages:
-  - framework
-  - compile-image
-
 on:
   push:
   pull_request:
@@ -17,7 +13,6 @@ permissions:
 
 jobs:
   builder-image:
-    stage: framework
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -69,7 +64,6 @@ jobs:
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
   build-framework:
-    stage: framework
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/tst-race/raceboat/raceboat-builder:${{ github.head_ref || github.ref_name }}
@@ -91,10 +85,9 @@ jobs:
           retention-days: 10
 
   compile-image:
-    stage: compile-image
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/tst-race/raceboat/raceboat-builder:${{ github.head_ref || github.ref_name }}
+    # dependencies:
+    #   - build-framework
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -136,10 +129,10 @@ jobs:
       - name: debug ls
         run: ls -R .
 
-       - name: untar 
+      - name: untar 
         run: tar xzf "${{ github.event.repository.name }}.tar.gz"
 
-      - name: debug ls 2
+      - name: debug ls
         run: ls -R .
 
       - name: Configure Docker Caching
