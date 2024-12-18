@@ -80,8 +80,8 @@ jobs:
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: "${{ github.event.repository.name }}-linux-x86_64.tar.gz"
-          path: "${{ github.event.repository.name }}-linux-x86_64.tar.gz"
+          name: "${{ github.event.repository.name }}.tar.gz"
+          path: "${{ github.event.repository.name }}.tar.gz"
           retention-days: 10
 
   compile-image:
@@ -121,8 +121,8 @@ jobs:
       - name: Download Framework Artifacts
         uses: actions/download-artifact@v3
         with:
-          name: "${{ github.event.repository.name }}-linux-x86_64.tar.gz"
-          path: "${{ github.event.repository.name }}-linux-x86_64.tar.gz"
+          name: "${{ github.event.repository.name }}.tar.gz"
+          path: "${{ github.event.repository.name }}.tar.gz"
 
       - name: untar 
         run: tar -xzf "${{ github.event.repository.name }}-linux-x86_64.tar.gz"
