@@ -129,7 +129,10 @@ jobs:
           name: "${{ github.event.repository.name }}.tar.gz"
           path: "${{ github.event.repository.name }}.tar.gz"
 
-      - name: untar 
+      - name: debug ls
+        run: ls -R .
+
+       - name: untar 
         run: tar xzf "${{ github.event.repository.name }}.tar.gz"
 
       - name: debug ls
