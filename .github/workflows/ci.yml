@@ -155,7 +155,7 @@ jobs:
       - name: Build and Push raceboat-compile Docker Image
         uses: docker/build-push-action@v4
         with:
-          context: project=${{ GITHUB_WORKSPACE }}
+          context: {{ GITHUB_WORKSPACE }}
           # context: raceboat-compile-image
           # context: "{{defaultContext}}:raceboat-compile-image"
           file: raceboat-compile-image/Dockerfile
@@ -165,7 +165,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
-          build-contexts: project=${{ GITHUB_WORKSPACE }}
+          # build-contexts: project=${{ GITHUB_WORKSPACE }}
 
   # # todo base these on the raceboat image
   # test-unit:
