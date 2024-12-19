@@ -115,6 +115,9 @@ jobs:
       - name: debu pwdg
         run: pwd
 
+      - name: env
+        run: env
+ 
       - name: Log in to Container Registry
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v2
@@ -161,7 +164,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
-          build-contexts: project={{defaultContext}}
+          build-contexts: project=${{ defaultContext }}
 
   # # todo base these on the raceboat image
   # test-unit:
