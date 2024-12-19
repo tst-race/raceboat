@@ -161,7 +161,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
-          build-context: project={{defaultContext}} .
+          build-contexts: project={{defaultContext}}
 
   # # todo base these on the raceboat image
   # test-unit:
