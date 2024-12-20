@@ -231,7 +231,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
-          build-contexts: ghcr.io/tst-race/raceboat/raceboat-compile:latest=ghcr.io/tst-race/raceboat/raceboat-compile:${{ steps.meta.outputs.tags }}
+          build-contexts: ghcr.io/tst-race/raceboat/raceboat-compile:latest=ghcr.io/tst-race/raceboat/raceboat-compile:${{ steps.meta.outputs.version }}
 
 
 
