@@ -79,10 +79,6 @@ jobs:
       - name: Create Framework Build Artifact
         run: "tar cvf ${{ github.event.repository.name }}.tar.gz -C /__w/raceboat/raceboat/ ./racesdk"
 
-      - name: Create CLI Build Artifact
-        run: "tar cvf ${{ github.event.repository.name }}-app.tar.gz -C /__w/raceboat/raceboat/ ./racesdk"
-
-
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v3
         with:
@@ -166,8 +162,8 @@ jobs:
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
 
- runtime-image:
-    needs: [build-framework]
+  runtime-image:
+    needs: [compile-image]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -213,7 +209,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ghcr.io/${{ github.repository }}/raceboat-compile
+          images: ghcr.io/${{ github.repository }}/runtime
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -225,13 +221,13 @@ jobs:
         id: cache
         uses: int128/docker-build-cache-config-action@v1
         with:
-          image: ghcr.io/${{ github.repository }}/raceboat-compile/cache
+          image: ghcr.io/${{ github.repository }}/runtime/cache
 
-      - name: Build and Push raceboat-compile Docker Image
+      - name: Build and Push runtime Docker Image
         uses: docker/build-push-action@v4
         with:
           context: ${{ GITHUB_WORKSPACE }}
-          file: raceboat-compile-image/Dockerfile
+          file: runtime-image/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
