@@ -76,7 +76,7 @@ jobs:
       - name: Build
         run: ./build.sh
 
-      - name: Create Framework Build Artifact
+      - name: Create Build Artifact
         run: "tar cvf ${{ github.event.repository.name }}.tar.gz -C /__w/raceboat/raceboat/ ./racesdk"
 
       - name: Upload Build Artifact
@@ -106,9 +106,6 @@ jobs:
 
       - name: debug ls
         run: ls -R racesdk
-
-      - name: debug ls
-        run: ls -R racesdk/package/LINUX_x86_64
 
       - name: debu pwdg
         run: pwd
@@ -153,9 +150,10 @@ jobs:
       - name: Build and Push raceboat-compile Docker Image
         uses: docker/build-push-action@v4
         with:
-          context: ${{ GITHUB_WORKSPACE }}
+          context: /home/runner/work/raceboat/raceboat
+          # context: "{{defaultContext}}:raceboat-compile-image"
           file: raceboat-compile-image/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -163,7 +161,7 @@ jobs:
           cache-to: ${{ steps.cache.outputs.cache-to }}
 
   runtime-image:
-    needs: [compile-image]
+    needs: [build-framework]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -209,7 +207,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ghcr.io/${{ github.repository }}/runtime
+          images: ghcr.io/${{ github.repository }}/raceboat-runtime
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -221,14 +219,15 @@ jobs:
         id: cache
         uses: int128/docker-build-cache-config-action@v1
         with:
-          image: ghcr.io/${{ github.repository }}/runtime/cache
+          image: ghcr.io/${{ github.repository }}/raceboat-runtime/cache
 
-      - name: Build and Push runtime Docker Image
+      - name: Build and Push raceboat-runtime Docker Image
         uses: docker/build-push-action@v4
         with:
-          context: ${{ GITHUB_WORKSPACE }}
-          file: runtime-image/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          context: /home/runner/work/raceboat/raceboat
+          # context: "{{defaultContext}}:raceboat-runtime-image"
+          file: raceboat-runtime-image/Dockerfile
+          platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
