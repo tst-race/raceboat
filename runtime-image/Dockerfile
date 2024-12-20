@@ -20,34 +20,16 @@ LABEL maintainer="Two Six Labs <race@twosixlabs.com>"
 ARG TARGETARCH
 RUN echo "building for architecture $TARGETARCH"
 
-# Copy locally-built artifacts into the image
-# Note: If you are adding new artifacts you may
-#       need to update the .dockerignore file
-#       so that they are included in the docker
-#       context. Otherwise the COPY may fail.
-
-
 # x86-64 linux
 FROM base as amd64-linux
-COPY racesdk/package/LINUX_x86_64/lib /linux/x86_64/lib
-# RUN ln -s /linux/x86_64/lib/libraceboat.so /linux/x86_64/lib/libraceSdkCommon.so
-ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/x86_64/lib" 
-COPY build/LINUX_x86_64/app/race-cli/race-cli /usr/local/bin/race-cli
-COPY build/LINUX_x86_64/app/bridge-distro/bridge-distro /usr/local/bin/bridge-distro
-COPY racesdk/package/LINUX_x86_64/go /usr/local/go
+COPY racesdk/package/LINUX_x86_64/app/race-cli /usr/local/bin/race-cli
+COPY racesdk/package/LINUX_x86_64/app/bridge-distro /usr/local/bin/bridge-distro
 
 # arm64 linux
 FROM base as arm64-linux
-COPY racesdk/package/LINUX_arm64-v8a/lib /linux/arm64-v8a/lib
-# RUN ln -s /linux/arm64-v8a/lib/libraceboat.so /linux/arm64-v8a/lib/libraceSdkCommon.so 
-ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/arm64-v8a/lib"
-COPY build/LINUX_arm64-v8a/app/race-cli/race-cli/ /usr/local/bin/race-cli
-COPY build/LINUX_arm64-v8a/app/bridge-distro/bridge-distro/ /usr/local/bin/bridge-distro
-COPY racesdk/package/LINUX_arm64-v8a/go /usr/local/go
+COPY racesdk/package/LINUX_arm64-v8a/app/race-cli /usr/local/bin/race-cli
+COPY racesdk/package/LINUX_arm64-v8a/app/bridge-distro /usr/local/bin/bridge-distro
 
 
 FROM ${TARGETARCH}-linux
-COPY race-cmake-modules /opt/race/race-cmake-modules
-
-# RUN apt-get update && yes | apt-get install ncat && yes | apt-get install libcpprest-dev
-RUN apt-get update && yes | apt-get install ncat 
+RUN apt-get update && yes | apt-get install ncat # for example / test / debug 

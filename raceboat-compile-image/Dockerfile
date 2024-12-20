@@ -23,7 +23,6 @@ RUN echo "building for architecture $TARGETARCH"
 # x86-64 linux
 FROM base AS amd64-linux
 COPY racesdk/package/LINUX_x86_64/lib /linux/x86_64/lib
-# RUN ln -s /linux/x86_64/lib/libraceboat.so /linux/x86_64/lib/libraceSdkCommon.so
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/x86_64/lib" 
 COPY racesdk/package/LINUX_x86_64/include /linux/x86_64/include/
 COPY racesdk/package/LINUX_x86_64/go /usr/local/go
@@ -32,7 +31,6 @@ RUN cp /usr/local/go/src/shims/comm/* /usr/local/go/src/shims/
 # arm64 linux
 FROM base AS arm64-linux
 COPY racesdk/package/LINUX_arm64-v8a/lib /linux/arm64-v8a/lib
-# RUN ln -s /linux/arm64-v8a/lib/libraceboat.so /linux/arm64-v8a/lib/libraceSdkCommon.so 
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/arm64-v8a/lib"
 COPY racesdk/package/LINUX_arm64-v8a/include /linux/arm64-v8a/include/
 COPY racesdk/package/LINUX_arm64-v8a/go /usr/local/go

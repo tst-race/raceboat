@@ -54,6 +54,12 @@ if(NOT ANDROID)
     add_subdirectory(test/common/DecomposedTestStub EXCLUDE_FROM_ALL)
     add_subdirectory(test/common/plugins/DecomposedTestImplementation EXCLUDE_FROM_ALL)
     add_subdirectory(test/source EXCLUDE_FROM_ALL)
+    install(
+        TARGETS
+                race-cli
+                bridge-distro
+        RUNTIME DESTINATION app
+    )
 endif()
 
 # Create this after all subdirectories have been added
@@ -63,6 +69,7 @@ install(
     TARGETS
         raceSdkCommon
     EXPORT raceSdkCommon
+    RUNTIME DESTINATION app
     LIBRARY DESTINATION lib
     PUBLIC_HEADER DESTINATION include
 )

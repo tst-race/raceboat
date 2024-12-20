@@ -54,12 +54,12 @@ else
     # cmake --build -j --preset=ANDROID_arm64-v8a --target install
 fi
 
-mkdir -p /usr/local/go
+# mkdir -p /usr/local/go
 
-cp -r racesdk/package/${LINUX_PRESET}/lib/* /linux/${ARCH}/lib
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/${ARCH}/lib" 
-mkdir -p /linux/${ARCH}/include/race/common
-cp -r racesdk/package/${LINUX_PRESET}/include/* /linux/${ARCH}/include/race/common/
-cp /linux/${ARCH}/include/race/common/Race.h /linux/${ARCH}/include/race/
-cp -r racesdk/package/${LINUX_PRESET}/go/* /usr/local/go/*
+# cp -r racesdk/package/${LINUX_PRESET}/lib/* /linux/${ARCH}/lib
+# export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/${ARCH}/lib" 
+# mkdir -p /linux/${ARCH}/include/race/common
+# cp -r racesdk/package/${LINUX_PRESET}/include/* /linux/${ARCH}/include/race/common/
+# cp /linux/${ARCH}/include/race/common/Race.h /linux/${ARCH}/include/race/
+# cp -r racesdk/package/${LINUX_PRESET}/go/* /usr/local/go/*
 
