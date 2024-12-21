@@ -160,7 +160,7 @@ jobs:
           cache-to: ${{ steps.cache.outputs.cache-to }}
 
   runtime-image:
-    # needs: [compile-image]
+    needs: [compile-image]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -232,7 +232,6 @@ jobs:
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
           build-contexts: ghcr.io/tst-race/raceboat/raceboat-compile=docker-image://ghcr.io/tst-race/raceboat/raceboat-compile:${{ steps.meta.outputs.version }}
-
 
 
   # # todo base these on the raceboat image
