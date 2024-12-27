@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __I_RACE_PLUGIN_COMMS_H_
-#define __I_RACE_PLUGIN_COMMS_H_
+#ifndef I_RACE_PLUGIN_COMMS_H
+#define I_RACE_PLUGIN_COMMS_H
 
 #include <string>
 

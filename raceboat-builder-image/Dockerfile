@@ -165,5 +165,19 @@ RUN for ARCH in x86_64 arm64-v8a; do \
     done && \
     rm /tmp/python-*.tar.gz
 
+# Cppcheck (Linux-only)
+ARG CPPCHECK_VERSION=2.4.1-1
+RUN case ${TARGETPLATFORM} in \
+        "linux/amd64") LINUX_ARCH=x86_64    ;; \
+        "linux/arm64") LINUX_ARCH=arm64-v8a ;; \
+    esac && \
+    wget \
+        --output-document=/tmp/cppcheck-${CPPCHECK_VERSION}-linux-${LINUX_ARCH}.tar.gz \
+        https://github.com/tst-race/ext-cppcheck/releases/download/${CPPCHECK_VERSION}/cppcheck-${CPPCHECK_VERSION}-linux-${LINUX_ARCH}.tar.gz && \
+    tar --extract \
+        --file=/tmp/cppcheck-${CPPCHECK_VERSION}-linux-${LINUX_ARCH}.tar.gz \
+        --directory=/usr/local && \
+    rm /tmp/cppcheck-*.tar.gz
+
 COPY ./android-x86_64.toolchain.cmake /opt/android/ndk/default/
 COPY ./android-arm64-v8a.toolchain.cmake /opt/android/ndk/default/

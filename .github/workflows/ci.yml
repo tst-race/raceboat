@@ -159,6 +159,18 @@ jobs:
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
 
+  run-tests:
+    needs: [compile-image]
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/tst-race/raceboat/raceboat-compile:${{ github.head_ref || github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Test
+        run: ./test.sh
+
   runtime-image:
     needs: [compile-image]
     runs-on: ubuntu-latest

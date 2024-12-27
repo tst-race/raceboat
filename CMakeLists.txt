@@ -42,8 +42,8 @@ include(race/test-targets)
 include(race/valgrind)
 include(race/warnings)
 
-# setup_project_test_targets(raceSdkCommon UNIT INTEGRATION)
-# setup_project_format_targets(raceSdkCommon)
+setup_project_test_targets(raceSdkCommon UNIT INTEGRATION)
+setup_project_format_targets(raceSdkCommon)
 
 add_subdirectory(language-shims)
 add_subdirectory(source)

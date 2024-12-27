@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __RACE_PLUGIN_EXPORTS_H_
-#define __RACE_PLUGIN_EXPORTS_H_
+#ifndef RACE_PLUGIN_EXPORTS_H
+#define RACE_PLUGIN_EXPORTS_H
 
 #include "RaceExport.h"
 

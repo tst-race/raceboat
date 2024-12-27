@@ -15,8 +15,8 @@
 // limitations under the License.
 //
 
-#ifndef __I_COMPONENT_TYPES_H__
-#define __I_COMPONENT_TYPES_H__
+#ifndef I_COMPONENT_TYPES_H
+#define I_COMPONENT_TYPES_H
 
 #include <string>
 #include <unordered_map>
