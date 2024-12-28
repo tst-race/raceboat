@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __PLUGIN_CONFIG_H_
-#define __PLUGIN_CONFIG_H_
+#ifndef PLUGIN_CONFIG_H
+#define PLUGIN_CONFIG_H
 
 #include <string>
 

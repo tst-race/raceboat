@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __I_RACE_SDK_COMMS_H_
-#define __I_RACE_SDK_COMMS_H_
+#ifndef I_RACE_SDK_COMMS_H
+#define I_RACE_SDK_COMMS_H
 
 #include <vector>
 

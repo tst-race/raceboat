@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __I_RACE_SDK_COMMON_H_
-#define __I_RACE_SDK_COMMON_H_
+#ifndef I_RACE_SDK_COMMON_H
+#define I_RACE_SDK_COMMON_H
 
 #include <cstdint>
 #include <limits>

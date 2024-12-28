@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __RACE_CONNECTION_TYPE_H_
-#define __RACE_CONNECTION_TYPE_H_
+#ifndef RACE_CONNECTION_TYPE_H
+#define RACE_CONNECTION_TYPE_H
 
 #include <string>
 
