@@ -36,7 +36,6 @@ COPY racesdk/package/LINUX_arm64-v8a/include /linux/arm64-v8a/include/
 COPY racesdk/package/LINUX_arm64-v8a/go /usr/local/go
 RUN cp /usr/local/go/src/shims/comm/* /usr/local/go/src/shims/
 
-
 FROM ${TARGETARCH}-linux
 COPY race-cmake-modules /opt/race/race-cmake-modules
 
