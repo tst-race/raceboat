@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    tools:context=".MainActivity">
+
+    <EditText
+        android:id="@+id/messageEditText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter message" />
+
+    <Spinner
+        android:id="@+id/modeSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/messageEditText"
+        android:layout_marginTop="26dp" />
+
+    <Button
+        android:id="@+id/sendButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/recvAddress"
+        android:layout_marginTop="64dp"
+        android:text="Run" />
+
+    <TextView
+        android:id="@+id/responseTextView"
+        android:layout_width="383dp"
+        android:layout_height="65dp"
+        android:layout_below="@+id/sendButton"
+        android:layout_marginTop="155dp"
+        android:text="Server Response"
+        android:textSize="16sp" />
+
+    <androidx.constraintlayout.widget.Group
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:constraint_referenced_ids="sendChannel,recvChannel" />
+
+    <EditText
+        android:id="@+id/sendChannel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/sendChannelTitle"
+        android:text="twoSixDirectCpp" />
+
+    <EditText
+        android:id="@+id/sendAddress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/sendChannel"
+        android:text=""
+        android:hint="Send Address" />
+
+    <EditText
+        android:id="@+id/recvAddress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/recvChannel"
+        android:text=""
+        android:hint="Receive Address (if necessary)"/>
+
+    <EditText
+        android:id="@+id/additionalParameters"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/recvAddress"
+        android:hint="Parameters"
+        android:text="" />
+
+    <EditText
+        android:id="@+id/recvChannel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/receiveChannelTitle"
+        android:text="twoSixDirectCpp" />
+
+    <TextView
+        android:id="@+id/sendChannelTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/modeSpinner"
+        android:ems="10"
+        android:text="Send Channel:" />
+
+    <TextView
+        android:id="@+id/receiveChannelTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/sendAddress"
+        android:text="Receive Channel:" />
+
+</RelativeLayout>

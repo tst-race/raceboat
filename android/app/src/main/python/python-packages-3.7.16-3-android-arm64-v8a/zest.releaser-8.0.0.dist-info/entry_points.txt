@@ -1,0 +1,28 @@
+[console_scripts]
+addchangelogentry = zest.releaser.addchangelogentry:main
+bumpversion = zest.releaser.bumpversion:main
+fullrelease = zest.releaser.fullrelease:main
+lasttagdiff = zest.releaser.lasttagdiff:main
+lasttaglog = zest.releaser.lasttaglog:main
+longtest = zest.releaser.longtest:main
+postrelease = zest.releaser.postrelease:main
+prerelease = zest.releaser.prerelease:main
+release = zest.releaser.release:main
+
+[zest.releaser.addchangelogentry.middle]
+datacheck = zest.releaser.addchangelogentry:datacheck
+
+[zest.releaser.bumpversion.middle]
+datacheck = zest.releaser.bumpversion:datacheck
+
+[zest.releaser.postreleaser.middle]
+datacheck = zest.releaser.postrelease:datacheck
+
+[zest.releaser.prereleaser.before]
+preparedocs = zest.releaser.preparedocs:prepare_entrypoint_documentation
+
+[zest.releaser.prereleaser.middle]
+datacheck = zest.releaser.prerelease:datacheck
+
+[zest.releaser.releaser.middle]
+datacheck = zest.releaser.release:datacheck

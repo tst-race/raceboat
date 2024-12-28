@@ -92,15 +92,30 @@ target_include_directories(commsPluginBindings PUBLIC ${PYTHON_INCLUDE_PATH})
 target_link_options(commsPluginBindings PUBLIC -Wl,--no-undefined)
 swig_link_libraries(commsPluginBindings ${PYTHON_LIBRARIES} language-shims-headers raceSdkCommon)
 
+if(CMAKE_ANDROID_ASSETS_DIRECTORIES)
+  add_custom_command(
+    TARGET commsPluginBindings
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+          "${CMAKE_ANDROID_ASSETS_DIRECTORIES}/python"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "$<TARGET_FILE:commsPluginBindings>"
+          "${CMAKE_ANDROID_ASSETS_DIRECTORIES}/python/$<TARGET_FILE_NAME:commsPluginBindings>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "${CMAKE_CURRENT_BINARY_DIR}/commsPluginBindings.py"
+          "${CMAKE_ANDROID_ASSETS_DIRECTORIES}/python/commsPluginBindings.py"
+    COMMENT "Copy commsPluginBindings to assets"
+  )
+endif()
 
 # ################################################################################
 # # Golang Comms
 # ################################################################################
-
+  
 set_source_files_properties(commsPluginBindings.golang.i PROPERTIES
   TYPE MODULE
   CPLUSPLUS ON
-  SWIG_FLAGS "-intgosize;64;-package;commShims"
+  SWIG_FLAGS "-intgosize;64;-package;commsShims"
 )
 swig_add_library(commsPluginBindingsGolang TYPE SHARED
   LANGUAGE go
@@ -112,30 +127,37 @@ set_target_properties(commsPluginBindingsGolang PROPERTIES
   SWIG_USE_TARGET_INCLUDE_DIRECTORIES TRUE
   COMPILE_OPTIONS "-Wno-error" # Clear warnings set globally via add_compile_options
 )
-
+target_include_directories(commsPluginBindingsGolang PUBLIC
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/race/common>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/race/decomposed>
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/race/unified>
+)
+  
 swig_link_libraries(commsPluginBindingsGolang language-shims-headers raceSdkCommon)
 
-# ################################################################################
-# # Golang Core
-# ################################################################################
+if(NOT ANDROID)
+  # ################################################################################
+  # # Golang Core
+  # ################################################################################
 
-set_source_files_properties(corePluginBindings.golang.i PROPERTIES
-  TYPE MODULE
-  CPLUSPLUS ON
-  SWIG_FLAGS "-intgosize;64;-package;coreShims"
-)
-swig_add_library(corePluginBindingsGolang TYPE SHARED
-  LANGUAGE go
-  SOURCES corePluginBindings.golang.i
-  OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/include/src/core"
-)
-add_dependencies(corePluginBindingsGolang raceSdkCommon)
-set_target_properties(corePluginBindingsGolang PROPERTIES
-  SWIG_USE_TARGET_INCLUDE_DIRECTORIES TRUE
-  COMPILE_OPTIONS "-Wno-error" # Clear warnings set globally via add_compile_options
-)
-
-swig_link_libraries(corePluginBindingsGolang raceSdkCommon)
+  set_source_files_properties(corePluginBindings.golang.i PROPERTIES
+    TYPE MODULE
+    CPLUSPLUS ON
+    SWIG_FLAGS "-intgosize;64;-package;coreShims"
+  )
+  swig_add_library(corePluginBindingsGolang TYPE SHARED
+    LANGUAGE go
+    SOURCES corePluginBindings.golang.i
+    OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/include/src/core"
+  )
+  add_dependencies(corePluginBindingsGolang raceSdkCommon)
+  set_target_properties(corePluginBindingsGolang PROPERTIES
+    SWIG_USE_TARGET_INCLUDE_DIRECTORIES TRUE
+    COMPILE_OPTIONS "-Wno-error" # Clear warnings set globally via add_compile_options
+  )
+  
+  swig_link_libraries(corePluginBindingsGolang raceSdkCommon)
+endif()
 
 
 # ################################################################################
@@ -162,15 +184,17 @@ install(
   DESTINATION go/src/shims/comm
 )
 
-# Core Golang bindings
-install(
-  TARGETS corePluginBindingsGolang
-  LIBRARY DESTINATION lib
-)
-
-install(
-  FILES ${CMAKE_CURRENT_BINARY_DIR}/include/src/core/corePluginBindingsGolang.go
-  DESTINATION go/src/shims/core
-)
-
-install(SCRIPT "init_go.cmake")
+if(NOT ANDROID)
+  # Core Golang bindings
+  install(
+    TARGETS corePluginBindingsGolang
+    LIBRARY DESTINATION lib
+  )
+  
+  install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/include/src/core/corePluginBindingsGolang.go
+    DESTINATION go/src/shims/core
+  )
+  
+  install(SCRIPT "init_go.cmake")
+endif()

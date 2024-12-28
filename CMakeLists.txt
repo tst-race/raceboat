@@ -34,7 +34,6 @@ if("${BUILD_VERSION}" STREQUAL "")
     message(FATAL_ERROR "Missing or empty BUILD_VERSION argument")
 endif()
 
-include(race/clang-format)
 include(race/coverage)
 include(race/java-format)
 include(race/lint)
@@ -43,7 +42,11 @@ include(race/valgrind)
 include(race/warnings)
 
 setup_project_test_targets(raceSdkCommon UNIT INTEGRATION)
-setup_project_format_targets(raceSdkCommon)
+
+if(NOT ANDROID)
+    include(race/clang-format)
+    setup_project_format_targets(raceSdkCommon)
+endif()
 
 add_subdirectory(language-shims)
 add_subdirectory(source)
@@ -60,6 +63,8 @@ if(NOT ANDROID)
                 bridge-distro
         RUNTIME DESTINATION app
     )
+else()
+    add_subdirectory(android/app/src/main/cpp)
 endif()
 
 # Create this after all subdirectories have been added
