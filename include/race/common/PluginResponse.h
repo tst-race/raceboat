@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __RACE_PLUGIN_RESPONSE_H_
-#define __RACE_PLUGIN_RESPONSE_H_
+#ifndef RACE_PLUGIN_RESPONSE_H
+#define RACE_PLUGIN_RESPONSE_H
 
 #include <string>
 

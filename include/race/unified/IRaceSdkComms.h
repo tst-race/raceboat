@@ -14,19 +14,19 @@
 // limitations under the License.
 //
 
-#ifndef __I_RACE_SDK_COMMS_H_
-#define __I_RACE_SDK_COMMS_H_
+#ifndef I_RACE_SDK_COMMS_H
+#define I_RACE_SDK_COMMS_H
 
 #include <vector>
 
-#include "../common/ChannelProperties.h"
-#include "../common/ChannelStatus.h"
-#include "../common/ConnectionStatus.h"
-#include "../common/EncPkg.h"
-#include "../common/LinkProperties.h"
-#include "../common/LinkStatus.h"
-#include "../common/PackageStatus.h"
-#include "../common/RaceEnums.h"
+#include "ChannelProperties.h"
+#include "ChannelStatus.h"
+#include "ConnectionStatus.h"
+#include "EncPkg.h"
+#include "LinkProperties.h"
+#include "LinkStatus.h"
+#include "PackageStatus.h"
+#include "RaceEnums.h"
 #include "IRaceSdkCommon.h"
 #include "SdkResponse.h"
 

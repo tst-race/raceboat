@@ -77,20 +77,25 @@ RUN case ${TARGETPLATFORM} in \
         --directory=/usr/local && \
     rm /tmp/swig-*.tar.gz
 
+# non-interactive install mode workaround to python prerequisite tzdata
 ENV DEBIAN_FRONTEND=noninteractive
-ARG PYTHON_VERSION=3.12.7
-RUN apt-get update -y && \
-    add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt-get update -y && \
-    apt-get install -y --no-install-recommends \
-        python3.12=${PYTHON_VERSION}-* \
-        python3.12-dev=${PYTHON_VERSION}-* \
+# RUN apt update && apt install tzdata
+
+# Python 3.12
+ARG PYTHON_VERSION=3.12
+RUN apt update && \
+    apt install software-properties-common -y --no-install-recommends
+
+RUN add-apt-repository ppa:deadsnakes/ppa -y && \
+    apt update && \
+    apt install -y --no-install-recommends \
+        python3.12 \
+        python3.12-dev \
         python3-pip \
         python3-setuptools \
         python3-wheel \
-        python3.12-tk=${PYTHON_VERSION}-* \
-        python3.12-distutils
-        
+        python3.12-tk
+
 RUN apt-get install -y \
     valgrind
 
@@ -160,6 +165,19 @@ RUN for ARCH in x86_64 arm64-v8a; do \
     done && \
     rm /tmp/python-*.tar.gz
 
+# Cppcheck (Linux-only)
+ARG CPPCHECK_VERSION=2.4.1-1
+RUN case ${TARGETPLATFORM} in \
+        "linux/amd64") LINUX_ARCH=x86_64    ;; \
+        "linux/arm64") LINUX_ARCH=arm64-v8a ;; \
+    esac && \
+    wget \
+        --output-document=/tmp/cppcheck-${CPPCHECK_VERSION}-linux-${LINUX_ARCH}.tar.gz \
+        https://github.com/tst-race/ext-cppcheck/releases/download/${CPPCHECK_VERSION}/cppcheck-${CPPCHECK_VERSION}-linux-${LINUX_ARCH}.tar.gz && \
+    tar --extract \
+        --file=/tmp/cppcheck-${CPPCHECK_VERSION}-linux-${LINUX_ARCH}.tar.gz \
+        --directory=/usr/local && \
+    rm /tmp/cppcheck-*.tar.gz
 
 COPY ./android-x86_64.toolchain.cmake /opt/android/ndk/default/
 COPY ./android-arm64-v8a.toolchain.cmake /opt/android/ndk/default/

@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __RACE_LINK_STATUS_H_
-#define __RACE_LINK_STATUS_H_
+#ifndef RACE_LINK_STATUS_H
+#define RACE_LINK_STATUS_H
 
 #include <iostream>
 #include <string>

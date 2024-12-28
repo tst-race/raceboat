@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __RACE_ENUMS_H_
-#define __RACE_ENUMS_H_
+#ifndef RACE_ENUMS_H
+#define RACE_ENUMS_H
 
 #include <string>
 

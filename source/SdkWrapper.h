@@ -17,7 +17,7 @@
 #pragma once
 
 #include "PluginContainer.h"
-#include "race/unified/IRaceSdkComms.h"
+#include "IRaceSdkComms.h"
 
 namespace Raceboat {
 class Core;

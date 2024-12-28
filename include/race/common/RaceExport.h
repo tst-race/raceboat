@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __EXPORTS_H_
-#define __EXPORTS_H_
+#ifndef EXPORTS_H
+#define EXPORTS_H
 
 #if defined(_WIN32)
 #define EXPORT __declspec(dllexport)

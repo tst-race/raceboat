@@ -19,7 +19,7 @@
 #include <nlohmann/json.hpp>
 
 #include "PluginDef.h"
-#include "race/common/RaceEnums.h"
+#include "RaceEnums.h"
 
 namespace Raceboat {
 

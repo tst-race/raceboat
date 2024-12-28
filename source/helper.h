@@ -20,8 +20,8 @@
 #include <string>
 #include <vector>
 
-#include "race/common/PluginResponse.h"
-#include "race/common/RaceLog.h"
+#include "PluginResponse.h"
+#include "RaceLog.h"
 
 namespace Raceboat {
 namespace helper {

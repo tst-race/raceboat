@@ -25,8 +25,8 @@
 #include <unordered_set>
 #include <vector>
 
-#include "race/common/EncPkg.h"
-#include "race/common/LinkProperties.h" // ConnectionID, LinkID
+#include "EncPkg.h"
+#include "LinkProperties.h" // ConnectionID, LinkID
 #include "race/decomposed/ComponentTypes.h"
 
 namespace Raceboat {

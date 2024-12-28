@@ -14,9 +14,7 @@
 // limitations under the License.
 //
 
-#pragma clang diagnostic ignored "-Wreserved-identifier"
 #ifndef RACE_LOG_H
-#pragma clang diagnostic ignored "-Wreserved-identifier"
 #define RACE_LOG_H
 
 #include <iomanip>

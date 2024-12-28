@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __RACE_LINK_TYPE_H_
-#define __RACE_LINK_TYPE_H_
+#ifndef RACE_LINK_TYPE_H
+#define RACE_LINK_TYPE_H
 
 #include <string>
 

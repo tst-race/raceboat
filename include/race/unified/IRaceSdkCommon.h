@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __I_RACE_SDK_COMMON_H_
-#define __I_RACE_SDK_COMMON_H_
+#ifndef I_RACE_SDK_COMMON_H
+#define I_RACE_SDK_COMMON_H
 
 #include <cstdint>
 #include <limits>
@@ -23,11 +23,11 @@
 #include <string>
 #include <vector>
 
-#include "../common/ChannelProperties.h"
-#include "../common/EncPkg.h"
-#include "../common/PluginResponse.h"
-#include "../common/constants.h"
-// #include "common/RaceEnums.h"
+#include "ChannelProperties.h"
+#include "EncPkg.h"
+#include "PluginResponse.h"
+#include "constants.h"
+// #include "RaceEnums.h"
 #include "SdkResponse.h"
 
 class IRaceSdkCommon {

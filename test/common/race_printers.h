@@ -17,11 +17,11 @@
 
 #pragma once
 
-#include "race/unified/SdkResponse.h"
-#include "race/common/ChannelProperties.h"
-#include "race/common/LinkProperties.h"
-#include "race/common/PluginConfig.h"
-#include "race/common/EncPkg.h"
+#include "SdkResponse.h"
+#include "ChannelProperties.h"
+#include "LinkProperties.h"
+#include "PluginConfig.h"
+#include "EncPkg.h"
 #include "nlohmann/json.hpp"
 
 using nlohmann::json;
