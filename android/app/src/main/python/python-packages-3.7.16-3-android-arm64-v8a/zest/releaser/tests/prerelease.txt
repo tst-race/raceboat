@@ -1,0 +1,47 @@
+Detailed tests of prerelease.py
+===============================
+
+Several items are prepared for us.
+
+A git checkout of a project:
+
+    >>> gitsourcedir
+    'TESTTEMP/tha.example-git'
+    >>> import os
+    >>> os.chdir(gitsourcedir)
+
+The version is at 0.1.dev0:
+
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '0.1.dev0'
+
+Asking input on the prompt is not unittestable unless we use the prepared
+testing hack in utils.py:
+
+    >>> from zest.releaser import utils
+    >>> utils.TESTMODE = True
+
+Run the prerelease script:
+
+    >>> utils.test_answer_book.set_answers(['', '', '', '', ''])
+    >>> from zest.releaser import prerelease
+    >>> prerelease.main()
+    Question...
+    Question: Enter version [0.1]:
+    Our reply: <ENTER>
+    Checking data dict
+    Question: OK to commit this (Y/n)?
+    Our reply: <ENTER>
+
+The changelog and setup.py are at 0.1 and indicate a release date:
+
+    >>> githead('CHANGES.txt')
+    Changelog of tha.example
+    ========================
+    <BLANKLINE>
+    0.1 (...-...-...)
+    ----------------
+    >>> githead('setup.py')
+    from setuptools import setup, find_packages
+    version = '0.1'

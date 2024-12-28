@@ -1,0 +1,156 @@
+Detailed tests of baserelease.py
+================================
+
+Change to a git dir:
+
+    >>> gitsourcedir
+    'TESTTEMP/tha.example-git'
+    >>> import os
+    >>> os.chdir(gitsourcedir)
+
+Init the Basereleaser, which is otherwise only used as a base class.
+
+    >>> from zest.releaser import baserelease
+    >>> base = baserelease.Basereleaser()
+
+The data dict is initialized.  And a vcs is chosen:
+
+    >>> base.data['workingdir']
+    'TESTTEMP/tha.example-git'
+    >>> base.data['name']
+    'tha.example'
+    >>> base.vcs
+    <Git at TESTTEMP/tha.example-git .>
+
+Two methods are unimplemented:
+
+    >>> base.prepare()
+    Traceback (most recent call last):
+    ...
+    NotImplementedError
+    >>> base.execute()
+    Traceback (most recent call last):
+    ...
+    NotImplementedError
+
+We can suffix commit messages based on what we find in ``setup.cfg``::
+
+    >>> lines = [
+    ...     "[zest.releaser]",
+    ...     "extra-message = Aargh!"]
+    >>> with open('setup.cfg', 'w') as f:
+    ...     _ = f.write('\n'.join(lines))
+    >>> base = baserelease.Basereleaser()
+    >>> print(base.update_commit_message('Ni!'))
+    Ni!
+    <BLANKLINE>
+    Aargh!
+
+Check that this works with non-ascii too.
+
+    >>> lines = [
+    ...     "[zest.releaser]".encode('utf-8'),
+    ...     "extra-message = \u2603".encode('utf-8')]
+    >>> with open('setup.cfg', 'wb') as f:
+    ...     _ = f.write(b'\n'.join(lines))
+    >>> base = baserelease.Basereleaser()
+    >>> base.update_commit_message('Ni!')
+    'Ni!\n\n\u2603'
+
+And check with multiple lines.
+
+    >>> lines = [
+    ...     "[zest.releaser]",
+    ...     "extra-message =",
+    ...     "    Where is my towel?",
+    ...     "    Not again."]
+    >>> with open('setup.cfg', 'w') as f:
+    ...     _ = f.write('\n'.join(lines))
+    >>> base = baserelease.Basereleaser()
+    >>> print(base.update_commit_message('Ni!'))
+    Ni!
+    <BLANKLINE>
+    Where is my towel?
+    Not again.
+
+We can prefix commit messages based on what we find in ``setup.cfg``::
+
+    >>> lines = [
+    ...     "[zest.releaser]",
+    ...     "prefix-message = Aargh!"]
+    >>> with open('setup.cfg', 'w') as f:
+    ...     _ = f.write('\n'.join(lines))
+    >>> base = baserelease.Basereleaser()
+    >>> print(base.update_commit_message('Ni!'))
+    Aargh! Ni!
+
+
+Check that this works with non-ascii too.
+
+    >>> lines = [
+    ...     "[zest.releaser]".encode('utf-8'),
+    ...     "prefix-message = \u2603".encode('utf-8')]
+    >>> with open('setup.cfg', 'wb') as f:
+    ...     _ = f.write(b'\n'.join(lines))
+    >>> base = baserelease.Basereleaser()
+    >>> base.update_commit_message('Ni!')
+    '\u2603 Ni!'
+
+And check with multiple lines.
+
+    >>> lines = [
+    ...     "[zest.releaser]",
+    ...     "prefix-message =",
+    ...     "    Where is my towel?",
+    ...     "    Not again."]
+    >>> with open('setup.cfg', 'w') as f:
+    ...     _ = f.write('\n'.join(lines))
+    >>> base = baserelease.Basereleaser()
+    >>> print(base.update_commit_message('Ni!'))
+    Where is my towel?
+    Not again. Ni!
+
+We can prefix and suffix commit messages based on what we find in ``setup.cfg``::
+
+    >>> lines = [
+    ...     "[zest.releaser]",
+    ...     "extra-message = after",
+    ...     "prefix-message = before"]
+    >>> with open('setup.cfg', 'w') as f:
+    ...     _ = f.write('\n'.join(lines))
+    >>> base = baserelease.Basereleaser()
+    >>> print(base.update_commit_message('Ni!'))
+    before Ni!
+    <BLANKLINE>
+    after
+
+We can use Markdown based on what we find in ``setup.cfg``::
+
+    >>> lines = [
+    ...     "[zest.releaser]",
+    ...     "history_format = md"]
+    >>> with open('setup.cfg', 'w') as f:
+    ...     _ = f.write('\n'.join(lines))
+
+Now, Basereleaser will recognize the format as Markdown::
+
+    >>> base = baserelease.Basereleaser()
+    >>> base.history_format
+    'md'
+
+And there won't be any underline in headers::
+
+    >>> base.underline_char == ""
+    True
+
+Also, if we have no ``history_format`` setting, but the
+history file ends with ``.md``, we consider it Markdown::
+
+    >>> lines = ["[zest.releaser]", ""]
+    >>> with open('setup.cfg', 'w') as f:
+    ...     _ = f.write('\n'.join(lines))
+    >>> rename_changelog("CHANGES.txt", "CHANGES.md")
+    >>> base = baserelease.Basereleaser()
+    >>> base._grab_history()
+    >>> base.history_format
+    'md'

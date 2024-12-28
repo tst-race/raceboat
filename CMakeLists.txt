@@ -34,7 +34,9 @@ if("${BUILD_VERSION}" STREQUAL "")
     message(FATAL_ERROR "Missing or empty BUILD_VERSION argument")
 endif()
 
-include(race/clang-format)
+if(NOT ANDROID)
+    include(race/clang-format)
+endif()
 include(race/coverage)
 include(race/java-format)
 include(race/lint)
@@ -60,6 +62,8 @@ if(NOT ANDROID)
                 bridge-distro
         RUNTIME DESTINATION app
     )
+else()
+    add_subdirectory(android/app/src/main/cpp)
 endif()
 
 # Create this after all subdirectories have been added

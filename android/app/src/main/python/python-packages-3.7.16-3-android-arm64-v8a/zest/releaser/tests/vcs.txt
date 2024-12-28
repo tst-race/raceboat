@@ -1,0 +1,320 @@
+Detailed tests of vcs.py
+========================
+
+Some initial imports and utility functions:
+
+    >>> from zest.releaser import vcs
+    >>> import os
+    >>> def writeto(filename, contents):
+    ...     with open(filename, 'w') as f:
+    ...         _ = f.write(contents)
+
+BaseVersionControl is the base class for subversion/mercurial/git support.  It
+handles some base cases and has a bunch of NotImplementedError methods.
+
+When started, it stores the current working directory:
+
+    >>> gitsourcedir
+    'TESTTEMP/tha.example-git'
+    >>> os.chdir(gitsourcedir)
+    >>> checkout = vcs.BaseVersionControl()
+    >>> checkout.workingdir
+    'TESTTEMP/tha.example-git'
+
+
+Methods that must be implemented in subclasses
+----------------------------------------------
+
+    >>> checkout.name()
+    Traceback (most recent call last):
+    ...
+    NotImplementedError
+    >>> checkout.available_tags()
+    Traceback (most recent call last):
+    ...
+    NotImplementedError
+    >>> checkout.prepare_checkout_dir('prefix')
+    Traceback (most recent call last):
+    ...
+    NotImplementedError
+    >>> checkout.tag_url('arg')
+    Traceback (most recent call last):
+    ...
+    NotImplementedError
+    >>> checkout.cmd_diff()
+    Traceback (most recent call last):
+    ...
+    NotImplementedError
+    >>> checkout.cmd_commit('arg')
+    Traceback (most recent call last):
+    ...
+    NotImplementedError
+    >>> checkout.cmd_diff_last_commit_against_tag('arg')
+    Traceback (most recent call last):
+    ...
+    NotImplementedError
+    >>> checkout.cmd_create_tag('arg', 'message')
+    Traceback (most recent call last):
+    ...
+    NotImplementedError
+
+
+Tag handling
+------------
+
+Extraction of tags is handled by the subclasses.  The one thing that the
+baseclass does is to check if a tag has already been made earlier:
+
+    >>> def mock_available_tags():
+    ...     return ['0.1', '0.2']
+    >>> checkout.available_tags = mock_available_tags
+    >>> checkout.tag_exists('1.0')
+    False
+    >>> checkout.tag_exists('0.2')
+    True
+
+
+Version handling
+----------------
+
+Create a project with a ``version.txt`` in it like often found in old zope
+products:
+
+    >>> versiontxtproject = os.path.join(tempdir, 'vp')
+    >>> os.mkdir(versiontxtproject)
+    >>> os.chdir(versiontxtproject)
+    >>> writeto('version.txt', '1.0 dev')
+
+We need some version control marker (like an ``.svn`` dir):
+
+    >>> os.mkdir('.marker')
+    >>> checkout = vcs.BaseVersionControl()
+    >>> checkout.internal_filename = '.marker'
+
+Open the project with the BaseVersionControl and it finds the version file and
+returns the cleaned-up version:
+
+    >>> checkout.get_version_txt_version()
+    '1.0dev'
+
+Setting the version works also with version.txt files (the setup.py scenario
+is tested in the other tests).
+
+    >>> checkout.version = '1.1'
+    >>> with open('version.txt') as f:
+    ...     print(f.read())
+    1.1
+
+In old Plone products, the setup.py often reads the version.txt and uses that
+as the version value.  In those cases, the version must be written to the
+version.txt and the setup.py must be left unmolested.
+
+    >>> lines = [
+    ...     "from setuptools import setup",
+    ...     "with open('version.txt') as f:",
+    ...     "    version = f.read().strip()",
+    ...     "setup(name='urgh', version=version)"]
+    >>> writeto('setup.py', '\n'.join(lines))
+    >>> checkout.version = '1.2'
+    >>> with open('version.txt') as f:
+    ...     print(f.read())
+    1.2
+    >>> with open('setup.py') as f:
+    ...     print(f.read())
+    from setuptools import setup
+    with open('version.txt') as f:
+        version = f.read().strip()
+    setup(name='urgh', version=version)
+
+If the setup.py version is different, this takes precedence and the
+version.txt is the one left as-is.
+
+    >>> lines = [
+    ...     "from setuptools import setup",
+    ...     "setup(name='urgh',",
+    ...     "      version='1.3',",
+    ...     "      )"]
+    >>> writeto('setup.py', '\n'.join(lines))
+    >>> checkout.version = '1.4'
+    >>> with open('version.txt') as f:
+    ...     print(f.read())  # Still at 1.2
+    1.2
+    >>> with open('setup.py') as f:
+    ...     print(f.read())  # Modified into 1.4
+    from setuptools import setup
+    setup(name='urgh',
+          version='1.4',
+          )
+
+The version writing breaks down if there's more than just a "version=" on that
+line.  The 99.9% case works, though.
+
+Another option is a ``__version__`` marker in a Python file. We cannot
+reliably figure out the right Python file to look in, so this file needs to be
+specified explicitly. As `PEP 396 <http://www.python.org/dev/peps/pep-0396/>`_
+specifies, the ``__version__`` attribute and the ``setup.py`` version need to
+be derived one from the other, so zest.releaser only looks at one version
+source. If a ``__version__`` marker file is specified, that's where we'll look
+and otherwise not.
+
+Create a Python file with ``__version__`` without configuring it. This won't
+change a thing. We test with a fresh checkout:
+
+    >>> checkout = vcs.BaseVersionControl()
+    >>> checkout.internal_filename = '.marker'
+    >>> lines = [
+    ...     "import something",
+    ...     "__version__ = '2.0'",
+    ...     "print('something.else')"]
+    >>> writeto('some_file.py', '\n'.join(lines))
+    >>> checkout = vcs.BaseVersionControl()
+    >>> checkout.internal_filename = '.marker'
+    >>> checkout.version
+    '1.4'
+
+Add a ``setup.cfg`` with a pointer at the Python file and its version gets
+picked up. We need a fresh checkout to pick up the change:
+
+    >>> lines = [
+    ...     "[zest.releaser]",
+    ...     "python-file-with-version = some_file.py"]
+    >>> writeto('setup.cfg', '\n'.join(lines))
+    >>> checkout = vcs.BaseVersionControl()
+    >>> checkout.internal_filename = '.marker'
+    >>> checkout.get_python_file_version()
+    '2.0'
+    >>> checkout.version
+    '2.0'
+
+Setting it sets it in the correct Python file:
+
+    >>> checkout.version = '2.1'
+    >>> with open('some_file.py') as f:
+    ...     print(f.read())
+    import something
+    __version__ = '2.1'
+    print('something.else')
+
+the Python file with double quotes:
+
+    >>> lines = [
+    ...     "import something",
+    ...     '__version__ = "2.0"',
+    ...     "print('something.else')"]
+    >>> writeto('some_file.py', '\n'.join(lines))
+
+The version line should have retained its double quotes, otherwise black would
+have to change it back again:
+
+    >>> checkout.version = '2.1'
+    >>> with open('some_file.py') as f:
+    ...     print(f.read())
+    import something
+    __version__ = "2.1"
+    print('something.else')
+
+
+Version corner cases
+--------------------
+
+Version files can also be called ``VERSION`` instead of ``version.txt`` (or
+``VERSION.TXT``):
+
+    >>> versiontxtproject = os.path.join(tempdir, 'vp2')
+    >>> os.mkdir(versiontxtproject)
+    >>> os.chdir(versiontxtproject)
+    >>> writeto('VERSION', '1.0 dev')
+
+We need some version control marker (like an ``.svn`` dir):
+
+    >>> os.mkdir('.marker')
+    >>> checkout = vcs.BaseVersionControl()
+    >>> checkout.internal_filename = '.marker'
+
+Open the project with the BaseVersionControl and it finds the version file and
+returns the cleaned-up version:
+
+    >>> checkout.get_version_txt_version()
+    '1.0dev'
+
+Setting the version works also with ``VERSION`` files:
+
+    >>> checkout.version = '1.1'
+    >>> with open('VERSION') as f:
+    ...     print(f.read())
+    1.1
+
+Same with a ``VERSION.txt``:
+
+    >>> os.remove('VERSION')
+    >>> writeto('VERSION.txt', '22.3')
+    >>> checkout.get_version_txt_version()
+    '22.3'
+    >>> checkout.version = '22.4'
+    >>> with open('VERSION.txt') as f:
+    ...     print(f.read())
+    22.4
+
+Version files can also be called ``version.rst`` (or .md or so) instead of ``version.txt``:
+
+    >>> os.remove('VERSION.txt')
+    >>> writeto('version.rst', '25.0')
+    >>> checkout.get_version_txt_version()
+    '25.0'
+
+Setup.py with an uppercase VERSION:
+
+    >>> uppercaseversionproject = os.path.join(tempdir, 'uvp')
+    >>> os.mkdir(uppercaseversionproject)
+    >>> os.chdir(uppercaseversionproject)
+    >>> lines = [
+    ...     "from setuptools import setup",
+    ...     "VERSION = '1.0'",
+    ...     "setup(name='urgh', version=VERSION)"]
+    >>> writeto('setup.py', '\n'.join(lines))
+    >>> checkout.version = '1.2'
+    >>> with open('setup.py') as f:
+    ...     print(f.read())
+    from setuptools import setup
+    VERSION = '1.2'
+    setup(name='urgh', version=VERSION)
+
+version in setup.cfg:
+
+    >>> setupcfgproject = os.path.join(tempdir, 'setupcfg')
+    >>> os.mkdir(setupcfgproject)
+    >>> os.chdir(setupcfgproject)
+    >>> lines = [
+    ...     "[metadata]",
+    ...     "version = 1.0"]
+    >>> writeto('setup.cfg', '\n'.join(lines))
+    >>> writeto('setup.py', '')
+    >>> checkout.version = '1.2'
+    >>> with open('setup.cfg') as f:
+    ...     print(f.read())
+    [metadata]
+    version = 1.2
+
+Setup.py with a double-quoted version, as prefered by the 'black' code
+formatter:
+
+    >>> doublequotedversionproject = os.path.join(tempdir, 'dqv')
+    >>> os.mkdir(doublequotedversionproject)
+    >>> os.chdir(doublequotedversionproject)
+    >>> lines = [
+    ...     "from setuptools import setup",
+    ...     "setup(name='urgh',",
+    ...     "      version=\"1.0\",",
+    ...     ")"]
+    >>> writeto('setup.py', '\n'.join(lines))
+    >>> checkout.version = '1.2'
+
+The version line should have retained its double quotes, otherwise black would
+have to change it back again:
+
+    >>> with open('setup.py') as f:
+    ...     print(f.read())
+    from setuptools import setup
+    setup(name='urgh',
+          version="1.2",
+    )

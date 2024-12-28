@@ -1,0 +1,801 @@
+Utility functions
+=================
+
+We're testing ``utils.py`` here:
+
+    >>> from zest.releaser import utils
+    >>> from pprint import pprint
+
+
+Log level
+---------
+
+A ``-v`` on the commandline turns on debug level logging:
+
+    >>> import sys
+    >>> import logging
+    >>> sys.argv[1:] = []
+    >>> utils.parse_options()
+    Namespace(auto_response=False, verbose=False)
+    >>> utils.VERBOSE
+    False
+    >>> utils.loglevel() == logging.INFO
+    True
+    >>> sys.argv[1:] = ['-v']
+    >>> utils.parse_options()
+    Namespace(auto_response=False, verbose=True)
+    >>> utils.VERBOSE
+    True
+    >>> utils.loglevel() == logging.DEBUG
+    True
+    >>> sys.argv[1:] = []
+
+
+Version numbers
+---------------
+
+Strip all whitespace in a version:
+
+    >>> utils.strip_version('1.0')
+    '1.0'
+    >>> utils.strip_version(' 1.0   dev  ')
+    '1.0dev'
+
+Remove development markers in various common forms:
+
+    >>> utils.cleanup_version('1.0')
+    '1.0'
+    >>> utils.cleanup_version('1.0 dev')
+    '1.0'
+    >>> utils.cleanup_version('1.0 (svn/devel)')
+    '1.0'
+    >>> utils.cleanup_version('1.0 svn')
+    '1.0'
+    >>> utils.cleanup_version('1.0 devel 13')
+    '1.0'
+    >>> utils.cleanup_version('1.0 beta devel 13')
+    '1.0 beta'
+    >>> utils.cleanup_version('1.0.dev0')
+    '1.0'
+    >>> utils.cleanup_version('1.0.dev42')
+    '1.0'
+
+
+Suggest version number
+----------------------
+
+Mostly for postrelease.  Suggest updated version number.
+
+    >>> utils.suggest_version('1.0')
+    '1.1'
+    >>> utils.suggest_version('1.9')
+    '1.10'
+    >>> utils.suggest_version('1.0.9')
+    '1.0.10'
+    >>> utils.suggest_version('1.2.3')
+    '1.2.4'
+    >>> utils.suggest_version('1.2.3.4')
+    '1.2.3.5'
+    >>> utils.suggest_version('1.2.3.19')
+    '1.2.3.20'
+    >>> utils.suggest_version('1.2a1')
+    '1.2a2'
+
+If you prefer major.minor.patch as version, you can influence this with the 'levels' parameter.
+
+    >>> utils.suggest_version('1.2', levels=2)
+    '1.3'
+    >>> utils.suggest_version('1.2', levels=3)
+    '1.2.1'
+    >>> utils.suggest_version('1.2', levels=4)
+    '1.2.0.1'
+
+If the existing number of levels is higher than the requested, we are not going to remove any:
+
+    >>> utils.suggest_version('1.2', levels=1)
+    '1.3'
+    >>> utils.suggest_version('1.2.3.4.5', levels=2)
+    '1.2.3.4.6'
+
+Some corner cases that should not break::
+
+    >>> utils.suggest_version('')
+    >>> utils.suggest_version('a.b')
+    >>> utils.suggest_version('a.1')
+    'a.2'
+
+Keep development marker when it is there, but reset any version part of that marker.
+
+    >>> utils.suggest_version('1.0.dev0')
+    '1.1.dev0'
+    >>> utils.suggest_version('1.0.dev6', levels=3)
+    '1.0.1.dev0'
+    >>> utils.suggest_version('1.0-snapshot123', dev_marker='-snapshot')
+    '1.1-snapshot'
+
+Suggest versions for a feature (minor) or breaking (major) release:
+
+    >>> utils.suggest_version('1.0', feature=True)
+    '1.1'
+    >>> utils.suggest_version('1.0.1', feature=True)
+    '1.1.0'
+    >>> utils.suggest_version('1.0.0.1', feature=True)
+    '1.1.0.0'
+    >>> utils.suggest_version('1.0', breaking=True)
+    '2.0'
+    >>> utils.suggest_version('1', feature=True)
+    '2'
+    >>> utils.suggest_version('1', breaking=True)
+    '2'
+    >>> utils.suggest_version('1', breaking=True, levels=3)
+    '2.0.0'
+    >>> utils.suggest_version('1.0.1', breaking=True)
+    '2.0.0'
+
+Prefering less levels than currently in the version number has no effect:
+
+    >>> utils.suggest_version('1.0.1', breaking=True, levels=1)
+    '2.0.0'
+
+Test with markers:
+
+    >>> utils.suggest_version('1.0.1.dev0', breaking=True)
+    '2.0.0.dev0'
+    >>> utils.suggest_version('1.0.1a1', feature=True)
+    '1.1.0'
+    >>> utils.suggest_version('1.0.1b1', breaking=True)
+    '2.0.0'
+
+If you want a feature bump on an alpha, beta, or release candidate, it gets confusing, and we give up:
+
+    >>> utils.suggest_version('1.2rc1', feature=True) is None
+    True
+
+We can prefer less zeroes:
+
+    >>> utils.suggest_version('1.2.3', feature=True, less_zeroes=True)
+    '1.3'
+    >>> utils.suggest_version('1.0.0.0.0', breaking=True, less_zeroes=True)
+    '2.0'
+    >>> utils.suggest_version('1.0.0', breaking=True, less_zeroes=True, levels=5)
+    '2.0'
+
+Without feature or breaking, less_zeroes has no effect, because it
+can only affect zeroes at the end of a version:
+
+    >>> utils.suggest_version('0.0.3', less_zeroes=False)
+    '0.0.4'
+
+Maurits thinks he prefers levels=3 and less_zeroes=True, because this
+hopefully delivers what the Plone Release Team prefers, so let's test
+this combination a bit more:
+
+    >>> utils.suggest_version('1.0', less_zeroes=True, levels=3)
+    '1.0.1'
+    >>> utils.suggest_version('1.0.1', less_zeroes=True, levels=3)
+    '1.0.2'
+    >>> utils.suggest_version('1.0.2', feature=True, less_zeroes=True, levels=3)
+    '1.1'
+    >>> utils.suggest_version('1.1', less_zeroes=True, levels=3)
+    '1.1.1'
+    >>> utils.suggest_version('1.1.1', breaking=True, less_zeroes=True, levels=3)
+    '2.0'
+    >>> utils.suggest_version('1.7.2.1', less_zeroes=True, levels=3)
+    '1.7.2.2'
+
+You can get a suggestion for a final release:
+
+    >>> utils.suggest_version('1.2.3a1', final=True)
+    '1.2.3'
+    >>> utils.suggest_version('1.2.3b2.dev1', final=True)
+    '1.2.3.dev0'
+    >>> utils.suggest_version('1.2.3rc1', final=True)
+    '1.2.3'
+    >>> utils.suggest_version('2.0rc2', final=True)
+    '2.0'
+
+If no final release is needed, you get no suggestion:
+
+    >>> utils.suggest_version('6.0.0dev0', final=True) is None
+    True
+
+
+Asking input
+------------
+
+Asking input on the prompt is not unittestable unless we use the prepared
+testing hack in utils.py:
+
+    >>> utils.TESTMODE = True
+    >>> utils.test_answer_book.set_answers([])
+
+The default is True, so hitting enter (which means no input) returns True
+
+    >>> utils.test_answer_book.set_answers([''])
+    >>> utils.ask('Does mocking work?')
+    Question: Does mocking work? (Y/n)?
+    Our reply: <ENTER>
+    True
+
+A default of False also changes the Y/n to y/N:
+
+    >>> utils.test_answer_book.set_answers([''])
+    >>> utils.ask('Does mocking work?', default=False)
+    Question: Does mocking work? (y/N)?
+    Our reply: <ENTER>
+    False
+
+A default of None requires an answer:
+
+    >>> utils.test_answer_book.set_answers(['', 'y'])
+    >>> utils.ask('Does mocking work?', default=None)
+    Question: Does mocking work? (y/n)?
+    Our reply: <ENTER>
+    Please explicitly answer y/n
+    Question: Does mocking work? (y/n)?
+    Our reply: y
+    True
+
+Y and n can be upper or lower case:
+
+    >>> utils.test_answer_book.set_answers(['y'])
+    >>> utils.ask('Does mocking work?', default=None)
+    Question: Does mocking work? (y/n)?
+    Our reply: y
+    True
+    >>> utils.test_answer_book.set_answers(['Y'])
+    >>> utils.ask('Does mocking work?', default=None)
+    Question: Does mocking work? (y/n)?
+    Our reply: Y
+    True
+    >>> utils.test_answer_book.set_answers(['n'])
+    >>> utils.ask('Does mocking work?', default=None)
+    Question: Does mocking work? (y/n)?
+    Our reply: n
+    False
+    >>> utils.test_answer_book.set_answers(['N'])
+    >>> utils.ask('Does mocking work?', default=None)
+    Question: Does mocking work? (y/n)?
+    Our reply: N
+    False
+
+Yes and no are fine:
+
+    >>> utils.test_answer_book.set_answers(['yes'])
+    >>> utils.ask('Does mocking work?', default=None)
+    Question: Does mocking work? (y/n)?
+    Our reply: yes
+    True
+    >>> utils.test_answer_book.set_answers(['no'])
+    >>> utils.ask('Does mocking work?', default=None)
+    Question: Does mocking work? (y/n)?
+    Our reply: no
+    False
+
+The y or n must be the first character, however, to prevent accidental input
+from causing mishaps:
+
+    >>> utils.test_answer_book.set_answers(['I reallY do not want it', 'n'])
+    >>> utils.ask('Does mocking work?', default=None)
+    Question: Does mocking work? (y/n)?
+    Our reply: I reallY do not want it
+    Please explicitly answer y/n
+    Question: Does mocking work? (y/n)?
+    Our reply: n
+    False
+
+You can also ask for a version number. Pass it as the default value:
+
+    >>> utils.test_answer_book.set_answers([''])
+    >>> utils.ask_version('New version', default='72.0')
+    Question: New version [72.0]:
+    Our reply: <ENTER>
+    '72.0'
+    >>> utils.test_answer_book.set_answers(['1.0', '', ''])
+    >>> utils.ask_version('New version', default='72.0')
+    Question: New version [72.0]:
+    Our reply: 1.0
+    '1.0'
+
+Note that ``y`` or ``n`` are not accepted as answer for a version
+number.  I see packages that get version ``y`` in postrelease because
+someone quickly types ``y`` everywhere without looking at the
+question.
+
+    >>> utils.test_answer_book.set_answers(['Y', 'y', 'N', 'n', ''])
+    >>> utils.ask_version('New version', default='72.0')
+    Question: New version [72.0]:
+    Our reply: Y
+    y/n not accepted as version.
+    Question: New version [72.0]:
+    Our reply: y
+    y/n not accepted as version.
+    Question: New version [72.0]:
+    Our reply: N
+    y/n not accepted as version.
+    Question: New version [72.0]:
+    Our reply: n
+    y/n not accepted as version.
+    Question: New version [72.0]:
+    Our reply: <ENTER>
+    '72.0'
+
+
+Not asking input
+----------------
+
+For running automatically, the ``--no-input`` option is available. By default
+it is off:
+
+    >>> utils.AUTO_RESPONSE
+    False
+
+We can switch it on:
+
+    >>> utils.TESTMODE = False
+    >>> utils.test_answer_book.set_answers([])
+    >>> import sys
+    >>> sys.argv[1:] = ['--no-input']
+    >>> utils.parse_options()
+    Namespace(auto_response=True, verbose=False)
+    >>> utils.AUTO_RESPONSE
+    True
+
+This way, answers aren't even asked. With a default of yes:
+
+    >>> utils.test_answer_book.set_answers([''])
+    >>> utils.ask('Does mocking work?')
+    True
+
+A default of False:
+
+    >>> utils.test_answer_book.set_answers([''])
+    >>> utils.ask('Does mocking work?', default=False)
+    False
+
+A default of None requires an answer, which means we cannot run in
+``--no-input`` mode. Return an error in this case:
+
+    >>> utils.ask('Does mocking work?', default=None)
+    Traceback (most recent call last):
+    ...
+    RuntimeError: The question 'Does...' requires a manual answer...
+
+The default for versions is accepted, too:
+
+    >>> utils.test_answer_book.set_answers([])
+    >>> utils.ask('What mocking version, my liege?', default='72')
+    '72'
+
+Reset the defaults:
+
+    >>> utils.TESTMODE = True
+    >>> utils.AUTO_RESPONSE = False
+
+
+Output filtering
+----------------
+
+Uploading to pypi returns quite some lines of output.  Only show the
+first and last few lines, though we make sure we do not print too much
+in case there are not 'enough' lines:
+
+    >>> output = "a\nb\nc\nd\ne\nf\ng\n"
+    >>> utils.show_interesting_lines(output)
+    a
+    b
+    c
+    d
+    e
+    f
+    g
+    <BLANKLINE>
+    >>> import string
+    >>> output = '\n'.join(string.ascii_lowercase)
+    >>> utils.show_interesting_lines(output)
+    Showing first few lines...
+    a
+    b
+    c
+    d
+    e
+    ...
+    Showing last few lines...
+    v
+    w
+    x
+    y
+    z
+
+Just one line: no problem:
+
+    >>> output = "just one line, no newlines"
+    >>> utils.show_interesting_lines(output)
+    just one line, no newlines
+
+In case of errors, shown in red, we show all and ask what the user
+wants to do.
+
+    >>> output = "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn"
+    >>> utils.show_interesting_lines(output)
+    Showing first few lines...
+    a
+    b
+    c
+    d
+    e
+    ...
+    Showing last few lines...
+    j
+    k
+    l
+    m
+    n
+    >>> from colorama import Fore
+    >>> output = Fore.RED + output
+    >>> utils.test_answer_book.set_answers([''])
+    >>> utils.show_interesting_lines(output)
+    Traceback (most recent call last):
+    ...
+    SystemExit: 1
+    >>> utils.test_answer_book.set_answers(['y'])
+    >>> utils.show_interesting_lines(output)
+    RED a
+    b
+    c
+    d
+    e
+    f
+    g
+    h
+    i
+    j
+    k
+    l
+    m
+    n
+    Question: There were errors or warnings. Are you sure you want to continue? (y/N)?
+    Our reply: y
+
+
+Running commands
+----------------
+
+We can run commands.
+
+    >>> print(utils.execute_command(['echo', "E.T. phone home."]))
+    E.T. phone home.
+
+We want to discover errors and show them in red.
+
+    >>> Fore.RED
+    '\x1b[31m'
+    >>> Fore.MAGENTA
+    '\x1b[35m'
+    >>> output = utils.execute_command(['ls', 'some-non-existing-file'])
+    >>> output.startswith(Fore.RED)
+    True
+
+Warnings may also end up in the error output.  That may be unwanted.
+We have a script to test this, which passes all input to std error.
+
+    >>> import os
+    >>> import zest.releaser.tests
+    >>> test_dir = os.path.dirname(zest.releaser.tests.__file__)
+    >>> script = os.path.join(test_dir, "cmd_error.py")
+
+    >>> warning = "warning: no previously-included files matching '*.pyc' found anywhere in distribution."
+    >>> result = utils.execute_command(['python', script, warning])
+    >>> result.startswith(Fore.RED)
+    False
+    >>> result.startswith(Fore.MAGENTA)
+    True
+    >>> print(result)
+    MAGENTA warning: no previously-included files matching '*.pyc' found anywhere in distribution.
+
+One similar harmless warning by distutils does not get the 'warning:'
+prefixed, so we handle it explicitly:
+
+    >>> warning = "no previously-included directories found matching devsrc"
+    >>> result = utils.execute_command(['python', script, warning])
+    >>> result.startswith(Fore.RED)
+    False
+    >>> result.startswith(Fore.MAGENTA)
+    True
+    >>> print(result)
+    MAGENTA no previously-included directories found matching devsrc
+
+Let's do a combination of a warning and an actual error:
+
+    >>> message = """
+    ... Warn: What is the answer to life, the universe and everything?
+    ...
+    ... 41"""
+    >>> result = utils.execute_command(['python', script, message])
+    >>> result
+    '\x1b[35mWarn: What is the answer to life, the universe and everything?\n\n\x1b[31m41'
+    >>> print(result)
+    MAGENTA Warn: What is the answer to life, the universe and everything?
+    <BLANKLINE>
+    RED 41
+
+
+Retrying commands
+-----------------
+
+Some commands may be retried.  For example, upload to PyPI may
+temporarily fail.  Maybe the user has set a wrong password or username
+in his .pypirc.  He can see the error, edit it (outside of the control
+of zest.releaser) and retry the command.
+
+Note that in these tests, the error output might not appear, because
+the program is exited before the output is printed.  Or it may
+appear twice, once printed and once as return value.
+
+Also, the error output of the ``ls`` command we use here, can differ
+significantly on different systems, so we do not check the exact line.
+
+The user can choose to quit:
+
+    >>> utils.test_answer_book.set_answers(['q'])
+    >>> utils.execute_command(['ls', 'some-non-existing-file'], allow_retry=True)
+    Traceback (most recent call last):
+    ...
+    zest.releaser.utils.CommandException: Command failed: 'ls some-non-existing-file'
+
+The user can choose to not retry and just continue:
+
+    >>> utils.test_answer_book.set_answers(['n'])
+    >>> result = utils.execute_command(['ls', 'some-non-existing-file'], allow_retry=True)
+    RED ...
+    RED There were errors or warnings.
+    Question: Retry this command? [Yes/no/quit/?]
+    Our reply: n
+    >>> print(result)
+    RED ...
+
+And there is the retry.  In the end you do have to choose something:
+
+    >>> utils.test_answer_book.set_answers(['y', 'y', 'n'])
+    >>> result = utils.execute_command(['ls', 'some-non-existing-file'], allow_retry=True)
+    RED ...
+    RED There were errors or warnings.
+    Question: Retry this command? [Yes/no/quit/?]
+    Our reply: y
+    RED ...
+    RED There were errors or warnings.
+    Question: Retry this command? [Yes/no/quit/?]
+    Our reply: y
+    RED ...
+    RED There were errors or warnings.
+    Question: Retry this command? [Yes/no/quit/?]
+    Our reply: n
+    >>> print(result)
+    RED ...
+    >>> utils.test_answer_book.set_answers(['y', 'y', 'q'])
+    >>> utils.execute_command(['ls', 'some-non-existing-file'], allow_retry=True)
+    Traceback (most recent call last):
+    ...
+    zest.releaser.utils.CommandException: Command failed: 'ls some-non-existing-file'
+
+
+Changelog header detection
+--------------------------
+
+Empty changelog:
+
+    >>> lines = []
+    >>> utils.extract_headings_from_history(lines)
+    []
+
+Various forms of version+date lines are recognised.  "unreleased" or a date in
+paretheses:
+
+    >>> lines = ["1.2 (unreleased)"]
+    >>> pprint(utils.extract_headings_from_history(lines))
+    [{'date': 'unreleased', 'line': 0, 'version': '1.2'}]
+    >>> lines = ["1.1 (2008-12-25)"]
+    >>> pprint(utils.extract_headings_from_history(lines))
+    [{'date': '2008-12-25', 'line': 0, 'version': '1.1'}]
+
+And dash-separated:
+
+    >>> lines = ["1.0 - 1972-12-25"]
+    >>> pprint(utils.extract_headings_from_history(lines))
+    [{'date': '1972-12-25', 'line': 0, 'version': '1.0'}]
+
+Versions with beta markers and spaces are fine:
+
+    >>> lines = ["1.4 beta - unreleased"]
+    >>> pprint(utils.extract_headings_from_history(lines))
+    [{'date': 'unreleased', 'line': 0, 'version': '1.4 beta'}]
+
+Multiple headers:
+
+    >>> lines = ["1.2 (unreleased)",
+    ...          "----------------",
+    ...          "",
+    ...          "- I did something.  [reinout]",
+    ...          "",
+    ...          "1.1 (2008-12-25)"
+    ...          "----------------",
+    ...          "",
+    ...          "- Played Herodes in church play.  [reinout]",
+    ...          ""]
+    >>> pprint(utils.extract_headings_from_history(lines))
+    [{'date': 'unreleased', 'line': 0, 'version': '1.2'},
+     {'date': '2008-12-25', 'line': 5, 'version': '1.1'}]
+
+
+Changelog list item detection
+-----------------------------
+
+Empty changelog:
+
+    >>> lines = []
+    >>> utils.get_list_item(lines)
+    '-'
+
+Stars:
+
+    >>> lines = ['- 1', '* 2', '* 3']
+    >>> utils.get_list_item(lines)
+    '*'
+
+Spaces in front:
+
+    >>> lines = ['  - 1', '  * 2', '  - 3']
+    >>> utils.get_list_item(lines)
+    '  -'
+
+
+reST headings
+-------------
+
+If a second line looks like a reST header line, fix up the length:
+
+    >>> first = 'Hey, a potential heading'
+    >>> second = '-------'
+    >>> utils.fix_rst_heading(first, second)
+    '------------------------'
+    >>> second = '=='
+    >>> utils.fix_rst_heading(first, second)
+    '========================'
+    >>> second = '``'
+    >>> utils.fix_rst_heading(first, second)
+    '````````````````````````'
+    >>> second = '~~'
+    >>> utils.fix_rst_heading(first, second)
+    '~~~~~~~~~~~~~~~~~~~~~~~~'
+
+No header line?  Just return the second line as-is:
+
+    >>> second = 'just some text'
+    >>> utils.fix_rst_heading(first, second)
+    'just some text'
+
+Empty line?  Just return it.
+
+    >>> second = ''
+    >>> utils.fix_rst_heading(first, second)
+    ''
+
+The second line must be uniform:
+
+    >>> second = '- bullet point, no header'
+    >>> utils.fix_rst_heading(first, second)
+    '- bullet point, no header'
+
+
+Safe setup.py running
+---------------------
+
+``setup_py()`` returns the ``python setup.py xyz`` command line by using
+sys.executable.
+
+    >>> cmd = utils.setup_py('cook', 'a', 'cow')
+    >>> cmd[0] = cmd[0].replace(sys.executable, 'python')  # test normalization
+    >>> print(repr(cmd))
+    ['python', 'setup.py', 'cook', 'a', 'cow']
+
+When the setup.py arguments include arguments that indicate pypi interaction,
+we refuse to work, because this should be done with twine now:
+
+    >>> print(utils.setup_py('upload'))
+    Traceback (most recent call last):
+    ...
+    SystemExit: 1
+    >>> print(utils.setup_py('register'))
+    Traceback (most recent call last):
+    ...
+    SystemExit: 1
+
+
+Data dict documentation
+-----------------------
+
+The releasers have a data dict that is passed to entry points (and used
+internally).  Because of the entry points, good documentation is necessary.
+So we can check whether all keys have attached documentation:
+
+    >>> data = {'commit_msg': 'get me some booze'}
+    >>> documentation = {'commit_msg': 'Commit message for git',
+    ...                  'target': 'Some other thingy'}
+    >>> utils.is_data_documented(data, documentation)
+    Checking data dict
+
+We print a warning when something is undocumented:
+
+    >>> data = {'version': '0.1'}
+    >>> utils.is_data_documented(data, documentation)
+    Checking data dict
+    Internal detail: key(s) ['version'] are not documented
+
+
+Formatting commands
+-------------------
+
+You should give a list or tuple as input.
+But let's see what happens with strings:
+
+    >>> print(utils.format_command(''))
+    >>> print(utils.format_command('xyz'))
+    x y z
+
+Do real strings or tuples:
+
+    >>> print(utils.format_command(['x']))
+    x
+    >>> print(utils.format_command(['x', 'y', 'zet']))
+    x y zet
+    >>> print(utils.format_command(('x', 'y', 'zet')))
+    x y zet
+
+Show some real action, and let's include non-ascii:
+
+    >>> cmd = ['git', 'tag', '1.0', '-m', '\xae registered trademark']
+    >>> print(utils.format_command(cmd))
+    git tag 1.0 -m '® registered trademark'
+
+
+Reading text files
+------------------
+
+When reading text files, reliable encoding handling is a pain. Did anyone say
+"corner cases"?
+
+On python 3 you have to watch out with bytes.
+b'example'[0] gives back an integer 101 instead of b'e'.
+101 is the number of 'e' in the ascii table.
+We needed to compensate for that so that the following example works:
+
+    >>> import os
+    >>> import tempfile
+    >>> _, example_filename = tempfile.mkstemp()
+    >>> with open(example_filename, 'wb') as f:
+    ...     _ = f.write('# -*- coding: utf-8 -*-\nblaá'.encode('utf-8'))
+    >>> lines, encoding = utils.read_text_file(example_filename)
+    >>> 'bla' in lines[1]
+    True
+    >>> encoding
+    'utf-8'
+    >>> os.remove(example_filename)  # cleanup
+
+By using `.splitlines()`, we reliably handle different lineendings now.
+A problem is that a newline at the end of the file is often desireable.
+`.splitlines()` removes that. So we have our own variant.
+
+    >>> example = "line 1\nline 2\n"
+    >>> lines = example.splitlines()
+    >>> len(lines)
+    2
+    >>> '\n'.join(lines)
+    'line 1\nline 2'
+
+The above misses the newline. Here's the correct version:
+
+    >>> lines = utils.splitlines_with_trailing(example)
+    >>> len(lines)
+    3
+    >>> '\n'.join(lines)
+    'line 1\nline 2\n'

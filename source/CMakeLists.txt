@@ -137,6 +137,7 @@ if(ANDROID)
             language-shims-headers
             ${PYTHON_LIBRARIES}
             ${CMAKE_DL_LIBS} # Contains dlopen and dlclose for dynamically loading plugins.
+            log
     )
     target_include_directories(raceSdkCommon SYSTEM PRIVATE ${PYTHON_INCLUDE_PATH})
 
@@ -160,4 +161,6 @@ endif()
 #     CHECKS all
 #     SUPPRESS unmatchedSuppression unusedFunction missingIncludeSystem useStlAlgorithm
 # )
-setup_clang_format_for_target(raceSdkCommon)
+if (NOT ANDROID)
+    setup_clang_format_for_target(raceSdkCommon)
+endif()
