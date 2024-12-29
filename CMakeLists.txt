@@ -34,9 +34,6 @@ if("${BUILD_VERSION}" STREQUAL "")
     message(FATAL_ERROR "Missing or empty BUILD_VERSION argument")
 endif()
 
-if(NOT ANDROID)
-    include(race/clang-format)
-endif()
 include(race/coverage)
 include(race/java-format)
 include(race/lint)
@@ -45,7 +42,11 @@ include(race/valgrind)
 include(race/warnings)
 
 setup_project_test_targets(raceSdkCommon UNIT INTEGRATION)
-setup_project_format_targets(raceSdkCommon)
+
+if(NOT ANDROID)
+    include(race/clang-format)
+    setup_project_format_targets(raceSdkCommon)
+endif()
 
 add_subdirectory(language-shims)
 add_subdirectory(source)
