@@ -1,13 +1,15 @@
 module twosix/race-dispatcher
 
-go 1.14
+go 1.23.1
 
 // require git.torproject.org/pluggable-transports/goptlib.git v1.2.0
 
 require (
+	git.torproject.org/pluggable-transports/goptlib.git v1.3.0
+	goptlib/goptlib v0.0.0-00010101000000-000000000000
 	race_pt3/race_pt3 v0.0.0-00010101000000-000000000000
-	twosix/core v1.1.1
 )
+require twosix/core v1.1.1 // indirect
 
 replace twosix/core => CORE_BINDINGS_GOLANG_BINARY_DIR
 replace race_pt3/race_pt3 => ../../pkg/race_pt3

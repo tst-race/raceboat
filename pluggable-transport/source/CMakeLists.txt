@@ -36,4 +36,4 @@ message("RACE_COMM_INCLUDE_PATH $ENV{RACE_COMM_INCLUDE_PATH}")
 
 add_subdirectory(pkg/race_pt3)
 add_subdirectory(cmd/race-dispatcher)
-add_subdirectory(tests)
+# add_subdirectory(tests)

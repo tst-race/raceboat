@@ -1,6 +1,6 @@
 module twosix/race_pt3
 
-go 1.14
+go 1.23.1
 
 // require git.torproject.org/pluggable-transports/goptlib.git v1.2.0
 require twosix/core v1.1.1

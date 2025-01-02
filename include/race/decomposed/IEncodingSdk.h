@@ -15,8 +15,8 @@
 // limitations under the License.
 //
 
-#ifndef __I_ENCODING_SDK_H__
-#define __I_ENCODING_SDK_H__
+#ifndef I_ENCODING_SDK_H_
+#define I_ENCODING_SDK_H_
 
 #include <vector>
 

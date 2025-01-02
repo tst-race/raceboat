@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __RACE_CHANNEL_ROLE_H_
-#define __RACE_CHANNEL_ROLE_H_
+#ifndef RACE_CHANNEL_ROLE_H
+#define RACE_CHANNEL_ROLE_H
 
 #include <string>
 #include <vector>

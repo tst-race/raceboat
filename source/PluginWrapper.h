@@ -21,7 +21,7 @@
 
 #include "Handler.h"
 #include "SdkWrapper.h"
-#include "race/unified/IRacePluginComms.h"
+#include "IRacePluginComms.h"
 
 namespace Raceboat {
 

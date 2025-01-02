@@ -18,9 +18,9 @@
 
 #include <mutex>
 
-#include "race/common/ChannelId.h"
-#include "race/common/ChannelProperties.h"
-#include "race/common/RaceHandle.h"
+#include "ChannelId.h"
+#include "ChannelProperties.h"
+#include "RaceHandle.h"
 
 namespace Raceboat {
 class Core;

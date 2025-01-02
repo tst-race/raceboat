@@ -8,15 +8,14 @@
 #include <vector>
 #include <string>
 
-#include "EncPkg.h"
+#include "constants.h"
+
 #include "ChannelProperties.h"
 #include "ChannelRole.h"
 #include "ChannelStatus.h"
 #include "ConnectionStatus.h"
 #include "ConnectionType.h"
-#include "IRacePluginComms.h"
-#include "IRaceSdkCommon.h"
-#include "IRaceSdkComms.h"
+#include "EncPkg.h"
 #include "LinkProperties.h"
 #include "LinkPropertyPair.h"
 #include "LinkPropertySet.h"
@@ -30,8 +29,25 @@
 #include "PluginConfig.h"
 #include "PluginResponse.h"
 #include "RaceEnums.h"
+#include "RaceHandle.h"
 #include "RaceLog.h"
-#include "SdkResponse.h"
+#include "SendType.h"
+#include "TransmissionType.h"
+
+#include "race/decomposed/ComponentTypes.h"
+#include "race/decomposed/IComponentBase.h"
+#include "race/decomposed/IComponentSdkBase.h"
+#include "race/decomposed/IEncodingComponent.h"
+#include "race/decomposed/IEncodingSdk.h"
+#include "race/decomposed/ITransportComponent.h"
+#include "race/decomposed/ITransportSdk.h"
+#include "race/decomposed/IUserModelComponent.h"
+#include "race/decomposed/IUserModelSdk.h"
+
+#include "race/unified/IRacePluginComms.h"
+#include "race/unified/IRaceSdkCommon.h"
+#include "race/unified/IRaceSdkComms.h"
+#include "race/unified/SdkResponse.h"
 %}
 
 // Enable cross-language polymorphism in the SWIG wrapper.

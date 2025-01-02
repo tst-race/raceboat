@@ -25,7 +25,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "../../include/race/Race.h"
+#include "Race.h"
 #include "../../include/race/unified/SdkResponse.h"
 #include "../state-machine/ApiContext.h"
 #include "../state-machine/ConduitStateMachine.h"
@@ -41,13 +41,13 @@
 #include "../state-machine/SendReceiveStateMachine.h"
 #include "../state-machine/SendStateMachine.h"
 #include "Handler.h"
-#include "race/common/ChannelProperties.h"
-#include "race/common/ConnectionStatus.h"
-#include "race/common/LinkProperties.h"
-#include "race/common/LinkStatus.h"
-#include "race/common/PackageStatus.h"
-#include "race/common/PluginResponse.h"
-#include "race/common/RaceHandle.h"
+#include "ChannelProperties.h"
+#include "ConnectionStatus.h"
+#include "LinkProperties.h"
+#include "LinkStatus.h"
+#include "PackageStatus.h"
+#include "PluginResponse.h"
+#include "RaceHandle.h"
 
 class EncPkg;
 

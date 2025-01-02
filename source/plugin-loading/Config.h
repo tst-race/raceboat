@@ -23,7 +23,7 @@
 #include "Composition.h"
 #include "FileSystem.h"
 #include "PluginDef.h"
-#include "race/common/ChannelProperties.h"
+#include "ChannelProperties.h"
 
 namespace Raceboat {
 /**

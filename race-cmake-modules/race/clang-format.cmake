@@ -19,7 +19,7 @@ include(race/local-targets)
 if (${CMAKE_HOST_SYSTEM} MATCHES "Darwin")
     find_program(CLANG_FORMAT_TOOL clang-format REQUIRED)
 else()
-    find_program(CLANG_FORMAT_TOOL clang-format-10 REQUIRED)
+    find_program(CLANG_FORMAT_TOOL clang-format-15 REQUIRED)
 endif()
 
 function(setup_clang_format_for_target TARGET_NAME)

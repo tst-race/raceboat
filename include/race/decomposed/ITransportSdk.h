@@ -15,12 +15,12 @@
 // limitations under the License.
 //
 
-#ifndef __I_TRANSPORT_SDK_H__
-#define __I_TRANSPORT_SDK_H__
+#ifndef I_TRANSPORT_SDK_H_
+#define I_TRANSPORT_SDK_H_
 
-#include "../common/ChannelProperties.h"
-#include "../common/LinkStatus.h"
-#include "../common/PackageStatus.h"
+#include "ChannelProperties.h"
+#include "LinkStatus.h"
+#include "PackageStatus.h"
 #include "ComponentTypes.h"
 #include "IComponentSdkBase.h"
 

@@ -86,9 +86,10 @@ public:
     };
 
     status2 = ApiStatus::INVALID;
-    acceptCallback = [this](ApiStatus _status, RaceHandle handle) {
+    acceptCallback = [this](ApiStatus _status, RaceHandle handle, ConduitProperties _properties) {
       status2 = _status;
       acceptHandle = handle;
+      properties = _properties;
     };
 
     status3 = ApiStatus::INVALID;
@@ -120,7 +121,7 @@ public:
 
   void
   listenCall(std::function<void(ApiStatus, LinkAddress, RaceHandle)> callback);
-  void acceptCall(std::function<void(ApiStatus, RaceHandle)> callback);
+  void acceptCall(std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback);
   void readCall(RaceHandle handle,
                 std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
   void writeCall(RaceHandle handle, std::function<void(ApiStatus)> callback);
@@ -168,13 +169,14 @@ public:
   RaceHandle destroyRecvLinkHandle;
 
   ApiStatus status1;
+  ConduitProperties properties;
   RaceHandle listenHandle;
   LinkAddress linkAddress;
   std::function<void(ApiStatus, LinkAddress, RaceHandle)> listenCallback;
 
   ApiStatus status2;
   RaceHandle acceptHandle;
-  std::function<void(ApiStatus, RaceHandle)> acceptCallback;
+  std::function<void(ApiStatus, RaceHandle, ConduitProperties)> acceptCallback;
 
   ApiStatus status3;
   std::vector<uint8_t> bytes2;
@@ -273,7 +275,7 @@ void ApiManagerListenTestFixture::listenCall(
 }
 
 void ApiManagerListenTestFixture::acceptCall(
-    std::function<void(ApiStatus, RaceHandle)> callback) {
+  std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback) {
   manager.accept(listenHandle, callback);
   manager.waitForCallbacks();
 }

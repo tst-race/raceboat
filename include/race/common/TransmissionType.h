@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __RACE_TRANSMISSION_TYPE_H_
-#define __RACE_TRANSMISSION_TYPE_H_
+#ifndef RACE_TRANSMISSION_TYPE_H
+#define RACE_TRANSMISSION_TYPE_H
 
 #include <string>
 

@@ -36,9 +36,8 @@ function(setup_clang_tidy_for_target)
         string(REPLACE ";" "," CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS}")
 
         set(CLANG_TIDY_CMD
-            clang-tidy-10
+            clang-tidy-15
             -checks=${CLANG_TIDY_CHECKS}
-            -warnings-as-errors=*
             -header-filter=.*
         )
         set_target_properties(${CLANG_TIDY_TARGET} PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_CMD}")

@@ -29,6 +29,7 @@ bool initPython(std::string pythonHome, std::string pluginPath,
     if (!pythonHome.empty()) {
       helper::logInfo(logPrefix + "Setting python home to " + pythonHome);
       std::wstring widePythonHome(pythonHome.begin(), pythonHome.end());
+      #pragma clang diagnostic ignored "-Wdeprecated-declarations"
       Py_SetPythonHome(widePythonHome.c_str());
 
       auto pythonPath = pythonHome + ":" + pythonHome + "/lib-dynload/";
