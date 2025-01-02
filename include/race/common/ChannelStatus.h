@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __RACE_CHANNEL_STATUS_H_
-#define __RACE_CHANNEL_STATUS_H_
+#ifndef RACE_CHANNEL_STATUS_H
+#define RACE_CHANNEL_STATUS_H
 
 #include <string>
 

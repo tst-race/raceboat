@@ -24,13 +24,13 @@
 #include "PluginContainer.h"
 #include "StateMachine.h"
 #include "race/Race.h"
-#include "race/common/ChannelId.h"
-#include "race/common/ChannelProperties.h"
-#include "race/common/ChannelStatus.h"
-#include "race/common/ConnectionStatus.h"
-#include "race/common/LinkProperties.h"
-#include "race/common/LinkStatus.h"
-#include "race/common/PackageStatus.h"
+#include "ChannelId.h"
+#include "ChannelProperties.h"
+#include "ChannelStatus.h"
+#include "ConnectionStatus.h"
+#include "LinkProperties.h"
+#include "LinkStatus.h"
+#include "PackageStatus.h"
 
 namespace Raceboat {
 

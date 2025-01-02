@@ -19,24 +19,6 @@
 set -e
 
 CMAKE_ARGS=""
-CORE_BINDINGS_GOLANG_BINARY_DIR=""
-
-for i in "$@"
-do
-    key="$1"
-    echo "key $1"
-    case $key in
-        -p=*)
-        CORE_BINDINGS_GOLANG_BINARY_DIR="${1#*=}"
-        shift
-        ;;
-
-        # echo "unknown argument \"$1\""
-        # exit 1
-        # ;;
-    esac
-done
-
 
 LINUX_PRESET=LINUX_x86_64
 ARCH=x86_64
@@ -46,33 +28,21 @@ then
     ARCH=arm64-v8a
 fi
 
-if [ -z "$CORE_BINDINGS_GOLANG_BINARY_DIR" ]
-then
-    DEFAULT_GOLANG_PATH="/code/build/LINUX_${ARCH}/language-shims/source/include/src/core"
-    echo "INFO: No -p argument, assuming golang install path is: ${DEFAULT_GOLANG_PATH}"
-    CMAKE_ARGS="-DCORE_BINDINGS_GOLANG_BINARY_DIR=${DEFAULT_GOLANG_PATH}"
-    # echo "ERROR: golang install path required (eg ./build.sh -p build/LINUX/language-shims/source/include/src)"
-else
-    # CMAKE_ARGS="-DCORE_BINDINGS_GOLANG_BINARY_DIR=${CORE_BINDINGS_GOLANG_BINARY_DIR} -D CMAKE_LIBRARY_PATH=/code/racesdk/package/LINUX_x86_64/lib/"
-    echo "path: $CORE_BINDINGS_GOLANG_BINARY_DIR"
-    CMAKE_ARGS="-DCORE_BINDINGS_GOLANG_BINARY_DIR="$CORE_BINDINGS_GOLANG_BINARY_DIR
-
-    echo "golang install path $CORE_BINDINGS_GOLANG_BINARY_DIR"
-fi
-
-
-cmake --preset=$LINUX_PRESET -DBUILD_VERSION="local"
+cmake --preset=$LINUX_PRESET -DBUILD_VERSION="local"  --debug-output -DCXX="clang++ -std=c++17"
 cmake --build -j --preset=$LINUX_PRESET --target install
+
 echo "Packaging ${LINUX_PRESET}"
 cmake --install build/${LINUX_PRESET}/ --component sdk --verbose
 
 if [ "$(uname -m)" == "x86_64" ]
 then
+echo "Building ANDROID x86_64"
     cmake --preset=ANDROID_x86_64 -DBUILD_VERSION="local"
     cmake --build -j --preset=ANDROID_x86_64 --target install
     echo "Packaging ANDROID_x86_64"
     cmake --install build/ANDROID_x86_64/ --component sdk --verbose
 
+echo "Building ANDROID arm64-v8a"
     cmake --preset=ANDROID_arm64-v8a -DBUILD_VERSION="local"
     cmake --build -j --preset=ANDROID_arm64-v8a --target install
     echo "Packaging ANDROID_arm64"
@@ -84,14 +54,12 @@ else
     # cmake --build -j --preset=ANDROID_arm64-v8a --target install
 fi
 
-cp -r racesdk/package/${LINUX_PRESET}/lib/* /linux/${ARCH}/lib
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/${ARCH}/lib" 
-mkdir -p /linux/${ARCH}/include/race/common
-cp -r racesdk/package/${LINUX_PRESET}/include/* /linux/${ARCH}/include/race/common/
-cp /linux/${ARCH}/include/race/common/Race.h /linux/${ARCH}/include/race/
-cp -r racesdk/package/${LINUX_PRESET}/go/* /usr/local/go/*
+# mkdir -p /usr/local/go
 
-pushd pluggable-transport
-cmake --preset=$LINUX_PRESET -DBUILD_VERSION="local" ${CMAKE_ARGS}
-cmake --build -j --preset=$LINUX_PRESET --target install 
-cp -r racesdk/package/${LINUX_PRESET}/lib/race/raceDispatcher ../racesdk/package/${LINUX_PRESET}/lib/raceDispatcher
+# cp -r racesdk/package/${LINUX_PRESET}/lib/* /linux/${ARCH}/lib
+# export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/${ARCH}/lib" 
+# mkdir -p /linux/${ARCH}/include/race/common
+# cp -r racesdk/package/${LINUX_PRESET}/include/* /linux/${ARCH}/include/race/common/
+# cp /linux/${ARCH}/include/race/common/Race.h /linux/${ARCH}/include/race/
+# cp -r racesdk/package/${LINUX_PRESET}/go/* /usr/local/go/*
+

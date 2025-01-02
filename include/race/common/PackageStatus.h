@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __RACE_PACKAGE_STATUS_H_
-#define __RACE_PACKAGE_STATUS_H_
+#ifndef RACE_PACKAGE_STATUS_H
+#define RACE_PACKAGE_STATUS_H
 
 #include <string>
 

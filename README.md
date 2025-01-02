@@ -9,20 +9,66 @@ Raceboat provides two different interfaces for censorship circumvention channels
 
 
 ## **Building**
-Raceboat uses a docker-based build process, running the below may take some time to download the compilation image. This build command also creates a `raceboat` docker image with the shared objects and executable built into it for easy testing and execution.
+Raceboat uses a docker-based build process, running the below may take some time to download the compilation image. This build command also creates a `raceboat` runtumie docker image with the shared objects and executable built into it for easy testing and execution. **These are all built in GitHub CI and available from the `ghcr.io/tst-race/raceboat` namespace.
+
+- `ghcr.io/tst-race/raceboat/raceboat-builder:main`: an image for building the raceboat framework itself (i.e. the code in this repository)
+
+- `ghcr.io/tst-race/raceboat/raceboat-compile:main`: extension of the raceboat-builder with prebuilt framework binaries, used to compile plugins that provide channels or components for raceboat to use.
+
+- `ghcr.io/tst-race/raceboat/raceboat:main`: runtime image which contains both prebuilt framework binaries and runtime dependencies.
+
+Use the following commands to build a local set of x86_64 images:
 
 ```bash
+pushd raceboat-builder-image && \
+./build_image.sh -n ghcr.io/tst-race/raceboat --platform-x86_64 && \
+popd && \
 docker run -it --rm --name=build-pt \
        -e MAKEFLAGS="-j" \
        -v $(pwd)/:/code/ \
        -w /code \
-       ghcr.io/tst-race/race-images/race-compile:main \
-       ./build.sh && docker-image/build_image.sh
+       raceboat-builder:latest \
+       ./build.sh && \
+pushd raceboat-compile-image && \
+./build_image.sh -n ghcr.io/tst-race/raceboat --platform-x86_64 && \
+popd && \
+pushd runtime-image && \
+./build_image.sh -n ghcr.io/tst-race/raceboat --platform-x86_64 && \
+popd
+```
+
+To build an aarch64 raceboat image locally:
+
+```bash
+./raceboat-builder-image/build_image.sh --platform-arm64
+./raceboat-compile-image/build_image.sh --platform-arm64
+docker run  -it --rm  -v $(pwd):/code/ -w /code raceboat-builder:latest bash 
+rm -fr build 
+export MAKEFLAGS="-j" 
+./build_it_all.sh 
+./create-package.sh --linux-arm64
+exit
+./docker-image/build_image.sh --platform-arm64
+```
+
+(Some) host dependencies:
+- golang v1.23.1 (change in build files if another version is preferred)
+
+## **Building Plugins**
+
+Users can compile plugins/channels with the resulting raceboat-compile:<tag>.  For example:
+
+```bash
+cd ../race-obfs
+rm -fr build
+rm -fr kit
+./build_artifacts_in_docker_image.sh -l -v latest
+cp -fr kit/artifacts/linux-<arch>-server/PluginObfs ../raceboat/kits
 ```
 
 ## **Running**
 
-The following commands run the different Raceboat modes using a simple TCP socket called `twoSixDirectCpp` provided by `PluginCommsTwoSixStub` and assumes you have downloaded or built that plugin and placed it in a `kits` directory that is volume-mounted into the docker container (this is the easiest development process for testing your own plugins/channels). _You can get a copy of some prebuilt kits for both arm64-v8a and x86_64 processors [here](https://github.com/tst-race/raceboat/releases/download/pets24/kits.tgz).
+The following commands run the different Raceboat modes using a simple TCP socket called `twoSixDirectCpp` provided by `PluginCommsTwoSixStub` and assumes you have downloaded or built that plugin and placed it in a `kits` directory that is volume-mounted into the docker container (this is the easiest development process for testing your own plugins/channels). _You can get a copy of some prebuilt kits for both arm64-v8a and x86_64 processors [here](https://github.com/tst-race/raceboat/releases/download/pets24/kits.tgz).  Download the prebuilt kits, extract the compressed folder, then copy the contents of the architecture specific files to ./kits (e.g ./kits/PluginCommsTwoSixStub).  
 
 In each case, you need to run two raceboat instances, we conventionally refer to these as a "client" and a "server"; generally the server should be started first (this isn't _necessary_ for some channels, but _is_ necessary when using a direct IP connection like `twoSixDirectCpp`). 
 
@@ -40,8 +86,8 @@ This is a unidirectional single-message push from the client to the server.
 docker run --rm -it --name=rbserver \
        --network=raceboat-network \
        --ip=10.11.1.3 \
-       -v $(pwd)/../kits:/server-kits \
-       ghcr.io/tst-race/raceboat/raceboat:latest bash -c \
+       -v $(pwd)/kits:/server-kits \
+       raceboat:latest bash -c \
        'race-cli -m --recv --quiet \
        --dir /server-kits \
        --recv-channel=twoSixDirectCpp \
@@ -58,8 +104,8 @@ __NOTE__: This outputs a line `Listening on {"hostname":"10.11.1.3","port":26262
 docker run --rm -it --name=rbclient \
        --network=raceboat-network \
        --ip=10.11.1.4 \
-       -v $(pwd)/../kits:/client-kits -v $(pwd):/code -w /code \
-       ghcr.io/tst-race/raceboat/raceboat:latest bash -c \
+       -v $(pwd)/kits:/client-kits -v $(pwd):/code -w /code \
+       raceboat:latest bash -c \
        'echo "Raceboat Client says Hello " \
        | race-cli -m --send --quiet \
        --dir /client-kits \
@@ -83,8 +129,8 @@ There is a "fork" of the race-cli called `bridge-distro` which demonstrates adap
 docker run --rm -it --name=rbserver \
        --network=raceboat-network \
        --ip=10.11.1.3 \
-       -v $(pwd)/../kits:/server-kits \
-       ghcr.io/tst-race/raceboat/raceboat:latest bash -c \
+       -v $(pwd)/kits:/server-kits \
+       raceboat:latest bash -c \
        'echo "Welcome, I am the Raceboat Server" \
        | race-cli -m --recv-reply --quiet \
        --dir /server-kits \
@@ -100,8 +146,8 @@ docker run --rm -it --name=rbserver \
 docker run --rm -it --name=rbclient \
        --network=raceboat-network \
        --ip=10.11.1.4 \
-       -v $(pwd)/../kits:/client-kits \
-       ghcr.io/tst-race/raceboat/raceboat:latest bash -c \
+       -v $(pwd)/kits:/client-kits \
+       raceboat:latest bash -c \
        'echo "Raceboat Client says Hello " \
        | race-cli -m --send-recv --quiet \
        --dir /client-kits \
@@ -127,8 +173,8 @@ For exemplary purposes, we use `netcat` as the server application.
 docker run --rm --name=rbserver -d \
        --network=raceboat-network \
        --ip=10.11.1.3 \
-       -v $(pwd)/../kits:/server-kits \
-       ghcr.io/tst-race/raceboat/raceboat:latest bash -c \
+       -v $(pwd)/kits:/server-kits \
+       raceboat:latest bash -c \
        'race-cli -m --server-bootstrap-connect --quiet \
        --dir /server-kits \
        --recv-channel=twoSixDirectCpp \
@@ -148,8 +194,8 @@ docker exec -it rbserver bash -c 'nc -l localhost 7777'
 docker run --rm -it --name=rbclient -d \
        --network=raceboat-network \
        --ip=10.11.1.4 \
-       -v $(pwd)/../kits:/client-kits \
-       ghcr.io/tst-race/raceboat/raceboat:latest bash -c \
+       -v $(pwd)/kits:/client-kits \
+       raceboat:latest bash -c \
        'race-cli -m --client-bootstrap-connect --quiet \
        --dir /client-kits \
        --recv-channel=twoSixDirectCpp \
@@ -174,9 +220,9 @@ One of the motivating use-cases for Raceboat is for bridge distribution. We have
 docker run --rm -it --name=rbserver \
        --network=raceboat-network \
        --ip=10.11.1.3 \
-       -v $(pwd)/../kits:/server-kits \
+       -v $(pwd)/kits:/server-kits \
        -v $(pwd)/scripts:/scripts \
-       ghcr.io/tst-race/raceboat/raceboat:latest bash -c \
+       raceboat:latest bash -c \
        'echo "Welcome, I am the Raceboat Server" \
        | bridge-distro --quiet \
        --passphrase bridge-please \
@@ -195,8 +241,8 @@ docker run --rm -it --name=rbserver \
 docker run --rm -it --name=rbclient \
        --network=raceboat-network \
        --ip=10.11.1.4 \
-       -v $(pwd)/../kits:/client-kits \
-       ghcr.io/tst-race/raceboat/raceboat:latest bash -c \
+       -v $(pwd)/kits:/client-kits \
+       raceboat:latest bash -c \
        'echo "bridge-please" \
        | race-cli -m --send-recv --quiet \
        --dir /client-kits \

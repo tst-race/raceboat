@@ -20,9 +20,10 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <optional>
 
-#include "common/ChannelId.h"
-#include "common/RaceHandle.h"
+#include "ChannelId.h"
+#include "RaceHandle.h"
 
 namespace Raceboat {
 

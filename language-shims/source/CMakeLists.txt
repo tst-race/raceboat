@@ -32,7 +32,7 @@ if(ANDROID)
     set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--warn-unresolved-symbols ${CMAKE_SHARED_LINKER_FLAGS}")
 endif()
 
-find_package(PythonLibs 3.7 EXACT REQUIRED)
+find_package(PythonLibs 3 REQUIRED)
 
 set(CMAKE_SWIG_FLAGS "-DSWIGWORDSIZE64")
 set(SWIG_COMPILE_FLAGS "${SWIG_COMPILE_FLAGS} -DSWIG_TYPE_TABLE=RaceSdk")

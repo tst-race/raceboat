@@ -67,9 +67,10 @@ public:
     linkProps.linkType = LT_BIDI;
 
     status1 = ApiStatus::INVALID;
-    dialCallback = [this](ApiStatus _status, RaceHandle _handle) {
+    dialCallback = [this](ApiStatus _status, RaceHandle _handle, ConduitProperties _properties) {
       status1 = _status;
       dialHandle = _handle;
+      properties = _properties;
     };
 
     status2 = ApiStatus::INVALID;
@@ -99,7 +100,7 @@ public:
   void expectCloseConnection(RaceHandle &handle, ConnectionID thisConnId);
   void expectDestroyLink(RaceHandle &handle, LinkID thisLinkId);
 
-  void dialCall(std::function<void(ApiStatus, RaceHandle)> callback,
+  void dialCall(std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback,
                 std::string send_address = "");
   void readCall(RaceHandle handle,
                 std::function<void(ApiStatus, std::vector<uint8_t>)> callback);
@@ -147,7 +148,8 @@ public:
 
   ApiStatus status1;
   RaceHandle dialHandle;
-  std::function<void(ApiStatus, RaceHandle)> dialCallback;
+  ConduitProperties properties;
+  std::function<void(ApiStatus, RaceHandle, ConduitProperties)> dialCallback;
 
   ApiStatus status2;
   std::vector<uint8_t> bytes2;
@@ -241,7 +243,7 @@ void ApiManagerDialTestFixture::expectDestroyLink(RaceHandle &handle,
 }
 
 void ApiManagerDialTestFixture::dialCall(
-    std::function<void(ApiStatus, RaceHandle)> callback,
+    std::function<void(ApiStatus, RaceHandle, ConduitProperties)> callback,
     std::string send_address) {
   SendOptions sendOptionsCopy = sendOptions;
   sendOptionsCopy.send_address =

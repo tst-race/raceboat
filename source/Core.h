@@ -17,16 +17,16 @@
 #pragma once
 
 #include "UserInput.h"
-#include "api-managers/ApiManager.h"
-#include "api-managers/ChannelManager.h"
-#include "plugin-loading/Config.h"
-#include "plugin-loading/PluginLoader.h"
-#include "race/Race.h"
-#include "race/common/ConnectionStatus.h"
-#include "race/common/LinkStatus.h"
-#include "race/common/PackageStatus.h"
-#include "race/common/PluginResponse.h"
-#include "race/common/RaceHandle.h"
+#include "ApiManager.h"
+#include "ChannelManager.h"
+#include "Config.h"
+#include "PluginLoader.h"
+#include "Race.h"
+#include "ConnectionStatus.h"
+#include "LinkStatus.h"
+#include "PackageStatus.h"
+#include "PluginResponse.h"
+#include "RaceHandle.h"
 
 class EncPkg;
 

@@ -89,19 +89,35 @@ add_library(raceSdkCommon SHARED
     UserInput.cpp
 )
 
-#Add the headers to the shared library
+#Add public headers to the shared library
 file(GLOB_RECURSE COMM_LIB_PUBLIC_HEADERS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
 )
 
+
+
 set_target_properties(raceSdkCommon PROPERTIES
-    PUBLIC_HEADER "${COMM_LIB_PUBLIC_HEADERS}"
+    PUBLIC_HEADER "${COMM_LIB_PUBLIC_HEADERS}"  
 )
+
+# BUILD_INTERFACE and INSTALL_INTERFACE used to specify different include paths that are relevant to your project in different build contexts
+# - BUILD_INTERFACE - Specifies properties that should be used when building the project in the build tree
+# - INSTALL_INTERFACE - Specifies properties that should be used when the project is installed (built and copied to installation dir for use by other projects)
 target_include_directories(raceSdkCommon PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race/common>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race/decomposed>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race/unified>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
+    PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/api-managers>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/decomposed>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/plugin-loading>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/state-machine>
 )
+
 
 file(GLOB_RECURSE COMM_LIB_PRIVATE_HEADERS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.h

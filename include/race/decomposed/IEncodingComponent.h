@@ -15,11 +15,11 @@
 // limitations under the License.
 //
 
-#ifndef __I_ENCODING_COMPONENT_H__
-#define __I_ENCODING_COMPONENT_H__
+#ifndef I_ENCODING_COMPONENT_H_
+#define I_ENCODING_COMPONENT_H_
 
-#include "../common/PluginConfig.h"
-#include "../common/RacePluginExports.h"
+#include "PluginConfig.h"
+#include "RacePluginExports.h"
 #include "ComponentTypes.h"
 #include "IComponentBase.h"
 #include "IEncodingSdk.h"

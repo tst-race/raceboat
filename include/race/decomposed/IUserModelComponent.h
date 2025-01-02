@@ -15,11 +15,11 @@
 // limitations under the License.
 //
 
-#ifndef __I_USER_MODEL_COMPONENT_H__
-#define __I_USER_MODEL_COMPONENT_H__
+#ifndef I_USER_MODEL_COMPONENT_H_
+#define I_USER_MODEL_COMPONENT_H_
 
-#include "../common/PluginConfig.h"
-#include "../common/RacePluginExports.h"
+#include "PluginConfig.h"
+#include "RacePluginExports.h"
 #include "ComponentTypes.h"
 #include "IUserModelSdk.h"
 

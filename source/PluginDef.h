@@ -21,7 +21,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "race/common/RaceEnums.h"
+#include "RaceEnums.h"
 
 namespace Raceboat {
 

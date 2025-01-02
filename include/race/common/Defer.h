@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __RACE_DEFER_H__
-#define __RACE_DEFER_H__
+#ifndef RACE_DEFER_H
+#define RACE_DEFER_H
 
 #include <utility> // std::move
 

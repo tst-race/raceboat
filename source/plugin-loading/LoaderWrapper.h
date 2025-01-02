@@ -26,7 +26,7 @@
 #include "PluginWrapper.h"
 #include "SdkWrapper.h"
 #include "helper.h"
-#include "race/common/RacePluginExports.h"
+#include "RacePluginExports.h"
 
 namespace Raceboat {
 

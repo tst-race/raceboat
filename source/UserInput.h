@@ -18,7 +18,7 @@
 
 #include <unordered_map>
 
-#include "race/Race.h"
+#include "Race.h"
 
 namespace Raceboat {
 

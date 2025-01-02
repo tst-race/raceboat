@@ -22,7 +22,7 @@
 #include "MockPluginWrapper.h"
 #include "MockApiManager.h"
 #include "MockUserInput.h"
-#include "race/common/EncPkg.h"
+#include "EncPkg.h"
 #include "gmock/gmock.h"
 
 namespace Raceboat {

@@ -15,8 +15,8 @@
 // limitations under the License.
 //
 
-#ifndef __I_COMPONENT_SDK_BASE_H__
-#define __I_COMPONENT_SDK_BASE_H__
+#ifndef I_COMPONENT_SDK_BASE_H_
+#define I_COMPONENT_SDK_BASE_H_
 
 #include "IComponentBase.h"
 

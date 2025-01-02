@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __CHANNEL_PROPERTIES_H_
-#define __CHANNEL_PROPERTIES_H_
+#ifndef CHANNEL_PROPERTIES_H
+#define CHANNEL_PROPERTIES_H
 
 #include <cstdint>
 #include <nlohmann/json.hpp>

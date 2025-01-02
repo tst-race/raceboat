@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __RACE_LOG_H_
-#define __RACE_LOG_H_
+#ifndef RACE_LOG_H
+#define RACE_LOG_H
 
 #include <iomanip>
 #include <ios>

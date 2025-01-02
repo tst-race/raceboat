@@ -18,7 +18,7 @@
 
 #include "Composition.h"
 #include "PluginContainer.h"
-#include "race/common/ChannelId.h"
+#include "ChannelId.h"
 
 namespace Raceboat {
 

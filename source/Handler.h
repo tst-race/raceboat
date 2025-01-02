@@ -26,9 +26,10 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <optional>
 
 #include "helper.h"
-#include "race/common/constants.h"
+#include "constants.h"
 
 namespace Raceboat {
 

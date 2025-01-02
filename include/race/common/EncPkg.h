@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __ENC_PKG_
-#define __ENC_PKG_
+#ifndef ENC_PKG
+#define ENC_PKG
 
 #include <cstdint>
 #include <string>

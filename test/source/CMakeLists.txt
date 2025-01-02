@@ -57,11 +57,17 @@ target_compile_definitions(testStandaloneLibrary
     PUBLIC DECOMPOSED_IMPLEMENTATION="$<TARGET_FILE:DecomposedTestTransportImplementation>"
 )
 
+message("CMAKE_CURRENT_SOURCE_DIR " ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(testStandaloneLibrary PRIVATE
+    $<BUILD_INTERFACE:/code/include/race/common/>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../common>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include/race>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../source>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../common>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race/common>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race/decomposed>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race/unified>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../source/api-managers>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../source/plugin-loading>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
     )

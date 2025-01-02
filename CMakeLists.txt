@@ -23,14 +23,17 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/race-cmake-modules)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Debug)
 
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "v")
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON) #Optional
+
 set(BUILD_VERSION "" CACHE STRING "Version of the SDK being built")
 if("${BUILD_VERSION}" STREQUAL "")
     message(FATAL_ERROR "Missing or empty BUILD_VERSION argument")
 endif()
 
-if(NOT ANDROID)
-    include(race/clang-format)
-endif()
 include(race/coverage)
 include(race/java-format)
 include(race/lint)
@@ -38,8 +41,12 @@ include(race/test-targets)
 include(race/valgrind)
 include(race/warnings)
 
-# setup_project_test_targets(raceSdkCommon UNIT INTEGRATION)
-# setup_project_format_targets(raceSdkCommon)
+setup_project_test_targets(raceSdkCommon UNIT INTEGRATION)
+
+if(NOT ANDROID)
+    include(race/clang-format)
+    setup_project_format_targets(raceSdkCommon)
+endif()
 
 add_subdirectory(language-shims)
 add_subdirectory(source)
@@ -50,6 +57,12 @@ if(NOT ANDROID)
     add_subdirectory(test/common/DecomposedTestStub EXCLUDE_FROM_ALL)
     add_subdirectory(test/common/plugins/DecomposedTestImplementation EXCLUDE_FROM_ALL)
     add_subdirectory(test/source EXCLUDE_FROM_ALL)
+    install(
+        TARGETS
+                race-cli
+                bridge-distro
+        RUNTIME DESTINATION app
+    )
 else()
     add_subdirectory(android/app/src/main/cpp)
 endif()
@@ -61,6 +74,7 @@ install(
     TARGETS
         raceSdkCommon
     EXPORT raceSdkCommon
+    RUNTIME DESTINATION app
     LIBRARY DESTINATION lib
     PUBLIC_HEADER DESTINATION include
 )

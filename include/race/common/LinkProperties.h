@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-#ifndef __LINK_PROPERTIES_H_
-#define __LINK_PROPERTIES_H_
+#ifndef LINK_PROPERTIES_H
+#define LINK_PROPERTIES_H
 
 #include <cstdint>
 #include <string>

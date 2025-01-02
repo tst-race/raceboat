@@ -25,7 +25,7 @@
 #include "Composition.h"
 #include "SdkWrappers.h"
 #include "plugin-loading/ComponentPlugin.h"
-#include "race/common/PluginResponse.h"
+#include "PluginResponse.h"
 
 namespace Raceboat {
 

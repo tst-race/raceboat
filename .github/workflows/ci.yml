@@ -9,87 +9,238 @@ on:
 
 permissions:
   contents: write
-  packages: read
+  packages: write
 
 jobs:
-  build:
+  builder-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: 'arm64,arm'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ghcr.io/${{ github.repository }}/raceboat-builder
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{raw}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+
+      - name: Configure Docker Caching
+        id: cache
+        uses: int128/docker-build-cache-config-action@v1
+        with:
+          image: ghcr.io/${{ github.repository }}/raceboat-builder/cache
+
+      - name: Build and Push raceboat-builder Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: raceboat-builder-image
+          file: raceboat-builder-image/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: ${{ steps.cache.outputs.cache-from }}
+          cache-to: ${{ steps.cache.outputs.cache-to }}
+
+  build-framework:
+    needs: [builder-image]
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/tst-race/race-images/race-compile:main
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      image: ghcr.io/tst-race/raceboat/raceboat-builder:${{ github.head_ref || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
       - name: Build
-        run: ./build_it_all.sh
-
-      - name: Build-pt
-        run: ./pluggable-transport/build.sh -p=build/LINUX_x86_64/language-shims/source/include/src/core
+        run: ./build.sh
 
       - name: Create Build Artifact
-        # NOTE: _commsPluginBindings.so not in racesdk/package/
-        run: "tar cvf ${{ github.event.repository.name }}.tar.gz -C racesdk/package/ ."
+        run: "tar cvf ${{ github.event.repository.name }}.tar.gz -C /__w/raceboat/raceboat/ ./racesdk"
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: "${{ github.event.repository.name }}-linux-x86_64.tar.gz"
-          path: "${{ github.event.repository.name }}-linux-x86_64.tar.gz"
+          name: "${{ github.event.repository.name }}.tar.gz"
+          path: "${{ github.event.repository.name }}.tar.gz"
           retention-days: 10
 
-  # todo base these on the raceboat image
-  test-unit:
-    # needs: build
+  compile-image:
+    needs: [build-framework]
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/tst-race/race-images/race-compile:main
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - name: unit test
-        uses: actions/checkout@v3
-
-      - name: Build and Run Unit Tests
-        # shuffle the order of the tests to potentially uncover weirdness
-        # note that you can reproduce the test results by finding the seed in the log output and
-        # setting the environment variable GTEST_RANDOM_SEED to that value.
-        env:
-          GTEST_SHUFFLE: 1
-        run: |
-          ./build_it_all.sh
-          cmake --build --preset=LINUX_x86_64 --target run_tests -j
-  test-coverage:
-    # needs: build
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/tst-race/race-images/race-compile:main
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Build and Run Unit Tests
-        # shuffle the order of the tests to potentially uncover weirdness
-        # note that you can reproduce the test results by finding the seed in the log output and
-        # setting the environment variable GTEST_RANDOM_SEED to that value.
-        env:
-          GTEST_SHUFFLE: 1
-        run: |
-          cmake --preset=coverage
-          cmake --build --preset=coverage --target coverage
-  test-format:
-    # needs: build
+      - name: Download Framework Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: "${{ github.event.repository.name }}.tar.gz"
+
+      - name: debug ls
+        run: ls -R .
+
+      - name: untar 
+        run: tar xf ${{ github.event.repository.name }}.tar.gz
+
+      - name: debug ls
+        run: ls -R racesdk
+
+      - name: debu pwdg
+        run: pwd
+
+      - name: env
+        run: env
+ 
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: 'arm64,arm'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ghcr.io/${{ github.repository }}/raceboat-compile
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{raw}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+
+      - name: Configure Docker Caching
+        id: cache
+        uses: int128/docker-build-cache-config-action@v1
+        with:
+          image: ghcr.io/${{ github.repository }}/raceboat-compile/cache
+
+      - name: Build and Push raceboat-compile Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: /home/runner/work/raceboat/raceboat
+          file: raceboat-compile-image/Dockerfile
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: ${{ steps.cache.outputs.cache-from }}
+          cache-to: ${{ steps.cache.outputs.cache-to }}
+
+  run-tests:
+    needs: [compile-image]
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/tst-race/race-images/race-compile:main
+      image: ghcr.io/tst-race/raceboat/raceboat-compile:${{ github.head_ref || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Check Format
-        run: |
-          ./build_it_all.sh
-          cmake --build --preset=LINUX_x86_64 --target check_format -j
+      - name: Test
+        run: ./test.sh
+
+  runtime-image:
+    needs: [compile-image]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Download Framework Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: "${{ github.event.repository.name }}.tar.gz"
+
+      - name: debug ls
+        run: ls -R .
+
+      - name: untar 
+        run: tar xf ${{ github.event.repository.name }}.tar.gz
+
+      - name: debug ls
+        run: ls -R racesdk
+
+      - name: debu pwdg
+        run: pwd
+
+      - name: env
+        run: env
+ 
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: 'arm64,arm'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ghcr.io/${{ github.repository }}/raceboat-runtime
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{raw}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+
+      - name: Configure Docker Caching
+        id: cache
+        uses: int128/docker-build-cache-config-action@v1
+        with:
+          image: ghcr.io/${{ github.repository }}/raceboat-runtime/cache
+
+      - name: Build and Push raceboat-runtime Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: /home/runner/work/raceboat/raceboat
+          file: raceboat-runtime-image/Dockerfile
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: ${{ steps.cache.outputs.cache-from }}
+          cache-to: ${{ steps.cache.outputs.cache-to }}
+          build-contexts: ghcr.io/tst-race/raceboat/raceboat-compile=docker-image://ghcr.io/tst-race/raceboat/raceboat-compile:${{ steps.meta.outputs.version }}

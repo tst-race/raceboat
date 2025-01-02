@@ -17,7 +17,7 @@
 #pragma once
 #include <memory.h>
 
-#include "race/common/PluginConfig.h"
+#include "PluginConfig.h"
 #include "race/decomposed/IEncodingComponent.h"
 #include "race/decomposed/ITransportComponent.h"
 #include "race/decomposed/IUserModelComponent.h"
