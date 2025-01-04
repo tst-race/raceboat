@@ -6,9 +6,10 @@
 %{
 #include <iostream>
 #include <vector>
+#include <unordered_map>
 #include <string>
 
-#include "constants.h"
+#include <constants.h>
 
 #include "ChannelProperties.h"
 #include "ChannelRole.h"
@@ -23,8 +24,6 @@
 #include "LinkType.h"
 #include "PackageStatus.h"
 #include "PackageType.h"
-#include "SendType.h"
-#include "TransmissionType.h"
 #include "PackageStatus.h"
 #include "PluginConfig.h"
 #include "PluginResponse.h"
@@ -34,20 +33,10 @@
 #include "SendType.h"
 #include "TransmissionType.h"
 
-#include "race/decomposed/ComponentTypes.h"
-#include "race/decomposed/IComponentBase.h"
-#include "race/decomposed/IComponentSdkBase.h"
-#include "race/decomposed/IEncodingComponent.h"
-#include "race/decomposed/IEncodingSdk.h"
-#include "race/decomposed/ITransportComponent.h"
-#include "race/decomposed/ITransportSdk.h"
-#include "race/decomposed/IUserModelComponent.h"
-#include "race/decomposed/IUserModelSdk.h"
-
-#include "race/unified/IRacePluginComms.h"
-#include "race/unified/IRaceSdkCommon.h"
-#include "race/unified/IRaceSdkComms.h"
-#include "race/unified/SdkResponse.h"
+#include "IRacePluginComms.h"
+#include "IRaceSdkCommon.h"
+#include "IRaceSdkComms.h"
+#include "SdkResponse.h"
 %}
 
 // Enable cross-language polymorphism in the SWIG wrapper.
@@ -74,17 +63,15 @@
 //   }
 // }
 
-%include "RaceExport.h"
+%include "constants.h"
 
-%include "EncPkg.h"
+
 %include "ChannelProperties.h"
 %include "ChannelRole.h"
 %include "ChannelStatus.h"
 %include "ConnectionStatus.h"
 %include "ConnectionType.h"
-%include "IRacePluginComms.h"
-%include "IRaceSdkCommon.h"
-%include "IRaceSdkComms.h"
+%include "EncPkg.h"
 %include "LinkProperties.h"
 %include "LinkPropertyPair.h"
 %include "LinkPropertySet.h"
@@ -92,11 +79,19 @@
 %include "LinkType.h"
 %include "PackageStatus.h"
 %include "PackageType.h"
-%include "SendType.h"
-%include "TransmissionType.h"
 %include "PackageStatus.h"
 %include "PluginConfig.h"
 %include "PluginResponse.h"
 %include "RaceEnums.h"
+%include "RaceExport.h"
+%include "RaceHandle.h"
 %include "RaceLog.h"
+%include "SendType.h"
+%include "TransmissionType.h"
+
+%include "IRacePluginComms.h"
+%include "IRaceSdkCommon.h"
+%include "IRaceSdkComms.h"
 %include "SdkResponse.h"
+
+typedef uint64_t RaceHandle;
