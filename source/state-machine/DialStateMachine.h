@@ -28,7 +28,9 @@ public:
   virtual void
   updateDial(const SendOptions &sendOptions, std::vector<uint8_t> &&data,
              std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) override;
-
+  virtual void
+  updateConnStateMachineLinkEstablished(RaceHandle contextHandle, LinkID linkId,
+                                  std::string linkAddress) override;
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
                                   std::string linkAddress) override;
