@@ -240,11 +240,6 @@ class AcceptObject {
 public:
   AcceptObject(std::shared_ptr<Core> core, OpHandle handle);
   AcceptObject() {}
-  AcceptObject(const AcceptObject &that) noexcept {
-    core = that.core;
-    handle = that.handle;
-  }
-
   std::pair<ApiStatus, Conduit> accept();
 
 private:
