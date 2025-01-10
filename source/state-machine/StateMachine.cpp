@@ -199,7 +199,8 @@ bool StateEngine::stateHandlesEvent(StateType stateId, EventType eventId) {
       success = true;
     } else {
       helper::logDebug(logPrefix + " event " + eventToString(eventId) +
-                       " not registered for state " + stateToString(stateId));
+                       " not registered for state " + stateToString(stateId) + ". Continuing without executing a transition.");
+      success = true;
     }
   }
   return success;

@@ -29,9 +29,12 @@ public:
       const SendOptions &sendOptions, std::vector<uint8_t> &&data,
       std::function<void(ApiStatus, std::vector<uint8_t>)> cb) override;
   virtual void
-  updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
+  updateConnStateMachineLinkEstablished(RaceHandle contextHandle, LinkID linkId,
                                   std::string linkAddress) override;
   virtual void
+  updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
+                                  std::string linkAddress) override;
+ virtual void
   updateReceiveEncPkg(ConnectionID connId,
                       std::shared_ptr<std::vector<uint8_t>> data) override;
 

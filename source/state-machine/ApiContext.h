@@ -109,6 +109,9 @@ public:
   virtual void updateStateMachineFinished(RaceHandle /* contextHandle */){};
   virtual void updateDependent(RaceHandle /* contextHandle */){};
   virtual void updateDetach(RaceHandle /* contextHandle */){};
+  virtual void updateConnStateMachineLinkEstablished(RaceHandle /* contextHandle */,
+                                               LinkID /* linkId */,
+                                               std::string /* linkAddress */){};
   virtual void updateConnStateMachineConnected(RaceHandle /* contextHandle */,
                                                ConnectionID /* connId */,
                                                std::string /* linkAddress */){};

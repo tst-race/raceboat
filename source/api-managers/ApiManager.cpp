@@ -301,6 +301,15 @@ SdkResponse ApiManager::onConnectionStatusChanged(
               connId, status, properties);
 }
 
+SdkResponse ApiManager::onConnStateMachineLinkEstablished(RaceHandle contextHandle,
+                                                          LinkID linkId,
+                                                          std::string linkAddress,
+                                                          std::string channelId) {
+  TRACE_METHOD();
+  return post(logPrefix, &ApiManagerInternal::onConnStateMachineLinkEstablished,
+              contextHandle, linkId, linkAddress, channelId);
+}
+
 SdkResponse ApiManager::onConnStateMachineConnected(RaceHandle contextHandle,
                                                     ConnectionID connId,
                                                     std::string linkAddress,
@@ -690,6 +699,14 @@ void ApiManagerInternal::stateMachineFinished(ApiContext &context) {
   manager.onStateMachineFinished(contextHandle);
 }
 
+void ApiManagerInternal::connStateMachineLinkEstablished(RaceHandle contextHandle,
+                                                   LinkID linkId,
+                                                   std::string linkAddress,
+                                                   std::string channelId) {
+  TRACE_METHOD(contextHandle, linkId, linkAddress, channelId);
+  manager.onConnStateMachineLinkEstablished(contextHandle, linkId, linkAddress, channelId);
+}
+
 void ApiManagerInternal::connStateMachineConnected(RaceHandle contextHandle,
                                                    ConnectionID connId,
                                                    std::string linkAddress,
@@ -733,6 +750,21 @@ void ApiManagerInternal::onStateMachineFinished(uint64_t postId,
   for (auto triggeredContext : contexts) {
     triggeredContext->updateStateMachineFinished(contextHandle);
     triggerEvent(*triggeredContext, EVENT_STATE_MACHINE_FINISHED);
+  }
+}
+
+void ApiManagerInternal::onConnStateMachineLinkEstablished(uint64_t postId,
+                                                     RaceHandle contextHandle,
+                                                     LinkID linkId,
+                                                     std::string linkAddress,
+                                                     std::string channelId) {
+  TRACE_METHOD(postId, contextHandle, linkId, linkAddress, channelId);
+
+  auto contexts = getContexts(contextHandle);
+  for (auto context : contexts) {
+    context->updateConnStateMachineLinkEstablished(contextHandle, linkId,
+                                             linkAddress);
+    triggerEvent(*context, EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED);
   }
 }
 
