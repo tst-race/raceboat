@@ -23,7 +23,7 @@ namespace Raceboat {
 class ApiDialContext : public ApiContext {
 public:
   ApiDialContext(ApiManagerInternal &manager, StateEngine &engine)
-      : ApiContext(manager, engine) {}
+    : ApiContext(manager, engine), sendConnSMHandle(0), recvConnSMHandle(0) {}
 
   virtual void
   updateDial(const SendOptions &sendOptions, std::vector<uint8_t> &&data,

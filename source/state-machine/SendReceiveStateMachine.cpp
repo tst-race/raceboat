@@ -122,6 +122,10 @@ struct StateSendReceiveWaitingForSendConnection : public SendReceiveState {
                        "emitting SATISFIED to move to next state");
         ctx.pendingEvents.push(EVENT_SATISFIED);
         return EventResult::SUCCESS;
+    } else if (ctx.sendConnSMHandle != 0) {
+      helper::logDebug(logPrefix +
+                       "Send Connection already in-progress, nothing left to do in this state until it finishes.");
+        return EventResult::SUCCESS;
     }
     helper::logDebug(logPrefix +
                      "recv link established, triggering connecting for send");
