@@ -133,6 +133,10 @@ public:
                                                     std::string role);
   virtual void stateMachineFailed(ApiContext &context);
   virtual void stateMachineFinished(ApiContext &context);
+  virtual void connStateMachineLinkEstablished(RaceHandle contextHandle,
+                                         LinkID linkId,
+                                         std::string linkAddress,
+                                         std::string channelId);
   virtual void connStateMachineConnected(RaceHandle contextHandle,
                                          ConnectionID connId,
                                          std::string linkAddress,
@@ -141,6 +145,11 @@ public:
   virtual void onStateMachineFailed(uint64_t postId, RaceHandle contextHandle);
   virtual void onStateMachineFinished(uint64_t postId,
                                       RaceHandle contextHandle);
+  virtual void onConnStateMachineLinkEstablished(uint64_t postId,
+                                           RaceHandle contextHandle,
+                                           LinkID linkId,
+                                           std::string linkAddress,
+                                           std::string channelId);
   virtual void onConnStateMachineConnected(uint64_t postId,
                                            RaceHandle contextHandle,
                                            ConnectionID connId,
@@ -330,6 +339,10 @@ public:
   // These are queued on the work thread queue to prevent stack issues
   virtual SdkResponse onStateMachineFailed(RaceHandle contextHandle);
   virtual SdkResponse onStateMachineFinished(RaceHandle contextHandle);
+  virtual SdkResponse onConnStateMachineLinkEstablished(RaceHandle contextHandle,
+                                                  LinkID linkId,
+                                                  std::string linkAddress,
+                                                  std::string channelId);
   virtual SdkResponse onConnStateMachineConnected(RaceHandle contextHandle,
                                                   ConnectionID connId,
                                                   std::string linkAddress,

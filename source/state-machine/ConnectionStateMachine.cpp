@@ -188,6 +188,9 @@ struct StateConnLinkEstablished : public ConnState {
     }
 
     ctx.manager.registerHandle(ctx, openConnHandle);
+    ctx.manager.connStateMachineLinkEstablished(ctx.handle, ctx.linkId,
+                                                ctx.updatedLinkAddress,
+                                                ctx.channelId);
 
     return EventResult::SUCCESS;
   }
