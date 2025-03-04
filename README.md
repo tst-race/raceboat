@@ -32,7 +32,7 @@ docker run -it --rm --name=build-pt \
 pushd raceboat-compile-image && \
 ./build_image.sh -n ghcr.io/tst-race/raceboat --platform-x86_64 && \
 popd && \
-pushd runtime-image && \
+pushd raceboat-runtime-image && \
 ./build_image.sh -n ghcr.io/tst-race/raceboat --platform-x86_64 && \
 popd
 ```
