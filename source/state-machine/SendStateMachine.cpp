@@ -89,7 +89,7 @@ struct StateSendInitial : public SendState {
     }
 
     RaceHandle connStateMachineHandle = ctx.manager.startConnStateMachine(
-                                                                          ctx.handle, channelId, role, linkAddress, false, true);
+                                                                          ctx.handle, channelId, role, linkAddress, false, LT_SEND);
 
     if (connStateMachineHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");

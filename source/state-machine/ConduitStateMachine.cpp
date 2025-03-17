@@ -123,7 +123,14 @@ struct StateConduitInitial : public ConduitState {
     ctx.manager.registerHandle(ctx, ctx.sendConnSMHandle);
     ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
     // ctx.manager.registerId(ctx, ctx.recvConnId);
-    ctx.manager.registerPackageId(ctx, ctx.recvConnId, ctx.packageId);
+
+    auto connId = ctx.recvConnId;
+    ChannelProperties properties = ctx.manager.getCore().getChannelManager().getChannelProperties(ctx.recvChannel);
+    if (ctx.sendChannel == ctx.recvChannel && properties.transmissionType == TT_UNICAST && properties.linkDirection == LD_BIDI) {
+      connId = ctx.sendConnId;
+    }
+  
+    ctx.manager.registerPackageId(ctx, connId, ctx.packageId);
     std::vector<uint8_t> packageIdBytes{ctx.packageId.begin(),
                                         ctx.packageId.end()};
     helper::logDebug(logPrefix + "PackageId: " + json(packageIdBytes).dump());

@@ -49,7 +49,8 @@ void ApiDialContext::updateConnStateMachineConnected(RaceHandle contextHandle,
   if (this->recvConnSMHandle == contextHandle) {
     this->recvConnId = connId;
     this->recvLinkAddress = linkAddress;
-  } else if (this->sendConnSMHandle == contextHandle) {
+  }
+  if (this->sendConnSMHandle == contextHandle) {
     this->sendConnId = connId;
   }
 }
@@ -93,15 +94,21 @@ struct StateDialInitial : public DialState {
         ctx.manager.getCore().getEntropy(packageIdLen);
     ctx.packageId = std::string(packageIdBytes.begin(), packageIdBytes.end());
 
-    ctx.recvConnSMHandle = ctx.manager.startConnStateMachine(
-                                                             ctx.handle, recvChannelId, recvRole, "", true, false);
+    ChannelProperties properties = ctx.manager.getCore().getChannelManager().getChannelProperties(recvChannelId);
+    if (recvChannelId == ctx.opts.send_channel && properties.transmissionType == TT_UNICAST && properties.linkDirection == LD_BIDI) {
+      ctx.pendingEvents.push(EVENT_SATISFIED);
+    } else {
+      ctx.recvConnSMHandle = ctx.manager.startConnStateMachine(
+                                                               ctx.handle, recvChannelId, recvRole, "", true, LT_RECV);
 
-    if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
-      helper::logError(logPrefix + " starting connection state machine failed");
-      return EventResult::NOT_SUPPORTED;
+  
+      if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
+        helper::logError(logPrefix + " starting connection state machine failed");
+        return EventResult::NOT_SUPPORTED;
+      }
+
+      ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
     }
-
-    ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
 
     return EventResult::SUCCESS;
   }
@@ -161,12 +168,19 @@ struct StateDialWaitingForSendConnection : public DialState {
     }
 
     ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
-                                                             ctx.handle, sendChannelId, sendRole, sendLinkAddress, false, true);
+                                                             ctx.handle, sendChannelId, sendRole, sendLinkAddress, false, LT_SEND);
     if (ctx.sendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
       return EventResult::NOT_SUPPORTED;
     }
     ctx.manager.registerHandle(ctx, ctx.sendConnSMHandle);
+
+    ChannelProperties properties = ctx.manager.getCore().getChannelManager().getChannelProperties(sendChannelId);
+    if (sendChannelId == ctx.opts.recv_channel && properties.transmissionType == TT_UNICAST && properties.linkDirection == LD_BIDI) {
+      ctx.recvConnSMHandle = ctx.sendConnSMHandle;
+      ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
+    }
+    
     return EventResult::SUCCESS;
   }
 };
@@ -222,6 +236,12 @@ struct StateDialPackageSent : public DialState {
       ctx.manager.registerId(ctx, ctx.recvConnId);
       ctx.pendingEvents.push(EVENT_SATISFIED);
     }
+
+    ChannelProperties properties = ctx.manager.getCore().getChannelManager().getChannelProperties(ctx.opts.recv_channel);
+    if (ctx.opts.recv_channel == ctx.opts.send_channel && properties.transmissionType == TT_UNICAST && properties.linkDirection == LD_BIDI) {
+      ctx.pendingEvents.push(EVENT_SATISFIED);
+    }
+
     return EventResult::SUCCESS;
   }
 };
@@ -304,6 +324,7 @@ DialStateEngine::DialStateEngine() {
 
   // clang-format off
     declareStateTransition(STATE_DIAL_INITIAL,                       EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED, STATE_DIAL_WAITING_FOR_SEND_CONNECTION);
+    declareStateTransition(STATE_DIAL_INITIAL,                       EVENT_SATISFIED, STATE_DIAL_WAITING_FOR_SEND_CONNECTION);
     declareStateTransition(STATE_DIAL_WAITING_FOR_SEND_CONNECTION, EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_DIAL_WAITING_FOR_SEND_CONNECTION);
     declareStateTransition(STATE_DIAL_WAITING_FOR_SEND_CONNECTION, EVENT_SATISFIED, STATE_DIAL_SEND_OPEN);
     declareStateTransition(STATE_DIAL_SEND_OPEN, EVENT_PACKAGE_SENT, STATE_DIAL_PACKAGE_SENT);

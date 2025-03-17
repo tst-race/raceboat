@@ -1005,7 +1005,8 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
                                                      std::string role,
                                                      std::string linkAddress,
                                                      bool creating,
-                                                     bool sending) {
+                                                     LinkType linkType,
+                                                     const LinkID &linkId) {
   TRACE_METHOD(contextHandle);
 
   // We already made this link/connection
@@ -1031,8 +1032,9 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
   
   // create a connection context and copy information from the send/recv context
   auto context = newConnContext();
+  helper::logDebug(logPrefix + " LinkID? " + "$" + linkId + "$");
   context->updateConnStateMachineStart(contextHandle, channelId, role,
-                                       linkAddress, creating, sending);
+                                       linkAddress, creating, linkType, linkId);
 
   EventResult result = connEngine.start(*context);
   if (result != EventResult::SUCCESS) {

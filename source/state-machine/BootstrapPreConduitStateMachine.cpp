@@ -139,7 +139,6 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
         helper::logError(logPrefix + " initSend address is missing but we are expecting to load it");
         return EventResult::NOT_SUPPORTED;
       } else {
-        bool sending = true;
         helper::logInfo(logPrefix + "Loading init-send link on " +ctx.opts.init_send_channel + " with address: " + ctx.initSendLinkAddress);
         ctx.initSendConnSMHandle = ctx.manager.
           startConnStateMachine(ctx.handle,
@@ -147,7 +146,7 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
                                 ctx.opts.init_send_role,
                                 ctx.initSendLinkAddress,
                                 create, // is false
-                                sending // is true
+                                LT_SEND
                                 );
         if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
           helper::logError(logPrefix + " starting connection state machine failed");
@@ -164,7 +163,6 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
 
     // We are creating, we will create and then send this address in a hello response
     if (create) {
-      bool sending = true;
       helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_send_channel);
       ctx.finalSendConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
@@ -172,7 +170,7 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
                               ctx.opts.final_send_role,
                               "",
                               create, // is true
-                              sending // is true
+                              LT_SEND
                               );
       if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting connection state machine failed");
@@ -184,7 +182,6 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
       helper::logError(logPrefix + " finalSend address is missing (was it sent in the hello?)");
       return EventResult::NOT_SUPPORTED;
     } else {
-    bool sending = true;
     helper::logInfo(logPrefix + "Loading final-send link on " + ctx.opts.final_send_channel + " with address: " + ctx.finalSendLinkAddress);
     ctx.finalSendConnSMHandle = ctx.manager.
       startConnStateMachine(ctx.handle,
@@ -192,7 +189,7 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
                             ctx.opts.final_send_role,
                             ctx.finalSendLinkAddress,
                             create, // is false
-                            sending // is true
+                            LT_SEND
                             );
     if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -207,7 +204,6 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
 
     // We are creating, we will create and then send this address in a hello response
     if (create) {
-      bool sending = false;
       helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_recv_channel);
       ctx.finalRecvConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
@@ -215,7 +211,7 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
                               ctx.opts.final_recv_role,
                               "",
                               create, // is true
-                              sending // is false
+                              LT_RECV
                               );
       if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting connection state machine failed");
@@ -227,7 +223,6 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
     helper::logError(logPrefix + " finalRecv address is missing (was it sent in the hello?)");
     return EventResult::NOT_SUPPORTED;
   } else {
-    bool sending = false;
     helper::logInfo(logPrefix + "Loading final-recv link on " + ctx.opts.final_recv_channel + " with address: " + ctx.finalRecvLinkAddress);
     ctx.finalRecvConnSMHandle = ctx.manager.
       startConnStateMachine(ctx.handle,
@@ -235,7 +230,7 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
                             ctx.opts.final_recv_role,
                             ctx.finalRecvLinkAddress,
                             create, // is false
-                            sending // is false
+                            LT_RECV
                             );
     if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");

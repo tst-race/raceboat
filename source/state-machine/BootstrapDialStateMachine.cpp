@@ -100,14 +100,13 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
         ctx.dialCallback = {};
         return EventResult::NOT_SUPPORTED;
       }
-      bool sending = true;
       ctx.initSendConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
                               ctx.opts.init_send_channel,
                               ctx.opts.init_send_role,
                               ctx.opts.init_send_address,
                               create, // is false
-                              sending // is true
+                              LT_SEND // is true
                               );
     }
     if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
@@ -139,14 +138,13 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
           return EventResult::NOT_SUPPORTED;
         }
       }
-      bool sending = false;
       ctx.initRecvConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
                               ctx.opts.init_recv_channel,
                               ctx.opts.init_recv_role,
                               ctx.opts.init_recv_address,
                               create, // is true
-                              sending // is false
+                              LT_RECV // is false
                               );
 
       if (ctx.initRecvConnSMHandle == NULL_RACE_HANDLE) {
@@ -164,14 +162,13 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
     // If we are NOT creating then we have to wait for the server to create and send us the address as a hello-response
     if (create) {
       helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_send_channel + (ctx.opts.init_recv_address.empty() ? "" : " from address: " + ctx.opts.init_recv_address));
-      bool sending = true;
       ctx.finalSendConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
                               ctx.opts.final_send_channel,
                               ctx.opts.final_send_role,
                               "",
                               create, // is true
-                              sending // is true
+                              LT_SEND
                               );
       if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting connection state machine failed");
@@ -196,14 +193,13 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
       // If we are NOT creating then we are waiting for the server to create and send the address as a hello-response
       if (create) {
         helper::logInfo(logPrefix + "Creating final-recv link on " + ctx.opts.final_recv_channel);
-        bool sending = false;
         ctx.finalRecvConnSMHandle = ctx.manager.
           startConnStateMachine(ctx.handle,
                                 ctx.opts.final_recv_channel,
                                 ctx.opts.final_recv_role,
                                 "",
                                 create, // is true
-                                sending // is false
+                                LT_RECV
                                 );
       
         if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
@@ -366,7 +362,6 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
             continue;
           }
 
-          bool sending = true;
           bool create = false;
           ctx.finalSendConnSMHandle = ctx.manager.
             startConnStateMachine(ctx.handle,
@@ -374,7 +369,7 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
                                   ctx.opts.final_send_role,
                                   finalSendLinkAddress,
                                   create, // is false
-                                  sending // is true
+                                  LT_SEND
                                   );
           
           if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
@@ -393,7 +388,6 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
             continue;
           }
 
-          bool sending = false;
           bool create = false;
           ctx.finalRecvConnSMHandle = ctx.manager.
             startConnStateMachine(ctx.handle,
@@ -401,7 +395,7 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
                                   ctx.opts.final_recv_role,
                                   finalRecvLinkAddress,
                                   create, // is false
-                                  sending // is false
+                                  LT_RECV
                                   );
           
           if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {

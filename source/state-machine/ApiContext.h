@@ -120,7 +120,8 @@ public:
                                            std::string /* role */,
                                            std::string /* linkAddress */,
                                            bool /* creating */,
-                                           bool /* sending */){};
+                                           LinkType /* sending */,
+                                           const LinkID &/* linkId */){};
   virtual void updateConduitectStateMachineStart(
       RaceHandle /* contextHandle */, RaceHandle /* recvHandle */,
       const ConnectionID & /* recvConnId */, RaceHandle /* sendHandle */,

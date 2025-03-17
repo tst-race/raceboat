@@ -186,7 +186,8 @@ public:
                                            std::string role,
                                            std::string linkAddress,
                                            bool creating,
-                                           bool sending);
+                                           LinkType linkType,
+                                           const LinkID &linkId="");
   virtual RaceHandle startConduitectStateMachine(
       RaceHandle contextHandle, RaceHandle recvHandle,
       const ConnectionID &recvConnId, RaceHandle sendHandle,

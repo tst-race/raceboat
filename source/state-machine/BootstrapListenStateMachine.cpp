@@ -94,14 +94,13 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
     // We are going to need to create this link and then transmit the address out-of-band to the dialer before they run dial
     if (create) {
       helper::logInfo(logPrefix + "Creating init-send link on " + ctx.opts.init_send_channel + (ctx.opts.init_recv_address.empty() ? "" : " from address: " + ctx.opts.init_recv_address));
-      bool sending = true;
       ctx.initSendConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
                               ctx.opts.init_send_channel,
                               ctx.opts.init_send_role,
                               ctx.opts.init_send_address,
                               create, // is true
-                              sending // is true
+                              LT_SEND
                               );
     if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -110,14 +109,13 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
     ctx.manager.registerHandle(ctx, ctx.initSendConnSMHandle);
     } else if (!ctx.opts.init_send_address.empty()) {
       helper::logInfo(logPrefix + "Loading init-send link on " + ctx.opts.init_send_channel + " with address: " + ctx.opts.init_send_address);
-      bool sending = true;
       ctx.initSendConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
                               ctx.opts.init_send_channel,
                               ctx.opts.init_send_role,
                               ctx.opts.init_send_address,
                               create, // is false
-                              sending // is true
+                              LT_SEND
                               );
     if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -137,14 +135,13 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
       create = ctx.shouldCreateReceiver(ctx.opts.init_recv_channel);
       if (create) {
         helper::logInfo(logPrefix + "Creating init-recv link on " + ctx.opts.init_recv_channel + " with address: " + ctx.opts.init_recv_address);
-      bool sending = false;
       ctx.initRecvConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
                               ctx.opts.init_recv_channel,
                               ctx.opts.init_recv_role,
                               ctx.opts.init_recv_address,
                               create, // is true
-                              sending // is false
+                              LT_RECV
                               );
       }
       else if (ctx.opts.init_recv_address.empty()) {
@@ -157,14 +154,13 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
       } else {
         helper::logInfo(logPrefix + "Loading init-recv link on " + ctx.opts.init_recv_channel + " with address: " + ctx.opts.init_recv_address);
       // If we are loading we should have a recv_address, if we are creating we will send the address in the hello message
-      bool sending = false;
       ctx.initRecvConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
                               ctx.opts.init_recv_channel,
                               ctx.opts.init_recv_role,
                               ctx.opts.init_recv_address,
                               create, // is false
-                              sending // is false
+                              LT_RECV
                               );
 
       }

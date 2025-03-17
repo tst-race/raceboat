@@ -142,7 +142,7 @@ struct StateResumeInitial : public ResumeState {
     ctx.packageId = decoded_package_id;
 
     ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
-                                                             ctx.handle, sendChannelId, sendRole, sendLinkAddress, false, true);
+                                                             ctx.handle, sendChannelId, sendRole, sendLinkAddress, false, LT_SEND);
 
     if (ctx.sendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -150,7 +150,7 @@ struct StateResumeInitial : public ResumeState {
     }
 
     ctx.recvConnSMHandle = ctx.manager.startConnStateMachine(
-                                                             ctx.handle, recvChannelId, recvRole, recvLinkAddress, true, false);
+                                                             ctx.handle, recvChannelId, recvRole, recvLinkAddress, true, LT_RECV);
 
     if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");

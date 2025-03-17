@@ -90,17 +90,23 @@ struct StatePreConduitAccepted : public PreConduitState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
-    ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
-                                                             ctx.handle, ctx.sendChannel, ctx.sendRole, ctx.sendLinkAddress, false, true);
+    ChannelProperties properties = ctx.manager.getCore().getChannelManager().getChannelProperties(ctx.recvChannel);
+    if (ctx.recvChannel == ctx.sendChannel && properties.transmissionType == TT_UNICAST && properties.linkDirection == LD_BIDI) {
+      ctx.sendConnId = ctx.recvConnId;
+      ctx.sendConnSMHandle = ctx.recvConnSMHandle;
+      ctx.pendingEvents.push(EVENT_SATISFIED);
+    } else {
+      ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
+                                                               ctx.handle, ctx.sendChannel, ctx.sendRole, ctx.sendLinkAddress, false, LT_SEND);
+      
+      if (ctx.sendConnSMHandle == NULL_RACE_HANDLE) {
+        helper::logError(logPrefix + " starting connection state machine failed");
+        return EventResult::NOT_SUPPORTED;
+      }
 
-    if (ctx.sendConnSMHandle == NULL_RACE_HANDLE) {
-      helper::logError(logPrefix + " starting connection state machine failed");
-      return EventResult::NOT_SUPPORTED;
+      ctx.manager.registerHandle(ctx, ctx.sendConnSMHandle);
+      ctx.pendingEvents.push(EVENT_ALWAYS);
     }
-
-    ctx.manager.registerHandle(ctx, ctx.sendConnSMHandle);
-    ctx.pendingEvents.push(EVENT_ALWAYS);
-
     return EventResult::SUCCESS;
   }
 };
@@ -108,8 +114,14 @@ struct StatePreConduitAccepted : public PreConduitState {
 struct StatePreConduitOpening : public PreConduitState {
   explicit StatePreConduitOpening(StateType id = STATE_PRE_CONN_OBJ_OPENING)
       : PreConduitState(id, "STATE_PRE_CONN_OBJ_OPENING") {}
-  virtual EventResult enter(Context & /* context */) {
+  virtual EventResult enter(Context &context) {
     TRACE_METHOD();
+
+    auto &ctx = getContext(context);
+
+    if (ctx.sendConnId == ctx.recvConnId) {
+      ctx.pendingEvents.push(EVENT_CONN_STATE_MACHINE_CONNECTED);
+    }
     return EventResult::SUCCESS;
   }
 };
@@ -193,6 +205,7 @@ PreConduitStateEngine::PreConduitStateEngine() {
     declareStateTransition(STATE_PRE_CONN_OBJ_INITIAL,   EVENT_RECEIVE_PACKAGE,              STATE_PRE_CONN_OBJ_INITIAL);
     declareStateTransition(STATE_PRE_CONN_OBJ_INITIAL,   EVENT_LISTEN_ACCEPTED,              STATE_PRE_CONN_OBJ_ACCEPTED);
     declareStateTransition(STATE_PRE_CONN_OBJ_ACCEPTED,  EVENT_ALWAYS,                       STATE_PRE_CONN_OBJ_OPENING);
+    declareStateTransition(STATE_PRE_CONN_OBJ_ACCEPTED,  EVENT_SATISFIED,                    STATE_PRE_CONN_OBJ_FINISHED);
     declareStateTransition(STATE_PRE_CONN_OBJ_OPENING,   EVENT_RECEIVE_PACKAGE,              STATE_PRE_CONN_OBJ_OPENING);
     declareStateTransition(STATE_PRE_CONN_OBJ_OPENING,   EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_PRE_CONN_OBJ_FINISHED);
   // clang-format on

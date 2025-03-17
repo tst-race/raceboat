@@ -57,6 +57,11 @@ void ApiListenContext::updateConnStateMachineConnected(
   this->recvConnId = connId;
   this->recvLinkAddress = linkAddress;
 };
+void ApiListenContext::updateConnStateMachineLinkEstablished(
+    RaceHandle /* contextHandle */, LinkID _linkId,
+    std::string /*linkAddress*/) {
+  this->linkId = _linkId;
+};
 
 //-----------------------------------------------------------------------------------------------
 // States
@@ -108,7 +113,7 @@ struct StateListenInitial : public ListenState {
     }
 
     ctx.recvConnSMHandle = ctx.manager.startConnStateMachine(
-                                                             ctx.handle, channelId, role, linkAddress, true, false);
+                                                             ctx.handle, channelId, role, linkAddress, true, LT_RECV);
 
     if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -130,8 +135,13 @@ struct StateListenConnectionOpen : public ListenState {
     auto &ctx = getContext(context);
     RaceHandle receiverHandle = ctx.manager.getCore().generateHandle();
 
-    ctx.listenCb(ApiStatus::OK, ctx.recvLinkAddress, receiverHandle);
-    ctx.listenCb = {};
+    // We repeatedly re-enter this state when a new connection is Accepted because we trigger a new conection opening. However, we do not need to call back up to the application with a Listener object
+    if (ctx.listenCb) {
+      ctx.listenCb(ApiStatus::OK, ctx.recvLinkAddress, receiverHandle);
+      ctx.listenCb = {};
+    } else {
+      helper::logDebug(logPrefix + "No callback function provided for listen");
+    }
 
     ctx.manager.registerHandle(ctx, receiverHandle);
 
@@ -198,6 +208,18 @@ struct StateListenWaiting : public ListenState {
 
         ctx.preConduitSM.push(preConnSMHandle);
 
+        ChannelId channelId = ctx.opts.recv_channel;
+        std::string newConnLinkAddress = "";
+        std::string role = ctx.opts.recv_role;
+        helper::logDebug(logPrefix + "Starting a new conn state machine to re-open another connection on this link");
+        ctx.recvConnSMHandle = ctx.manager.startConnStateMachine(ctx.handle, channelId, role, newConnLinkAddress, false, LT_RECV, ctx.linkId);
+        if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
+          helper::logError(logPrefix +
+                           " starting connection state machine failed");
+          return EventResult::NOT_SUPPORTED;
+        }
+
+        ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
         break;
       } catch (std::exception &e) {
         helper::logError(logPrefix +
@@ -287,6 +309,7 @@ ListenStateEngine::ListenStateEngine() {
 
   // clang-format off
     declareStateTransition(STATE_LISTEN_INITIAL,                       EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_LISTEN_CONNECTION_OPEN);
+    declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_CONN_STATE_MACHINE_CONNECTED,              STATE_LISTEN_CONNECTION_OPEN);
     declareStateTransition(STATE_LISTEN_CONNECTION_OPEN,               EVENT_ALWAYS,                       STATE_LISTEN_WAITING);
     declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_RECEIVE_PACKAGE,              STATE_LISTEN_WAITING);
     declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_ACCEPT,                       STATE_LISTEN_WAITING);

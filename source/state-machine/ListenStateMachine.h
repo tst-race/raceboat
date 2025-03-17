@@ -39,6 +39,10 @@ public:
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
                                   std::string linkAddress) override;
 
+  virtual void
+  updateConnStateMachineLinkEstablished(RaceHandle contextHandle, ConnectionID connId,
+                                  std::string linkAddress) override;
+
 public:
   ReceiveOptions opts;
   std::queue<std::shared_ptr<std::vector<uint8_t>>> data;
@@ -51,6 +55,7 @@ public:
   std::string recvLinkAddress;
 
   std::queue<RaceHandle> preConduitSM;
+  LinkID linkId;
 };
 
 class ListenStateEngine : public StateEngine {

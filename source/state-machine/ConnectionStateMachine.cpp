@@ -36,14 +36,16 @@ void ApiConnContext::updateConnStateMachineStart(RaceHandle _contextHandle,
                                                  std::string _role,
                                                  std::string _linkAddress,
                                                  bool _creating,
-                                                 bool _sending) {
+                                                 LinkType _linkType,
+                                                 const LinkID &_linkId) {
   this->dependents.insert(_contextHandle);
   this->newestDependent = _contextHandle;
   this->channelId = _channelId;
   this->channelRole = _role;
   this->linkAddress = _linkAddress;
   this->create = _creating;
-  this->send = _sending;
+  this->linkType = _linkType;
+  this->linkId = _linkId;
 }
 
 void ApiConnContext::updateChannelStatusChanged(
@@ -125,8 +127,13 @@ struct StateConnActivated : public ConnState {
     RaceHandle linkHandle = ctx.manager.getCore().generateHandle();
     PluginWrapper &plugin = getPlugin(ctx, ctx.channelId);
 
+    helper::logDebug(logPrefix + "CTX LINKID: " + ctx.linkId);
     SdkResponse response = SDK_INVALID;
-    if (ctx.create) {
+    if (!ctx.linkId.empty()) { // Already have a link, just opening a new connection
+      helper::logDebug(logPrefix + "Already have link, just opening a new connection");
+      ctx.pendingEvents.push(EVENT_LINK_ESTABLISHED);
+      response = SDK_OK;
+    } else if (ctx.create) {
       if (ctx.linkAddress.empty()) {
         response = plugin.createLink(linkHandle, ctx.channelId, 0);
       } else {
@@ -164,7 +171,7 @@ struct StateConnLinkEstablished : public ConnState {
     ctx.manager.registerId(ctx, ctx.linkId);
 
     // TODO I don't think this should be only for recv links
-    if (!ctx.send && !ctx.linkAddress.empty() &&
+    if (!ctx.linkAddress.empty() &&
         ctx.updatedLinkAddress != ctx.linkAddress) {
       nlohmann::json updatedJson =
           nlohmann::json::parse(ctx.updatedLinkAddress);
@@ -178,9 +185,8 @@ struct StateConnLinkEstablished : public ConnState {
         return EventResult::NOT_SUPPORTED;
       }
     }
-
-    LinkType linkType = ctx.send ? LT_SEND : LT_RECV;
-    SdkResponse response = plugin.openConnection(openConnHandle, linkType,
+    helper::logDebug(logPrefix + "CALLING plugin.openConnection");
+    SdkResponse response = plugin.openConnection(openConnHandle, ctx.linkType,
                                                  ctx.linkId, "{}", 0, 0, 0);
 
     if (response.status != SdkStatus::SDK_OK) {
