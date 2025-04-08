@@ -25,6 +25,8 @@
 #include "race/decomposed/ITransportComponent.h"
 #include "race/decomposed/IUserModelComponent.h"
 
+namespace fs = std::filesystem;
+
 namespace Raceboat {
 
 struct ComponentPlugin : public IComponentPlugin {
