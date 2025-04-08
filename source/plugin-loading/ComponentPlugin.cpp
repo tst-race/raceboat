@@ -14,6 +14,7 @@
 // limitations under the License.
 //
 
+#include "FileSystem.h"
 #include "ComponentPlugin.h"
 
 namespace Raceboat {
@@ -61,7 +62,8 @@ ComponentPlugin::createTransport(const std::string &name, ITransportSdk *sdk,
                                  PluginConfig &pluginConfig) {
   TRACE_METHOD(path, name);
   initTransport();
-  pluginConfig.pluginDirectory = path;
+  fs::path pluginDirectory = path;
+  pluginConfig.pluginDirectory = pluginDirectory.remove_filename().c_str();
   ITransportComponent *transport =
       createTransportImpl(name.c_str(), sdk, roleName.c_str(), pluginConfig);
   return std::shared_ptr<ITransportComponent>(transport, destroyTransportImpl);
@@ -73,7 +75,8 @@ ComponentPlugin::createUserModel(const std::string &name, IUserModelSdk *sdk,
                                  PluginConfig &pluginConfig) {
   TRACE_METHOD(path, name);
   initUserModel();
-  pluginConfig.pluginDirectory = path;
+  fs::path pluginDirectory = path;
+  pluginConfig.pluginDirectory = pluginDirectory.remove_filename().c_str();
   return std::shared_ptr<IUserModelComponent>(
       createUserModelImpl(name.c_str(), sdk, roleName.c_str(), pluginConfig),
       destroyUserModelImpl);
@@ -85,7 +88,8 @@ ComponentPlugin::createEncoding(const std::string &name, IEncodingSdk *sdk,
                                 PluginConfig &pluginConfig) {
   TRACE_METHOD(path, name);
   initEncoding();
-  const std::string pluginPath = path;
+  fs::path pluginDirectory = path;
+  pluginConfig.pluginDirectory = pluginDirectory.remove_filename().c_str();
   return std::shared_ptr<IEncodingComponent>(
       createEncodingImpl(name.c_str(), sdk, roleName.c_str(), pluginConfig),
       destroyEncodingImpl);
