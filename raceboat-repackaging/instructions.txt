@@ -1,0 +1,18 @@
+Both create package scripts will clone down the raceboat repo
+
+Running locally on mac or linux to create zip package: ./create-package.sh
+
+Running locally on linux, to create app image and build raceboat from scratch ./create-package-AppImage.sh
+
+For making an app image, by running with fuse (on mac) and doing the work in docker:
+ docker run -it --rm \
+  --device /dev/fuse \
+  --cap-add SYS_ADMIN \
+  -v "$PWD:/workspace" \
+  -w /workspace \
+  ubuntu:22.04 \
+  bash
+
+
+run this if you don’t want to rebuild the all of raceboat when you create app image
+ SKIP_DOCKER_BUILD=1 ./create-package-AppImage.sh
