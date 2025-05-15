@@ -138,12 +138,12 @@ public:
    * @brief List of hint names supported by this channel
    *
    */
-  std::vector<std::string> supported_hints;
+  std::vector<std::string> supportedHints;
 
   int maxLinks;
 
-  int creatorsPerLoader;
-  int loadersPerCreator;
+  int maxCreatorsPerLoader;
+  int maxLoadersPerCreator;
 
   std::vector<ChannelRole> roles;
 
@@ -195,10 +195,10 @@ inline bool operator==(const ChannelProperties &a, const ChannelProperties &b) {
          a.loaderExpected == b.loaderExpected &&
          a.creatorExpected == b.creatorExpected && a.mtu == b.mtu &&
          a.reliable == b.reliable && a.duration_s == b.duration_s &&
-         a.period_s == b.period_s && a.supported_hints == b.supported_hints &&
+         a.period_s == b.period_s && a.supportedHints == b.supportedHints &&
          a.multiAddressable == b.multiAddressable && a.maxLinks == b.maxLinks &&
-         a.creatorsPerLoader == b.creatorsPerLoader &&
-         a.loadersPerCreator == b.loadersPerCreator && a.roles == b.roles &&
+         a.maxCreatorsPerLoader == b.maxCreatorsPerLoader &&
+         a.maxLoadersPerCreator == b.maxLoadersPerCreator && a.roles == b.roles &&
          a.currentRole == b.currentRole &&
          a.maxSendsPerInterval == b.maxSendsPerInterval &&
          a.secondsPerInterval == b.secondsPerInterval &&

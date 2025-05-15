@@ -201,7 +201,7 @@ eval DOCKER_BUILDKIT=1 docker buildx build \
     --no-cache \
     --rm \
     -f "${DIR}/Dockerfile" \
-    -t "${IMAGE_NAMESPACE}raceboat:${IMAGE_VERSION}" \
+    -t "${IMAGE_NAMESPACE}raceboat-runtime:${IMAGE_VERSION}" \
     --load \
     --progress=plain \
     $PUSH_OPTION \

@@ -28,7 +28,7 @@ ChannelProperties::ChannelProperties()
       transmissionType(TT_UNDEF), connectionType(CT_UNDEF), sendType(ST_UNDEF),
       multiAddressable(false), reliable(false), bootstrap(false),
       isFlushable(false), duration_s(-1), period_s(-1), mtu(-1), maxLinks(-1),
-      creatorsPerLoader(-1), loadersPerCreator(-1), maxSendsPerInterval(-1),
+      maxCreatorsPerLoader(-1), maxLoadersPerCreator(-1), maxSendsPerInterval(-1),
       secondsPerInterval(-1), intervalEndTime(0), sendsRemainingInInterval(-1) {
 }
 
@@ -55,11 +55,11 @@ std::string channelPropertiesToString(const ChannelProperties &props) {
      << ", ";
   ss << "loaderExpected: " << linkPropertyPairToString(props.loaderExpected)
      << ", ";
-  ss << "supported_hints: " << stringVectorToString(props.supported_hints)
+  ss << "supportedHints: " << stringVectorToString(props.supportedHints)
      << ", ";
   ss << "maxLinks: " << props.maxLinks << ", ";
-  ss << "creatorsPerLoader: " << props.creatorsPerLoader << ", ";
-  ss << "loadersPerCreator: " << props.loadersPerCreator << ", ";
+  ss << "maxCreatorsPerLoader: " << props.maxCreatorsPerLoader << ", ";
+  ss << "maxLoadersPerCreator: " << props.maxLoadersPerCreator << ", ";
   ss << "roles: [";
   for (const ChannelRole &role : props.roles) {
     ss << channelRoleToString(role) << ", ";
@@ -115,11 +115,11 @@ bool channelStaticPropertiesEqual(const ChannelProperties &a,
           a.multiAddressable == b.multiAddressable &&
           a.reliable == b.reliable && a.bootstrap == b.bootstrap &&
           a.isFlushable == b.isFlushable && a.duration_s == b.duration_s &&
-          a.period_s == b.period_s && a.supported_hints == b.supported_hints &&
+          a.period_s == b.period_s && a.supportedHints == b.supportedHints &&
           a.mtu == b.mtu && a.creatorExpected == b.creatorExpected &&
           a.loaderExpected == b.loaderExpected && a.maxLinks == b.maxLinks &&
-          a.creatorsPerLoader == b.creatorsPerLoader &&
-          a.loadersPerCreator == b.loadersPerCreator && a.roles == b.roles);
+          a.maxCreatorsPerLoader == b.maxCreatorsPerLoader &&
+          a.maxLoadersPerCreator == b.maxLoadersPerCreator && a.roles == b.roles);
 }
 
 template <typename T>
@@ -130,7 +130,7 @@ static bool parseField(const nlohmann::json &config, T &dest,
     dest = config.at(fieldName).get<T>();
     return true;
   } catch (std::exception &e) {
-    helper::logError("Failed to parse " + fieldName + " from channel '" +
+    helper::logDebug("Using default value for " + fieldName + " because it was not found in manifest for channel '" +
                      channelGid + "': " + std::string(e.what()));
     return false;
   }
@@ -150,7 +150,7 @@ static bool parseLinkPropertySet(const nlohmann::json &propsJson,
     success &= parseField(lpSetJson, set.loss, "loss", channelGid);
     return success;
   } catch (std::exception &e) {
-    helper::logError("Failed to parse " + fieldName + " from channel '" +
+    helper::logDebug("Using default value for " + fieldName + " because it was not found in the manifest for channel '" +
                      channelGid + "', field '" + pairField +
                      "': " + std::string(e.what()));
     return false;
@@ -170,8 +170,9 @@ static bool parseLinkPropertyPair(const nlohmann::json &propsJson,
                                     channelGid, fieldName);
     return success;
   } catch (std::exception &e) {
-    helper::logError("Failed to parse " + fieldName + " from channel '" +
-                     channelGid + "': " + std::string(e.what()));
+    helper::logDebug("Using default value for " + fieldName + " because it was not found in the manifest for channel '" +
+                     channelGid + 
+                     "': " + std::string(e.what()));
     return false;
   }
 }
@@ -199,13 +200,23 @@ static bool parseRoles(const nlohmann::json &propsJson,
       roles.push_back(role);
     }
   } catch (std::exception &e) {
-    helper::logError("Failed to parse " + fieldName + " from channel '" +
-                     channelGid + ": " + std::string(e.what()));
+    helper::logDebug("Using default value for " + fieldName + " because it was not found in the manifest for channel '" +
+                     channelGid +
+                     "': " + std::string(e.what()));
     success = false;
   } catch (...) {
-    helper::logError("Failed to parse " + fieldName + " from channel '" +
+    helper::logDebug("Using default value for " + fieldName + " because it was not found in the manifest for channel '" +
                      channelGid);
     success = false;
+  }
+
+  // Insert default role if none provided
+  if (roles.empty()) {
+    helper::logDebug("No roles specified in manifest, inserting \"default\" role for " + channelGid);
+    ChannelRole role;
+    role.roleName = "default";
+    role.linkSide = LS_BOTH;
+    roles.push_back(role);
   }
   return success;
 }
@@ -213,59 +224,61 @@ static bool parseRoles(const nlohmann::json &propsJson,
 void from_json(const nlohmann::json &j, ChannelProperties &props) {
   bool success = true;
   try {
-    // adapted from RaceConfig.cpp (racesdk)
-    props.channelStatus = CHANNEL_UNSUPPORTED;
-    props.channelGid = "<missing channelGid>";
-
-    success &= parseField(j, props.channelGid, "channelGid", props.channelGid);
-    success &= parseField(j, props.bootstrap, "bootstrap", props.channelGid);
-    success &= parseField(j, props.duration_s, "duration_s", props.channelGid);
-    success &=
-        parseField(j, props.isFlushable, "isFlushable", props.channelGid);
-    success &= parseField(j, props.mtu, "mtu", props.channelGid);
-    success &= parseField(j, props.multiAddressable, "multiAddressable",
-                          props.channelGid);
-    success &= parseField(j, props.period_s, "period_s", props.channelGid);
-    success &= parseField(j, props.reliable, "reliable", props.channelGid);
-    success &= parseField(j, props.supported_hints, "supported_hints",
-                          props.channelGid);
-    success &= parseField(j, props.maxLinks, "maxLinks", props.channelGid);
-    success &= parseField(j, props.creatorsPerLoader, "creatorsPerLoader",
-                          props.channelGid);
-    success &= parseField(j, props.loadersPerCreator, "loadersPerCreator",
-                          props.channelGid);
-    success &= parseLinkPropertyPair(j, "creatorExpected",
-                                     props.creatorExpected, props.channelGid);
-    success &= parseLinkPropertyPair(j, "loaderExpected", props.loaderExpected,
-                                     props.channelGid);
-
     std::string tmp;
 
-    tmp = connectionTypeToString(CT_UNDEF);
-    success &= parseField(j, tmp, "connectionType", props.channelGid);
-    props.connectionType = connectionTypeFromString(tmp);
-
+    // REQUIRED fields: channelGid, linkDirection, transmissionType
+    props.channelStatus = CHANNEL_UNSUPPORTED;
+    props.channelGid = "<missing channelGid>";
+    success &= parseField(j, props.channelGid, "channelGid", props.channelGid);
+    
     tmp = linkDirectionToString(LD_UNDEF);
     success &= parseField(j, tmp, "linkDirection", props.channelGid);
     props.linkDirection = linkDirectionFromString(tmp);
 
-    tmp = sendTypeToString(ST_UNDEF);
-    success &= parseField(j, tmp, "sendType", props.channelGid);
-    props.sendType = sendTypeFromString(tmp);
-
-    tmp = transmissionTypeToString(TT_UNDEF);
-    success &= parseField(j, tmp, "transmissionType", props.channelGid);
+    // OPTIONAL fields
+    tmp = transmissionTypeToString(TT_UNICAST);
+    parseField(j, tmp, "transmissionType", props.channelGid);
     props.transmissionType = transmissionTypeFromString(tmp);
 
-    success &= parseRoles(j, props.roles, "roles", props.channelGid);
+    parseField(j, props.bootstrap, "bootstrap", props.channelGid);
+    parseField(j, props.duration_s, "duration_s", props.channelGid);
+    parseField(j, props.isFlushable, "isFlushable", props.channelGid);
+    parseField(j, props.mtu, "mtu", props.channelGid);
+    parseField(j, props.multiAddressable, "multiAddressable",
+                          props.channelGid);
+    parseField(j, props.period_s, "period_s", props.channelGid);
+    parseField(j, props.reliable, "reliable", props.channelGid);
+    parseField(j, props.supportedHints, "supportedHints",
+                          props.channelGid);
+    parseField(j, props.maxLinks, "maxLinks", props.channelGid);
+    parseField(j, props.maxCreatorsPerLoader, "maxCreatorsPerLoader",
+                          props.channelGid);
+    parseField(j, props.maxLoadersPerCreator, "maxLoadersPerCreator",
+                          props.channelGid);
+    parseLinkPropertyPair(j, "creatorExpected",
+                                     props.creatorExpected, props.channelGid);
+    parseLinkPropertyPair(j, "loaderExpected", props.loaderExpected,
+                                     props.channelGid);
 
-    success &= parseField(j, props.maxSendsPerInterval, "maxSendsPerInterval",
+
+    tmp = connectionTypeToString(CT_UNDEF);
+    parseField(j, tmp, "connectionType", props.channelGid);
+    props.connectionType = connectionTypeFromString(tmp);
+
+
+    tmp = sendTypeToString(ST_UNDEF);
+    parseField(j, tmp, "sendType", props.channelGid);
+    props.sendType = sendTypeFromString(tmp);
+
+    parseRoles(j, props.roles, "roles", props.channelGid);
+
+    parseField(j, props.maxSendsPerInterval, "maxSendsPerInterval",
                           props.channelGid);
-    success &= parseField(j, props.secondsPerInterval, "secondsPerInterval",
+    parseField(j, props.secondsPerInterval, "secondsPerInterval",
                           props.channelGid);
-    success &= parseField(j, props.intervalEndTime, "intervalEndTime",
+    parseField(j, props.intervalEndTime, "intervalEndTime",
                           props.channelGid);
-    success &= parseField(j, props.sendsRemainingInInterval,
+    parseField(j, props.sendsRemainingInInterval,
                           "sendsRemainingInInterval", props.channelGid);
   } catch (std::exception &ex) {
     helper::logError("exception \"" + std::string(ex.what()) +
