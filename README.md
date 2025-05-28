@@ -13,7 +13,7 @@ Raceboat uses a docker-based build process, running the below may take some time
 
 - `ghcr.io/tst-race/raceboat/raceboat-builder:main`: an image for building the raceboat framework itself (i.e. the code in this repository)
 
-- `ghcr.io/tst-race/raceboat/raceboat-compile:main`: extension of the raceboat-builder with prebuilt framework binaries, used to compile plugins that provide channels or components for raceboat to use.
+- `ghcr.io/tst-race/raceboat/raceboat-plugin-builder:main`: extension of the raceboat-builder with prebuilt framework binaries, used to compile plugins that provide channels or components for raceboat to use.
 
 - `ghcr.io/tst-race/raceboat/raceboat:main`: runtime image which contains both prebuilt framework binaries and runtime dependencies.
 
@@ -29,7 +29,7 @@ docker run -it --rm --name=build-pt \
        -w /code \
        raceboat-builder:latest \
        ./build.sh && \
-pushd raceboat-compile-image && \
+pushd raceboat-plugin-builder-image && \
 ./build_image.sh -n ghcr.io/tst-race/raceboat --platform-x86_64 && \
 popd && \
 pushd raceboat-runtime-image && \
@@ -41,7 +41,7 @@ To build an aarch64 raceboat image locally:
 
 ```bash
 ./raceboat-builder-image/build_image.sh --platform-arm64
-./raceboat-compile-image/build_image.sh --platform-arm64
+./raceboat-plugin-builder-image/build_image.sh --platform-arm64
 docker run  -it --rm  -v $(pwd):/code/ -w /code raceboat-builder:latest bash 
 rm -fr build 
 export MAKEFLAGS="-j" 
@@ -56,7 +56,7 @@ exit
 
 ## **Building Plugins**
 
-Users can compile plugins/channels with the resulting raceboat-compile:<tag>.  For example:
+Users can compile plugins/channels with the resulting raceboat-plugin-builder:<tag>.  For example:
 
 ```bash
 cd ../race-obfs
@@ -222,7 +222,7 @@ docker run --rm -it --name=rbserver \
        --ip=10.11.1.3 \
        -v $(pwd)/kits:/server-kits \
        -v $(pwd)/scripts:/scripts \
-       raceboat:latest bash -c \
+       raceboat-runtime:latest bash -c \
        'echo "Welcome, I am the Raceboat Server" \
        | bridge-distro --quiet \
        --passphrase bridge-please \
@@ -242,7 +242,7 @@ docker run --rm -it --name=rbclient \
        --network=raceboat-network \
        --ip=10.11.1.4 \
        -v $(pwd)/kits:/client-kits \
-       raceboat:latest bash -c \
+       raceboat-runtime:latest bash -c \
        'echo "bridge-please" \
        | race-cli -m --send-recv --quiet \
        --dir /client-kits \

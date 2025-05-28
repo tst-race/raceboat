@@ -86,7 +86,7 @@ jobs:
           path: "${{ github.event.repository.name }}.tar.gz"
           retention-days: 10
 
-  compile-image:
+  plugin-builder-image:
     needs: [build-framework]
     runs-on: ubuntu-latest
     steps:
@@ -133,7 +133,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ghcr.io/${{ github.repository }}/raceboat-compile
+          images: ghcr.io/${{ github.repository }}/raceboat-plugin-builder
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -145,13 +145,13 @@ jobs:
         id: cache
         uses: int128/docker-build-cache-config-action@v1
         with:
-          image: ghcr.io/${{ github.repository }}/raceboat-compile/cache
+          image: ghcr.io/${{ github.repository }}/raceboat-plugin-builder/cache
 
-      - name: Build and Push raceboat-compile Docker Image
+      - name: Build and Push raceboat-plugin-builder Docker Image
         uses: docker/build-push-action@v4
         with:
           context: /home/runner/work/raceboat/raceboat
-          file: raceboat-compile-image/Dockerfile
+          file: raceboat-plugin-builder-image/Dockerfile
           platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -160,10 +160,10 @@ jobs:
           cache-to: ${{ steps.cache.outputs.cache-to }}
 
   run-tests:
-    needs: [compile-image]
+    needs: [plugin-builder-image]
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/tst-race/raceboat/raceboat-compile:${{ github.head_ref || github.ref_name }}
+      image: ghcr.io/tst-race/raceboat/raceboat-plugin-builder:${{ github.head_ref || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -172,7 +172,7 @@ jobs:
         run: ./test.sh
 
   runtime-image:
-    needs: [compile-image]
+    needs: [plugin-builder-image]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -243,4 +243,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
-          build-contexts: ghcr.io/tst-race/raceboat/raceboat-compile=docker-image://ghcr.io/tst-race/raceboat/raceboat-compile:${{ steps.meta.outputs.version }}
+          build-contexts: ghcr.io/tst-race/raceboat/raceboat-plugin-builder=docker-image://ghcr.io/tst-race/raceboat/raceboat-plugin-builder:${{ steps.meta.outputs.version }}

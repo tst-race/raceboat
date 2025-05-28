@@ -194,14 +194,14 @@ if [ ! -z $MULTIARCH ]; then
 fi
 
 set -x
-formatlog "INFO" "Building raceboat Image: ${IMAGE_NAMESPACE}raceboat-compile:${IMAGE_VERSION}"
+formatlog "INFO" "Building raceboat Image: ${IMAGE_NAMESPACE}raceboat-plugin-builder:${IMAGE_VERSION}"
 eval DOCKER_BUILDKIT=1 docker buildx build \
     --platform $PLATFORM \
     --build-arg BUILDKIT_INLINE_CACHE=1 \
     --no-cache \
     --rm \
     -f "${DIR}/Dockerfile" \
-    -t "${IMAGE_NAMESPACE}raceboat-compile:${IMAGE_VERSION}" \
+    -t "${IMAGE_NAMESPACE}raceboat-plugin-builder:${IMAGE_VERSION}" \
     --load \
     --progress=plain \
     $PUSH_OPTION \

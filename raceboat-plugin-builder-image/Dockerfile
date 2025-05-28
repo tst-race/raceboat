@@ -39,4 +39,13 @@ RUN cp /usr/local/go/src/shims/comm/* /usr/local/go/src/shims/
 FROM ${TARGETARCH}-linux
 COPY race-cmake-modules /opt/race/race-cmake-modules
 
-
+# Installing PluginCommsTwoSixStubDecomposed and Destini dependencies at system level
+# TODO: refactor those plugins to bring their own dependencies with them
+RUN apt-get update && yes | apt-get install -y \
+    libboost-system1.74.0 \
+    libboost-filesystem1.74.0 \
+    libjsoncpp25 \
+    libevent-2.1-7 \
+    parallel \
+    libjpeg62-dev \
+    libavdevice-dev
