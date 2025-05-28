@@ -30,12 +30,14 @@ FROM base as arm64-linux
 COPY racesdk/package/LINUX_arm64-v8a/app/race-cli /usr/local/bin/race-cli
 COPY racesdk/package/LINUX_arm64-v8a/app/bridge-distro /usr/local/bin/bridge-distro
 
+FROM ${TARGETARCH}-linux
+
 # Installing ncat for testing purposes
 RUN apt-get update && yes | apt-get install ncat # for example / test / debug
 
 # Installing PluginCommsTwoSixStubDecomposed and Destini dependencies at system level
 # TODO: refactor those plugins to bring their own dependencies with them
-FROM ${TARGETARCH}-linux
+
 RUN apt-get update && yes | apt-get install -y \
     libboost-system1.74.0 \
     libboost-filesystem1.74.0 \
