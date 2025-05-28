@@ -30,6 +30,9 @@ FROM base as arm64-linux
 COPY racesdk/package/LINUX_arm64-v8a/app/race-cli /usr/local/bin/race-cli
 COPY racesdk/package/LINUX_arm64-v8a/app/bridge-distro /usr/local/bin/bridge-distro
 
+# Installing ncat for testing purposes
+RUN apt-get update && yes | apt-get install ncat # for example / test / debug
+
 # Installing PluginCommsTwoSixStubDecomposed and Destini dependencies at system level
 # TODO: refactor those plugins to bring their own dependencies with them
 FROM ${TARGETARCH}-linux
@@ -44,8 +47,6 @@ RUN apt-get update && yes | apt-get install -y \
     # ffmpeg \
 
 COPY libflickcurl.so /usr/local/lib/libflickcurl.so
-RUN apt-get update && yes | apt-get install ncat # for example / test / debug
-
 RUN pip install pillow psutil
 
 # Installing older ffmpeg version directly from the RACE external build to avoid _potential_ versioning issues in Destini video encoding

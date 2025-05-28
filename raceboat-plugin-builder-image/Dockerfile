@@ -42,10 +42,29 @@ COPY race-cmake-modules /opt/race/race-cmake-modules
 # Installing PluginCommsTwoSixStubDecomposed and Destini dependencies at system level
 # TODO: refactor those plugins to bring their own dependencies with them
 RUN apt-get update && yes | apt-get install -y \
-    libboost-system1.74.0 \
-    libboost-filesystem1.74.0 \
-    libjsoncpp25 \
-    libevent-2.1-7 \
-    parallel \
+    libboost-all-dev \
+    libthrift-dev \
     libjpeg62-dev \
-    libavdevice-dev
+    libjsoncpp-dev \
+    libboost-all-dev \
+    libcpprest-dev \
+    libcurl4-openssl-dev \
+    libevent-dev \
+    libxml2-dev \
+    parallel
+
+
+# Installing older ffmpeg version directly from the RACE external build to avoid _potential_ versioning issues in Destini video encoding
+ARG FFMPEG_VERSION=4.2.2-1
+ARG TARGETPLATFORM="linux/amd64"
+RUN case ${TARGETPLATFORM} in \
+        "linux/amd64") LINUX_ARCH=x86_64    ;; \
+        "linux/arm64") LINUX_ARCH=arm64-v8a ;; \
+    esac && \
+    wget \
+        --output-document=/tmp/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
+        https://github.com/tst-race/ext-ffmpeg/releases/download/${FFMPEG_VERSION}/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz && \
+    tar --extract \
+        --file=/tmp/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
+        --directory=/usr/local && \
+    rm /tmp/ffmpeg-*.tar.gz
