@@ -50,7 +50,7 @@ RUN apt-get update && yes | apt-get install -y \
     # ffmpeg \
 
 COPY destini-deps/libflickcurl.so /usr/local/lib/libflickcurl.so
-RUN ln -s /usr/local/lib/libflickcurl.so libflickcurl.so.0
+RUN ln -s /usr/local/lib/libflickcurl.so /usr/local/lib/libflickcurl.so.0
 RUN pip install pillow psutil
 
 # Installing older ffmpeg version directly from the RACE external build to avoid _potential_ versioning issues in Destini video encoding
