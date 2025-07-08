@@ -1124,6 +1124,7 @@ ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_o
       recv_opt.recv_role = conn_opt.init_recv_role;
       recv_opt.send_channel = conn_opt.init_send_channel;
       recv_opt.send_role = conn_opt.init_send_role;
+      recv_opt.recv_address = conn_opt.init_recv_address;
       std::tie(status1, link_addr, listener) = race.listen(recv_opt);
   }
   if (status1 != ApiStatus::OK) {
