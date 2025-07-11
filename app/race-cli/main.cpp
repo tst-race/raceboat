@@ -517,7 +517,7 @@ void close_socket(int &socket_fd) {
   socket_fd = -1;
 }
 
-int create_listening_socket(int port) {
+int create_listening_socket(int port, const std::string &host) {
   int listening_sock, optval = 1;
   char on = 1;
   struct addrinfo hints, *res = NULL;
@@ -529,11 +529,10 @@ int create_listening_socket(int port) {
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
 
-  std::string bind_addr = "localhost";
   sprintf(portstr, "%d", port);
 
   // Try to resolve address if bind_address is a hostname
-  if (::getaddrinfo(bind_addr.c_str(), portstr, &hints, &res) != 0) {
+  if (::getaddrinfo(host.c_str(), portstr, &hints, &res) != 0) {
     printf("getadddrinfo() failed\n");
     return -1;
   }
@@ -578,7 +577,7 @@ int create_listening_socket(int port) {
   return listening_sock;
 }
 
-int create_client_connection(std::string &hostaddr, uint16_t port) {
+int create_client_connection(const std::string &hostaddr, uint16_t port) {
   struct addrinfo hints, *res = NULL;
   int client_sock;
   char portstr[12];
@@ -1000,6 +999,16 @@ void check_for_local_port_override(const CmdOptions &opts, int &local_port) {
   }
 }
 
+void check_for_host_override(const CmdOptions &opts, std::string &host) {
+  for (auto pair: opts.params) {
+    if (pair.first == "host") {
+      host = pair.second;
+      printf("host: %s\n", host.c_str());
+      break;
+    }
+  }
+}
+
 int handle_client_connect(const CmdOptions &opts) {
   // listen for localhost connection
   // dial into / connect to race connection
@@ -1031,11 +1040,13 @@ int handle_client_connect(const CmdOptions &opts) {
 
   int local_port = 9999;
   check_for_local_port_override(opts, local_port);
+  std::string host = "localhost";
+  check_for_host_override(opts, host);
 
   int server_sock;
   printf("CREATING LOCAL SOCKET\n");
   // start server for client app to connect to
-  server_sock = create_listening_socket(local_port);
+  server_sock = create_listening_socket(local_port, host);
   if (server_sock < 0) {
     printf("Failed to create local socket\n");
     return -1;
@@ -1080,11 +1091,13 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
 
   int local_port = 9999;
   check_for_local_port_override(opts, local_port);
+  std::string host = "localhost";
+  check_for_host_override(opts, host);
 
   int server_sock;
   printf("CREATING LOCAL SOCKET\n");
   // start server for client app to connect to
-  server_sock = create_listening_socket(local_port);
+  server_sock = create_listening_socket(local_port, host);
   if (server_sock < 0) {
     printf("Failed to create local socket\n");
     return -1;
@@ -1099,7 +1112,7 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
 }
 
 
-ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_opt, int local_port, bool bootstrapping) {
+ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_opt, int local_port, const std::string &host, bool bootstrapping) {
   // establish a <local-app-socket, conduit> connection pair to relay data to and from each other
   // close both upon timeout
   ApiStatus status = ApiStatus::OK;
@@ -1133,7 +1146,6 @@ ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_o
   }
   printf("\nlistening on link address: '%s'\n", link_addr.c_str());
 
-  std::string host = "localhost";
   while (1) {
     printf("server calling accept\n");
     auto [status2, connection] = listener.accept();
@@ -1150,6 +1162,7 @@ ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_o
     // assume listening local app process is or will be running
     int client_sock = -1;
     while (client_sock < 0) {
+      printf("accepted client sonnection, connecting to %s:%d\n", host.c_str(), local_port);
       client_sock = create_client_connection(host, local_port);
       if (client_sock < 0) {
         printf("Awaiting listening socket \n");
@@ -1192,7 +1205,9 @@ int handle_server_connect(const CmdOptions &opts) {
   
   int local_port = 7777;
   check_for_local_port_override(opts, local_port);
-  ApiStatus status = server_connections_loop(race, conn_opt, local_port, false);
+  std::string host = "localhost";
+  check_for_host_override(opts, host);
+  ApiStatus status = server_connections_loop(race, conn_opt, local_port, host, false);
 
   return (status == ApiStatus::OK);
 }
@@ -1224,7 +1239,9 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
   
   int local_port = 7777;
   check_for_local_port_override(opts, local_port);
-  ApiStatus status = server_connections_loop(race, conn_opt, local_port, true);
+  std::string host = "localhost";
+  check_for_host_override(opts, host);
+  ApiStatus status = server_connections_loop(race, conn_opt, local_port, host, true);
 
   return (status == ApiStatus::OK);
 }
