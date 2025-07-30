@@ -51,6 +51,7 @@ RUN apt-get update && yes | apt-get install -y \
     libcurl4-openssl-dev \
     libevent-dev \
     libxml2-dev \
+    git \
     parallel
 
 
