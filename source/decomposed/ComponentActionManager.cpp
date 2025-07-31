@@ -186,8 +186,16 @@ ComponentActionManager::createActionInfo(Action &&action) {
       info->wildcardLink |= (param.linkId == "*");
     }
 
-    auto props = manager.encodingComponentFromEncodingParams(param)
-                     ->getEncodingPropertiesForParameters(param);
+    auto encoding = manager.encodingComponentFromEncodingParams(param);
+    if (encoding == nullptr) {
+      std::string message =
+          logPrefix +
+          "Failed to find encoding for params. Encoding type: " + param.type;
+      helper::logError(message);
+      throw std::out_of_range(message);
+    }
+    
+    auto props = encoding->getEncodingPropertiesForParameters(param);
 
     info->encoding.push_back({
         std::move(param),
