@@ -65,6 +65,7 @@ enum class Mode : int {
 struct CmdOptions {
   Mode mode;
   RaceLog::LogLevel log_level;
+  std::string log_file = "";
   std::vector<std::pair<std::string, std::string>> params;
 
   std::string plugin_path = "/etc/race";
@@ -97,6 +98,8 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       // logging
       {"debug", no_argument, &log_level, RaceLog::LogLevel::LL_DEBUG},
       {"quiet", no_argument, &log_level, RaceLog::LogLevel::LL_ERROR},
+
+      {"logto", required_argument, nullptr, 'o'},
 
       // connection style
       {"send", no_argument, &mode, static_cast<int>(Mode::SEND_ONESHOT)},
@@ -165,6 +168,9 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
     case 0:
       /* If this option set a flag, do nothing else now. */
       break;
+
+    case 'o':
+      opts.log_file = optarg;
 
     case 'R':
       opts.init_recv_channel = optarg;
@@ -278,6 +284,7 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
                     "Logging:\n"
                     "    --debug             Enable verbose logging\n"
                     "    --quiet             Disable logging\n"
+                    "    --logto, -o         Log to file (suppresses all logging to stdout)\n"
                     "\n"
                     "Modes:\n"
                     "    --send              Send a message without receiving a response\n"
@@ -1253,6 +1260,11 @@ int main(int argc, char **argv) {
   }
 
   RaceLog::setLogLevel(opts->log_level);
+  RaceLog::setLogFile(opts->log_file);
+
+  if (opts->log_file != "") {
+      RaceLog::setLogLevelStdout(RaceLog::LogLevel::LL_NONE);
+  }
 
   int result = -1;
 
