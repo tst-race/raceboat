@@ -114,7 +114,7 @@ public:
    * @brief List of hint names supported by this link
    *
    */
-  std::vector<std::string> supported_hints;
+  std::vector<std::string> supportedHints;
 
   /**
    * @brief Name of the channel this link instantiates
@@ -136,7 +136,7 @@ inline bool operator==(const LinkProperties &a, const LinkProperties &b) {
          a.connectionType == b.connectionType && a.worst == b.worst &&
          a.expected == b.expected && a.best == b.best && a.mtu == b.mtu &&
          a.reliable == b.reliable && a.duration_s == b.duration_s &&
-         a.period_s == b.period_s && a.supported_hints == b.supported_hints &&
+         a.period_s == b.period_s && a.supportedHints == b.supportedHints &&
          a.linkAddress == b.linkAddress;
 }
 inline bool operator!=(const LinkProperties &a, const LinkProperties &b) {

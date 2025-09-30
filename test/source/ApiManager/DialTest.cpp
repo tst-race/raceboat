@@ -47,14 +47,14 @@ public:
     channelProps.bootstrap = false;
     channelProps.channelStatus = CHANNEL_UNDEF;
     channelProps.connectionType = CT_UNDEF;
-    channelProps.creatorsPerLoader = 1;
+    channelProps.maxCreatorsPerLoader = 1;
     channelProps.currentRole.roleName = sendOptions.send_role;
     channelProps.currentRole.linkSide = LS_UNDEF;
     channelProps.duration_s = 0;
     channelProps.intervalEndTime = 0;
     channelProps.isFlushable = true;
     channelProps.linkDirection = LD_LOADER_TO_CREATOR;
-    channelProps.loadersPerCreator = 1;
+    channelProps.maxLoadersPerCreator = 1;
 
     sendBytes.reserve(0x100);
     recvBytes.reserve(0x100);
