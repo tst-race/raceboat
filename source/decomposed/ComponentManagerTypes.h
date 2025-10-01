@@ -1,4 +1,3 @@
-
 //
 // Copyright 2023 Two Six Technologies
 //
@@ -251,6 +250,23 @@ struct PackageInfo {
 
 std::ostream &operator<<(std::ostream &out, const PackageInfo &packageInfo);
 
+struct StoredFragment {
+    std::vector<uint8_t> data;
+    uint8_t flags;
+    std::chrono::steady_clock::time_point timestamp;
+};
+struct ProducerQueue {
+  // uint32_t lastFragmentReceived;
+  // std::vector<uint8_t> pendingBytes;
+  uint32_t lastFragmentReceived = 0;
+  std::vector<uint8_t> pendingBytes;
+  
+  // Store fragments by ID until we can process them
+  std::map<uint32_t, StoredFragment> storedFragments;
+  std::chrono::steady_clock::time_point lastActivity = std::chrono::steady_clock::now();
+
+};
+
 // This struct is owned by the ComponentLinkManager
 struct Link {
   explicit Link(const LinkID &linkId) : linkId(linkId) {}
@@ -269,10 +285,6 @@ struct Link {
   std::vector<uint8_t> producerId;
   uint32_t fragmentCount = 0;
 
-  struct ProducerQueue {
-    uint32_t lastFragmentReceived;
-    std::vector<uint8_t> pendingBytes;
-  };
   std::unordered_map<std::string, ProducerQueue> producerQueues;
 };
 

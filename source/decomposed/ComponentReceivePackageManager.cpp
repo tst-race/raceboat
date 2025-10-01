@@ -1,4 +1,3 @@
-
 //
 // Copyright 2023 Two Six Technologies
 //
@@ -172,63 +171,108 @@ CmInternalStatus ComponentReceivePackageManager::receiveFragmentProducer(
   TRACE_METHOD(offset, link->linkId, bytes.size(), connVec.size());
 
   uint32_t fragmentId = readFromBuffer<uint32_t>(bytes, offset);
+  uint8_t flags = readFromBuffer<uint8_t>(bytes, offset);
 
   auto fragmentQueue = &link->producerQueues[producer];
-  if (fragmentId != fragmentQueue->lastFragmentReceived + 1) {
-    // Currently there's no support for out of order packages
-    // if we get packages out of order, drop old packages
-    fragmentQueue->pendingBytes.clear();
-  }
-  fragmentQueue->lastFragmentReceived = fragmentId;
+  fragmentQueue->lastActivity = std::chrono::steady_clock::now();
 
-  uint8_t flags = readFromBuffer<uint8_t>(bytes, offset);
-  if (!(flags & CONTINUE_LAST_PACKAGE) &&
-      !fragmentQueue->pendingBytes.empty()) {
-    // Just in case the previous package was marked as continued and this one
-    // wasn't, clear the buffer.
-    helper::logDebug(logPrefix +
-                     "Clearing pending bytes from previous fragment");
-    fragmentQueue->pendingBytes.clear();
-  }
-
-  bool firstFragment = true;
+  // Read all fragment data
+  std::vector<uint8_t> fragmentData;
   while (offset < bytes.size()) {
     auto pkgBytes = readFragment(bytes, offset);
-
-    if (firstFragment && (flags & CONTINUE_LAST_PACKAGE) &&
-        fragmentQueue->pendingBytes.empty()) {
-      firstFragment = false;
-      // A fragment was lost before this so we can't reconstruct the package. No
-      // point in keeping this data around.
-      helper::logDebug(
-          logPrefix +
-          "Dropping fragment because previous fragments are missing");
-      continue;
-    }
-    firstFragment = false;
-
-    fragmentQueue->pendingBytes.insert(fragmentQueue->pendingBytes.end(),
-                                       pkgBytes.begin(), pkgBytes.end());
-
-    if ((flags & CONTINUE_NEXT_PACKAGE) && offset >= bytes.size()) {
-      // This wasn't the end of the package. There should be more fragments of
-      // the package in the future.
-      helper::logDebug("Package continues in next fragment");
-      continue;
-    }
-
-    EncPkg pkg(std::move(fragmentQueue->pendingBytes));
-    fragmentQueue->pendingBytes.clear();
-    manager.sdk.receiveEncPkg(pkg, connVec, RACE_BLOCKING);
+    fragmentData.insert(fragmentData.end(), pkgBytes.begin(), pkgBytes.end());
   }
 
+  // Store the fragment
+  StoredFragment storedFrag;
+  storedFrag.data = std::move(fragmentData);
+  storedFrag.flags = flags;
+  storedFrag.timestamp = std::chrono::steady_clock::now();
+  
+  fragmentQueue->storedFragments[fragmentId] = std::move(storedFrag);
+  
+  helper::logDebug(logPrefix + "Stored fragment " + std::to_string(fragmentId) + 
+                   " for producer " + producer);
+
+  // Process any complete sequences starting from lastFragmentReceived + 1
+  processCompleteSequences(fragmentQueue, connVec);
+  
+  // Clean up old fragments periodically
+  cleanupExpiredFragments(fragmentQueue);
+
   return OK;
+}
+
+void ComponentReceivePackageManager::processCompleteSequences(
+    ProducerQueue* fragmentQueue, const std::vector<std::string>& connVec) {
+
+  TRACE_METHOD(fragmentQueue->lastFragmentReceived, connVec.size());
+  while (true) {
+    uint32_t nextExpected = fragmentQueue->lastFragmentReceived + 1;
+    
+    // Check if we have the next expected fragment
+    auto fragIt = fragmentQueue->storedFragments.find(nextExpected);
+    if (fragIt == fragmentQueue->storedFragments.end()) {
+      break; // No more consecutive fragments available
+    }
+
+    // Process this fragment
+    const auto& fragment = fragIt->second;
+    
+    // Clear pending bytes if this isn't continuing from previous package
+    if (!(fragment.flags & CONTINUE_LAST_PACKAGE) && !fragmentQueue->pendingBytes.empty()) {
+      helper::logDebug(logPrefix + "Clearing pending bytes from previous fragment");
+      fragmentQueue->pendingBytes.clear();
+    }
+
+    // Add fragment data to pending bytes
+    fragmentQueue->pendingBytes.insert(fragmentQueue->pendingBytes.end(),
+                                      fragment.data.begin(), fragment.data.end());
+
+    bool isPackageEnd = !(fragment.flags & CONTINUE_NEXT_PACKAGE);
+    
+    // Update state and remove processed fragment
+    fragmentQueue->lastFragmentReceived = nextExpected;
+    fragmentQueue->storedFragments.erase(fragIt);
+
+    if (isPackageEnd) {
+      // Package is complete, send it
+      if (!fragmentQueue->pendingBytes.empty()) {
+        EncPkg pkg(std::move(fragmentQueue->pendingBytes));
+        fragmentQueue->pendingBytes.clear();
+        manager.sdk.receiveEncPkg(pkg, connVec, RACE_BLOCKING);
+        
+        helper::logDebug(logPrefix + "Sent complete package ending at fragment " + 
+                        std::to_string(nextExpected));
+      }
+    } else {
+      helper::logDebug(logPrefix + "Package continues in next fragment");
+    }
+  }
+}
+
+void ComponentReceivePackageManager::cleanupExpiredFragments(ProducerQueue* fragmentQueue) {
+  TRACE_METHOD(fragmentQueue->storedFragments.size());
+  auto now = std::chrono::steady_clock::now();
+  const std::chrono::seconds timeout{3000}; // TODO: make this configurable, depends on channel latency
+  
+  for (auto it = fragmentQueue->storedFragments.begin(); 
+       it != fragmentQueue->storedFragments.end();) {
+    if (now - it->second.timestamp > timeout) {
+      helper::logWarning(logPrefix + "Removing expired fragment " + 
+                        std::to_string(it->first));
+      it = fragmentQueue->storedFragments.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 void ComponentReceivePackageManager::teardown() {
   TRACE_METHOD();
 
   pendingDecodings.clear();
+  pendingPackages.clear(); // Add cleanup for new data structure
 }
 
 void ComponentReceivePackageManager::setup() { TRACE_METHOD(); }

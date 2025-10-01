@@ -200,6 +200,28 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
 }
 
 TEST_F(ComponentReceivePackageManagerTestFixture,
+       test_onBytesDecoded_fragment_single_producer_two_fragments_out_of_order) {
+  mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
+  mockComponentManager.mockLink.connections = {"connection1", "connection2"};
+  auto bytes1 = append({createHeader({}, 1, CONTINUE_NEXT_PACKAGE),
+                        createFragment(10, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
+                                            0x38, 0x39, 0x40, 0x41})});
+
+  auto bytes2 = append({createHeader({}, 2, CONTINUE_LAST_PACKAGE),
+                        createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+                                            0x48, 0x49, 0x50, 0x51})});
+
+  LOG_EXPECT(this->logger, __func__, receiveManager);
+  receiveManager.pendingDecodings[{1}] = "mockLinkId";
+  receiveManager.onBytesDecoded({12}, {1}, std::move(bytes2),
+                                EncodingStatus::ENCODE_OK);
+  receiveManager.pendingDecodings[{2}] = "mockLinkId";
+  receiveManager.onBytesDecoded({13}, {2}, std::move(bytes1),
+                                EncodingStatus::ENCODE_OK);
+  LOG_EXPECT(this->logger, __func__, receiveManager);
+}
+
+TEST_F(ComponentReceivePackageManagerTestFixture,
        test_onBytesDecoded_fragment_single_producer_three_fragments) {
   mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
@@ -227,6 +249,76 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
                                 EncodingStatus::ENCODE_OK);
   receiveManager.pendingDecodings[{3}] = "mockLinkId";
   receiveManager.onBytesDecoded({14}, {3}, std::move(bytes3),
+                                EncodingStatus::ENCODE_OK);
+  LOG_EXPECT(this->logger, __func__, receiveManager);
+}
+
+TEST_F(ComponentReceivePackageManagerTestFixture,
+       test_onBytesDecoded_fragment_single_producer_three_fragments_out_of_order) {
+  mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
+  mockComponentManager.mockLink.connections = {"connection1", "connection2"};
+
+  auto bytes1 = append({createHeader({}, 1, CONTINUE_NEXT_PACKAGE),
+                        createFragment(10, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
+                                            0x38, 0x39, 0x40, 0x41})});
+
+  auto bytes2 = append(
+      {createHeader({}, 2, CONTINUE_NEXT_PACKAGE | CONTINUE_LAST_PACKAGE),
+       createFragment(20, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
+                           0x49, 0x50, 0x51, 0x42, 0x43, 0x44, 0x45,
+                           0x46, 0x47, 0x48, 0x49, 0x50, 0x51})});
+
+  auto bytes3 = append({createHeader({}, 3, CONTINUE_LAST_PACKAGE),
+                        createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+                                            0x48, 0x49, 0x50, 0x51})});
+
+  LOG_EXPECT(this->logger, __func__, receiveManager);
+  receiveManager.pendingDecodings[{1}] = "mockLinkId";
+  receiveManager.onBytesDecoded({12}, {1}, std::move(bytes1),
+                                EncodingStatus::ENCODE_OK);
+  receiveManager.pendingDecodings[{2}] = "mockLinkId";
+  receiveManager.onBytesDecoded({13}, {2}, std::move(bytes3),
+                                EncodingStatus::ENCODE_OK);
+  receiveManager.pendingDecodings[{3}] = "mockLinkId";
+  receiveManager.onBytesDecoded({14}, {3}, std::move(bytes2),
+                                EncodingStatus::ENCODE_OK);
+  LOG_EXPECT(this->logger, __func__, receiveManager);
+}
+
+TEST_F(ComponentReceivePackageManagerTestFixture,
+       test_onBytesDecoded_fragment_single_producer_multifrag_out_of_order) {
+  mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
+  mockComponentManager.mockLink.connections = {"connection1", "connection2"};
+
+  auto bytes1 = append({createHeader({}, 1, CONTINUE_NEXT_PACKAGE),
+                        createFragment(10, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
+                                            0x38, 0x39, 0x40, 0x41})});
+
+  auto bytes2 = append(
+      {createHeader({}, 2, CONTINUE_LAST_PACKAGE),
+       createFragment(20, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
+                           0x49, 0x50, 0x51, 0x42, 0x43, 0x44, 0x45,
+                           0x46, 0x47, 0x48, 0x49, 0x50, 0x51})});
+
+  auto bytes3 = append({createHeader({}, 3, CONTINUE_NEXT_PACKAGE),
+                        createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+                                            0x48, 0x49, 0x50, 0x51})});
+  auto bytes4 = append({createHeader({}, 4, CONTINUE_LAST_PACKAGE),
+                        createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+                                            0x48, 0x49, 0x50, 0x51})});
+
+  LOG_EXPECT(this->logger, __func__, receiveManager);
+  receiveManager.pendingDecodings[{1}] = "mockLinkId";
+  receiveManager.onBytesDecoded({12}, {1}, std::move(bytes4),
+                                EncodingStatus::ENCODE_OK);
+  receiveManager.pendingDecodings[{2}] = "mockLinkId";
+  receiveManager.onBytesDecoded({13}, {2}, std::move(bytes1),
+                                EncodingStatus::ENCODE_OK);
+  receiveManager.pendingDecodings[{3}] = "mockLinkId";
+  receiveManager.onBytesDecoded({14}, {3}, std::move(bytes2),
+                                EncodingStatus::ENCODE_OK);
+  receiveManager.pendingDecodings[{4}] = "mockLinkId";
+  receiveManager.onBytesDecoded({15}, {4}, std::move(bytes3),
                                 EncodingStatus::ENCODE_OK);
   LOG_EXPECT(this->logger, __func__, receiveManager);
 }
