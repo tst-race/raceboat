@@ -1,4 +1,3 @@
-
 //
 // Copyright 2023 Two Six Technologies
 //
@@ -17,7 +16,9 @@
 
 #pragma once
 
+#include <chrono>
 #include <memory>
+#include <map>
 #include <unordered_map>
 
 #include "ComponentManagerTypes.h"
@@ -28,7 +29,25 @@
 
 namespace Raceboat {
 
+using CMTypes::ProducerQueue;
+
 class ComponentManagerInternal;
+
+struct FragmentInfo {
+  std::vector<uint8_t> data;
+  uint8_t flags;
+  uint32_t fragmentId;
+  std::chrono::steady_clock::time_point timestamp;
+};
+
+struct PackageAssembly {
+  std::map<uint32_t, FragmentInfo> fragments; // fragmentId -> fragment data
+  uint32_t expectedNextId = 1;
+  std::chrono::steady_clock::time_point lastActivity;
+  bool hasLastFragment = false;
+  uint32_t lastFragmentId = 0;
+};
+
 
 class ComponentReceivePackageManager {
 public:
@@ -76,5 +95,23 @@ protected:
   uint64_t nextDecodingHandle{0};
 
   std::unordered_map<CMTypes::DecodingHandle, LinkID> pendingDecodings;
+
+private:
+  // New members for fragment management
+  std::unordered_map<std::string, PackageAssembly> pendingPackages; // producer -> assembly
+  std::chrono::seconds fragmentTimeout{30}; // Configurable timeout
+
+  // New helper methods
+  CMTypes::CmInternalStatus processOutOfOrderFragment(
+      const std::string& producer, uint32_t fragmentId, uint8_t flags,
+      std::vector<uint8_t>&& fragmentData, std::vector<std::string>&& connVec);
+
+  bool tryAssemblePackage(const std::string& producer, std::vector<std::string>&& connVec);
+  void cleanupExpiredFragments();
+  bool isPackageComplete(const PackageAssembly& assembly);
+
+  void processCompleteSequences(ProducerQueue* fragmentQueue, 
+                                 const std::vector<std::string>& connVec);
+  void cleanupExpiredFragments(ProducerQueue* fragmentQueue);
 };
 } // namespace Raceboat
