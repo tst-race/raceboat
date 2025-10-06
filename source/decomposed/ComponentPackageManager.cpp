@@ -159,6 +159,7 @@ bool ComponentPackageManager::isTimeToEncode(double now,
   auto encodingTime = manager.getMaxEncodingTime();
 
   if (now + encodingTime <= actionInfo->action.timestamp) {
+    helper::logDebug("ComponentPackageManager::isTimeToEncode: TRUE: " + std::to_string(now) + " + " + std::to_string(encodingTime) + " <= " + std::to_string(actionInfo->action.timestamp));
     return true;
   } else {
     return false;

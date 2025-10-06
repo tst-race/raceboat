@@ -53,12 +53,14 @@ void ComponentActionManager::setup() {
   TRACE_METHOD();
 
   auto transportProps = manager.getTransport()->getTransportProperties();
+  helper::logDebug("Tranpsort Props:" + transportPropertiesToString(transportProps));
   maxEncodingTime = 0;
   for (auto &action : transportProps.supportedActions) {
     double encodingTime = 0;
     for (EncodingType encodingType : action.second) {
       EncodingParameters params;
       params.type = encodingType;
+                       
       auto encoding = manager.encodingComponentFromEncodingParams(params);
       if (encoding == nullptr) {
         std::string message =
@@ -68,13 +70,19 @@ void ComponentActionManager::setup() {
         throw std::out_of_range(message);
       }
       encodingTime += encoding->getEncodingProperties().encodingTime;
+      helper::logDebug("encodingTime reported=" + 
+                       std::to_string(encodingTime));
     }
     maxEncodingTime = std::max(maxEncodingTime, encodingTime);
+    helper::logDebug("maxEncodingTime calculated=" + 
+                     std::to_string(maxEncodingTime));
   }
 
   // add 0.1 for ComponentManager overhead. This isn't based on anything. Is
   // there a better approach?
   maxEncodingTime += 0.1 * TIME_MULTIPLIER;
+  helper::logDebug("maxEncodingTime=" + 
+                   std::to_string(maxEncodingTime));
 
   auto usermodelProperties = manager.getUserModel()->getUserModelProperties();
   timelineLength = usermodelProperties.timelineLength;
@@ -331,6 +339,9 @@ void ComponentActionManager::updateEncodeTimestamp() {
   nextEncodeTime = std::numeric_limits<double>::infinity();
   if (it != actions.end()) {
     nextEncodeTime = (*it)->action.timestamp - maxEncodingTime;
+    helper::logDebug("set nextEncodeTime to: " + std::to_string(nextEncodeTime) +
+                     " (" + std::to_string((*it)->action.timestamp) + " - " +
+                     std::to_string(maxEncodingTime));
   }
 }
 
@@ -347,6 +358,8 @@ void ComponentActionManager::runActionThread() {
     //
     // Each iteration of the while loop will perform one of these, and then
     // check again for any other work
+    helper::logDebug(logPrefix + " setting wait_until, nextEncodeTime is: " +
+                     std::to_string(nextEncodeTime));
     double wait_until =
         fmin(fmin(nextFetchTime, nextActionTime), nextEncodeTime);
     double start = currentTime();
