@@ -145,7 +145,7 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
   mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
   auto bytes =
-      append({createHeader({}, 0, 0),
+      append({createHeader({}, 1, 0),
               createFragment(20, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
                                   0x39, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45,
                                   0x46, 0x47, 0x48, 0x49, 0x50, 0x51})});
@@ -162,7 +162,7 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
   mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
   auto bytes = append(
-      {createHeader({}, 0, 0),
+      {createHeader({}, 1, 0),
        createFragment(20, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
                            0x39, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45,
                            0x46, 0x47, 0x48, 0x49, 0x50, 0x51}),
@@ -398,7 +398,7 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
   std::vector<uint8_t> producerId = {1, 2,  3,  4,  5,  6,  7,  8,
                                      9, 10, 11, 12, 13, 14, 15, 16};
   auto bytes =
-      append({createHeader(producerId, 0, 0),
+      append({createHeader(producerId, 1, 0),
               createFragment(20, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
                                   0x39, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45,
                                   0x46, 0x47, 0x48, 0x49, 0x50, 0x51})});
@@ -417,7 +417,7 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
   std::vector<uint8_t> producerId = {1, 2,  3,  4,  5,  6,  7,  8,
                                      9, 10, 11, 12, 13, 14, 15, 16};
   auto bytes = append(
-      {createHeader(producerId, 0, 0),
+      {createHeader(producerId, 1, 0),
        createFragment(20, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
                            0x39, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45,
                            0x46, 0x47, 0x48, 0x49, 0x50, 0x51}),

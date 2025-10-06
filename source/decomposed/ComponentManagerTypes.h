@@ -262,7 +262,7 @@ struct ProducerQueue {
   std::vector<uint8_t> pendingBytes;
   
   // Store fragments by ID until we can process them
-  std::map<uint32_t, StoredFragment> storedFragments;
+  std::map<uint32_t, std::vector<StoredFragment>> storedFragments;
   std::chrono::steady_clock::time_point lastActivity = std::chrono::steady_clock::now();
 
 };
