@@ -12,6 +12,6 @@ MockRaceSdkComms::getEntropy:  with numBytes=16
 MockRaceSdkComms::onLinkStatusChanged:  with handle=43, linkId=default link id, status=LINK_CREATED, properties=linkType: 0, transmissionType: 0, reliable: 0
 , timeout=-2147483648
 MockRaceSdkComms::generateConnectionId:  with linkId=default link id
-MockRaceSdkComms::receiveEncPkg:  with pkg.getSize()=17, connIdsJson=["default connection id"], timeout=-2147483648
+MockRaceSdkComms::receiveEncPkg:  with pkg.getSize()=8, connIdsJson=["default connection id"], timeout=-2147483648
 MockRaceSdkComms::onChannelStatusChanged:  with handle=0, channelGid=composition_id, status=CHANNEL_ENABLED, properties=<ChannelProperties>
 , timeout=-2147483648
