@@ -88,7 +88,7 @@ public:
 protected:
   ComponentManagerInternal &manager;
   uint64_t nextEncodingHandle{0};
-  uint64_t nextFragmentHandle{1};
+  uint64_t nextFragmentHandle{0};
 
   // Mapping of SDK handles to all packages being processed by the Comms. This
   // mapping is necessary in order to remove packages from link package queues

@@ -187,6 +187,7 @@ bool ComponentPackageManager::generateFragmentsForPackage(
       size_t bytesToEncode =
           std::min(spaceAvailable, packageInfo->pkg.getSize() - offset);
 
+      helper::logDebug(logPrefix + "creating fragment with fragmentId: " + std::to_string(nextFragmentHandle));
       auto packageFragment = std::make_unique<PackageFragmentInfo>(
           PackageFragmentInfo{{nextFragmentHandle++},
                               packageInfo,
@@ -195,6 +196,7 @@ bool ComponentPackageManager::generateFragmentsForPackage(
                               offset,
                               bytesToEncode,
                               false});
+      helper::logDebug(logPrefix + "nextFragmentHandle = " + std::to_string(nextFragmentHandle));
 
       offset += bytesToEncode;
 
