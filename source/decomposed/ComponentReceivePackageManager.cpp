@@ -214,6 +214,7 @@ void ComponentReceivePackageManager::processCompleteSequences(
   TRACE_METHOD(fragmentQueue->lastFragmentReceived, connVec.size());
   while (true) {
     uint32_t nextExpected = fragmentQueue->lastFragmentReceived + 1;
+    helper::logDebug(logPrefix + " looking for fragment " + std::to_string(nextExpected));
     
     // Check if we have the next expected fragment
     auto fragIt = fragmentQueue->storedFragments.find(nextExpected);

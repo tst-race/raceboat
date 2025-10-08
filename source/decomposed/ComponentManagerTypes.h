@@ -283,7 +283,7 @@ struct Link {
   std::deque<std::unique_ptr<PackageInfo>> packageQueue;
   LinkProperties props;
   std::vector<uint8_t> producerId;
-  uint32_t fragmentCount = 0;
+  uint32_t fragmentCount = 1;
 
   std::unordered_map<std::string, ProducerQueue> producerQueues;
 };
