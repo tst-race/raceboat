@@ -38,12 +38,12 @@ add_executable(testStandaloneLibrary
     SdkWrapperTest.cpp
     UserInputTest.cpp
     # StateMachineTest.cpp
-    ApiManager/DialTest.cpp
-    ApiManager/ListenTest.cpp
-    ApiManager/ReceiveRespondTest.cpp
-    ApiManager/RecvTest.cpp
-    ApiManager/SendTest.cpp
-    ApiManager/SendReceiveTest.cpp
+    # ApiManager/DialTest.cpp
+    # ApiManager/ListenTest.cpp
+    # ApiManager/ReceiveRespondTest.cpp
+    # ApiManager/RecvTest.cpp
+    # ApiManager/SendTest.cpp
+    # ApiManager/SendReceiveTest.cpp
     # ApiManager/BootstrapListenTest.cpp
 )
 

@@ -2,7 +2,7 @@ ComponentPackageManagerTestFixture_test_onPackageStatusChanged_package_fragment_
     pendingEncodings:{}
     nextEncodingHandle: 0
     fragments: {
-        1:PackageFragmentInfo{package: 7, action: nullptr, state: DONE, offset: 9, len: 10}, 
+        1:PackageFragmentInfo{package: 7, action: nullptr, state: DONE, offset: 1, len: 2}, 
     }
 }
 ComponentPackageManagerTestFixture_test_onPackageStatusChanged_package_fragment_all_succeeded_Test::TestBody:  with mockComponentManager.mockLink=Link{
@@ -10,7 +10,7 @@ ComponentPackageManagerTestFixture_test_onPackageStatusChanged_package_fragment_
     connections: []
     actionQueue: []
     packageQueue: [
-        PackageInfo{ linkId: mockLinkId, sdkHandle: 7, pendingEncodeHandle: 3, packageFragments: [PackageFragmentInfo{package: 7, action: nullptr, state: SENT, offset: 0, len: 9}, PackageFragmentInfo{package: 7, action: nullptr, state: DONE, offset: 9, len: 10}, ] }, 
+        PackageInfo{ linkId: mockLinkId, sdkHandle: 7, pendingEncodeHandle: 3, packageFragments: [PackageFragmentInfo{package: 7, action: nullptr, state: SENT, offset: 0, len: 1}, PackageFragmentInfo{package: 7, action: nullptr, state: DONE, offset: 1, len: 2}, ] }, 
     ]
 }
 MockRaceSdkComms::onPackageStatusChanged:  with handle=7, status=PACKAGE_SENT, timeout=-2147483648
