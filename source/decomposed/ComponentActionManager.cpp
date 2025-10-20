@@ -68,6 +68,8 @@ void ComponentActionManager::setup() {
         throw std::out_of_range(message);
       }
       encodingTime += encoding->getEncodingProperties().encodingTime;
+      helper::logDebug(logPrefix + " accumulating encoding time for encoding type " + 
+                       encodingType + ", it is now: " + std::to_string(encodingTime));
     }
     maxEncodingTime = std::max(maxEncodingTime, encodingTime);
   }
@@ -75,6 +77,7 @@ void ComponentActionManager::setup() {
   // add 0.1 for ComponentManager overhead. This isn't based on anything. Is
   // there a better approach?
   maxEncodingTime += 0.1 * TIME_MULTIPLIER;
+  helper::logDebug(logPrefix + "Max encoding time set to " + std::to_string(maxEncodingTime));
 
   auto usermodelProperties = manager.getUserModel()->getUserModelProperties();
   timelineLength = usermodelProperties.timelineLength;
@@ -151,6 +154,7 @@ void ComponentActionManager::fetchTimeline() {
 
 void ComponentActionManager::updateTimeline(ActionTimeline &usermodelActions,
                                             Timestamp start) {
+  helper::logDebug("Updating timeline with " + std::to_string(usermodelActions.size()) + " actions from user model");
   updateGlobalTimeline(usermodelActions, start);
   updateLinkTimelines();
   removeDeletedActions();
@@ -163,6 +167,8 @@ void ComponentActionManager::updateTimeline(ActionTimeline &usermodelActions,
 std::unique_ptr<ActionInfo>
 ComponentActionManager::createActionInfo(Action &&action) {
   MAKE_LOG_PREFIX();
+  helper::logDebug(logPrefix + "Creating ActionInfo for action id " +
+                   std::to_string(action.actionId));
   std::unique_ptr<ActionInfo> info = std::make_unique<ActionInfo>();
   info->action = action;
   info->toBeRemoved = false;
