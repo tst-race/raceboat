@@ -772,7 +772,7 @@ CMTypes::State ComponentManagerInternal::getState() {
   return lifetimeManager.state;
 }
 
-EncodingComponentWrapper *
+std::vector<EncodingComponentWrapper *>
 ComponentManagerInternal::encodingComponentFromEncodingParams(
     const EncodingParameters &params) {
   TRACE_METHOD();

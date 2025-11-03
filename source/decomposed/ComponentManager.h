@@ -173,7 +173,7 @@ public:
   virtual CMTypes::State getState();
   virtual const std::string &getCompositionId();
 
-  virtual EncodingComponentWrapper *
+  virtual std::vector<EncodingComponentWrapper *>
   encodingComponentFromEncodingParams(const EncodingParameters &params);
   virtual TransportComponentWrapper *getTransport();
   virtual UserModelComponentWrapper *getUserModel();

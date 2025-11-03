@@ -50,13 +50,16 @@ CmInternalStatus ComponentReceivePackageManager::onReceive(
   TRACE_METHOD(postId, linkId, bytes.size());
 
   // TODO: decode packages based on multiple encoding parameters
-  auto encoding = manager.encodingComponentFromEncodingParams(params);
-  if (encoding == nullptr) {
+  auto matchingEncodings = manager.encodingComponentFromEncodingParams(params);
+  if (matchingEncodings.empty()) {
     helper::logError(
         logPrefix +
         "Failed to find encoding for params. Encoding type: " + params.type);
     return ERROR;
+  } else if (matchingEncodings.size() > 1) {
+    helper::logWarning(logPrefix + "Multiple encodings found for encoding type " + params.type + ", using first one - this is dangerous because the sender may have a different first encoding");
   }
+  auto encoding = matchingEncodings.front();
   DecodingHandle decodingHandle{++nextDecodingHandle};
   pendingDecodings[decodingHandle] = linkId;
   encoding->decodeBytes(decodingHandle, params, bytes);

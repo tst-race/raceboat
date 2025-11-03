@@ -1,4 +1,3 @@
-
 //
 // Copyright 2023 Two Six Technologies
 //
@@ -51,8 +50,8 @@ public:
                                         const std::string &componentId,
                                         ComponentState state);
 
-  EncodingComponentWrapper *
-  encodingComponentFromEncodingParams(const EncodingParameters &params);
+  std::vector<EncodingComponentWrapper *> encodingComponentFromEncodingParams(
+      const EncodingParameters &params);
 
   void fail(CMTypes::ComponentWrapperHandle postId);
   void teardown();

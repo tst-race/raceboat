@@ -1,10 +1,10 @@
-
 //
 // Copyright 2023 Two Six Technologies
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
+//
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
@@ -188,16 +188,18 @@ void ComponentLifetimeManager::checkActivated() {
   }
 }
 
-EncodingComponentWrapper *
+std::vector<EncodingComponentWrapper *>
 ComponentLifetimeManager::encodingComponentFromEncodingParams(
     const EncodingParameters &params) {
+  std::vector<EncodingComponentWrapper *> matchingEncodings;
+
   for (auto &encoding : encodingsByType) {
     if (mimeTypeMatches(encoding.first, params.type)) {
-      return encoding.second;
+      matchingEncodings.push_back(encoding.second);
     }
   }
 
-  return nullptr;
+  return matchingEncodings;
 }
 
 void ComponentLifetimeManager::teardown() {

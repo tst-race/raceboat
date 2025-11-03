@@ -302,14 +302,19 @@ void ComponentPackageManager::encodeForAction(CMTypes::ActionInfo *actionInfo) {
       packageFragment->package->pendingEncodeHandle = encodingHandle;
     }
 
-    auto encoding =
+    auto matchingEncodings =
         manager.encodingComponentFromEncodingParams(encodingInfo.params);
-    if (encoding == nullptr) {
+    if (matchingEncodings.empty()) {
       helper::logError(logPrefix +
                        "Failed to find encoding for params. Encoding type: " +
                        encodingInfo.params.type);
       continue;
+    } else if (matchingEncodings.size() > 1) {
+      helper::logWarning(logPrefix + "Multiple encodings found for encoding type " +
+                               encodingInfo.params.type +
+                               ", using first one - this is dangerous because the receiver may have a different first encoding");
     }
+    auto encoding = matchingEncodings.front();
 
     pendingEncodings[encodingHandle] = &encodingInfo;
     encodingInfo.params.linkId = actionInfo->linkId;

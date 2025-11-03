@@ -59,16 +59,21 @@ void ComponentActionManager::setup() {
     for (EncodingType encodingType : action.second) {
       EncodingParameters params;
       params.type = encodingType;
-      auto encoding = manager.encodingComponentFromEncodingParams(params);
-      if (encoding == nullptr) {
+      auto matchingEncodings = manager.encodingComponentFromEncodingParams(params);
+      if (matchingEncodings.empty()) {
         std::string message =
             logPrefix +
             "Failed to find encoding for params. Encoding type: " + params.type;
         helper::logError(message);
         throw std::out_of_range(message);
       }
-      encodingTime += encoding->getEncodingProperties().encodingTime;
-      helper::logDebug(logPrefix + " accumulating encoding time for encoding type " + 
+      double maxEncodingTimeForType = 0;
+      for (auto encoding : matchingEncodings) {
+        double currentEncodingTime = encoding->getEncodingProperties().encodingTime;
+        maxEncodingTimeForType = std::max(maxEncodingTimeForType, currentEncodingTime);
+      }
+      encodingTime += maxEncodingTimeForType;
+      helper::logDebug(logPrefix + " accumulating encoding time for encoding type " +
                        encodingType + ", it is now: " + std::to_string(encodingTime));
     }
     maxEncodingTime = std::max(maxEncodingTime, encodingTime);
@@ -192,15 +197,17 @@ ComponentActionManager::createActionInfo(Action &&action) {
       info->wildcardLink |= (param.linkId == "*");
     }
 
-    auto encoding = manager.encodingComponentFromEncodingParams(param);
-    if (encoding == nullptr) {
+    auto matchingEncodings = manager.encodingComponentFromEncodingParams(param);
+    if (matchingEncodings.empty()) {
       std::string message =
           logPrefix +
           "Failed to find encoding for params. Encoding type: " + param.type;
       helper::logError(message);
       throw std::out_of_range(message);
+    } else if (matchingEncodings.size() > 1) {
+      helper::logWarning(logPrefix + "Multiple encodings found for encoding type " + param.type + ", using first one - this is dangerous because the receiver may have a different first encoding");
     }
-    
+    auto encoding = matchingEncodings.front();
     auto props = encoding->getEncodingPropertiesForParameters(param);
 
     info->encoding.push_back({
