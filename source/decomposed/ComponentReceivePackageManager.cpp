@@ -202,9 +202,6 @@ CmInternalStatus ComponentReceivePackageManager::receiveFragmentProducer(
   // Process any complete sequences starting from lastFragmentReceived + 1
   processCompleteSequences(fragmentQueue, connVec);
   
-  // Clean up old fragments periodically
-  cleanupExpiredFragments(fragmentQueue);
-
   return OK;
 }
 
@@ -266,29 +263,208 @@ void ComponentReceivePackageManager::processCompleteSequences(
 
 void ComponentReceivePackageManager::cleanupExpiredFragments(ProducerQueue* fragmentQueue) {
   TRACE_METHOD(fragmentQueue->storedFragments.size());
-  auto now = std::chrono::steady_clock::now();
-  const std::chrono::seconds timeout{3000}; // TODO: make this configurable, depends on channel latency
   
-  for (auto it = fragmentQueue->storedFragments.begin(); 
-       it != fragmentQueue->storedFragments.end();) {
-    if (now - it->second[0].timestamp > timeout) {
-      helper::logWarning(logPrefix + "Removing expired fragment " + 
-                        std::to_string(it->first));
-      it = fragmentQueue->storedFragments.erase(it);
-    } else {
-      ++it;
+  uint32_t nextExpected = fragmentQueue->lastFragmentReceived + 1;
+  
+  helper::logWarning(logPrefix + "Timeout reached: skipping missing fragments starting from " + 
+                     std::to_string(nextExpected));
+  
+  // Skip all missing fragments until we find one we have
+  skipMissingFragmentsUntilAvailable(fragmentQueue);
+}
+
+
+void ComponentReceivePackageManager::skipMissingFragmentsUntilAvailable(ProducerQueue* fragmentQueue) {
+  TRACE_METHOD();
+  uint32_t nextExpected = fragmentQueue->lastFragmentReceived + 1;
+  
+  helper::logDebug(logPrefix + "Starting to skip from fragment " + std::to_string(nextExpected));
+  
+  // Clear pending bytes since we're breaking the sequence
+  if (!fragmentQueue->pendingBytes.empty()) {
+    helper::logWarning(logPrefix + "Clearing " + std::to_string(fragmentQueue->pendingBytes.size()) + 
+                       " pending bytes due to skipped fragments");
+    fragmentQueue->pendingBytes.clear();
+  }
+  
+  // Find the first available fragment
+  uint32_t firstAvailable = 0;
+  for (const auto& [fragmentId, fragmentList] : fragmentQueue->storedFragments) {
+    if (fragmentId >= nextExpected && !fragmentList.empty()) {
+      if (firstAvailable == 0 || fragmentId < firstAvailable) {
+        firstAvailable = fragmentId;
+      }
     }
   }
+  
+  if (firstAvailable == 0) {
+    helper::logWarning(logPrefix + "No available fragments found to skip to");
+    return;
+  }
+  
+  helper::logWarning(logPrefix + "Skipping fragments " + std::to_string(nextExpected) + 
+                     " through " + std::to_string(firstAvailable - 1) + 
+                     ", jumping to " + std::to_string(firstAvailable));
+  
+  // Remove all fragments between nextExpected and firstAvailable
+  for (uint32_t fragmentId = nextExpected; fragmentId < firstAvailable; ++fragmentId) {
+    auto it = fragmentQueue->storedFragments.find(fragmentId);
+    if (it != fragmentQueue->storedFragments.end()) {
+      helper::logDebug(logPrefix + "Removing skipped fragment " + std::to_string(fragmentId));
+      fragmentQueue->storedFragments.erase(it);
+    }
+  }
+  
+  // Check if the first available fragment has CONTINUE_LAST_PACKAGE
+  auto availableIt = fragmentQueue->storedFragments.find(firstAvailable);
+  if (availableIt != fragmentQueue->storedFragments.end() && !availableIt->second.empty()) {
+    bool hasContinueLastPackage = false;
+    for (const auto& fragment : availableIt->second) {
+      if (fragment.flags & CONTINUE_LAST_PACKAGE) {
+        hasContinueLastPackage = true;
+        break;
+      }
+    }
+    
+    if (hasContinueLastPackage) {
+      helper::logWarning(logPrefix + "First available fragment " + std::to_string(firstAvailable) + 
+                         " has CONTINUE_LAST_PACKAGE flag, skipping it too");
+      fragmentQueue->storedFragments.erase(availableIt);
+      
+      // Recursively find the next available fragment that doesn't continue from previous
+      fragmentQueue->lastFragmentReceived = firstAvailable;
+      skipMissingFragmentsUntilAvailable(fragmentQueue);
+      return;
+    }
+  }
+  
+  // Jump to just before the first available fragment
+  fragmentQueue->lastFragmentReceived = firstAvailable - 1;
+  
+  helper::logDebug(logPrefix + "Set lastFragmentReceived to " + 
+                   std::to_string(fragmentQueue->lastFragmentReceived) + 
+                   ", next expected is now " + std::to_string(firstAvailable));
 }
+
+// Make the timeout configurable
+void ComponentReceivePackageManager::setFragmentTimeout(std::chrono::seconds timeout) {
+  TRACE_METHOD();
+  fragmentTimeout = timeout;
+  helper::logDebug(logPrefix + "Fragment timeout set to " + std::to_string(timeout.count()) + " seconds");
+}
+
+void ComponentReceivePackageManager::setCleanupCheckInterval(std::chrono::seconds interval) {
+  TRACE_METHOD();
+  cleanupCheckInterval = interval;
+  helper::logDebug(logPrefix + "Cleanup check interval set to " + std::to_string(interval.count()) + " seconds");
+}
+
+std::chrono::steady_clock::time_point 
+ComponentReceivePackageManager::findOldestFragmentTime(ProducerQueue* fragmentQueue) {
+  TRACE_METHOD();
+  auto oldestTime = std::chrono::steady_clock::time_point::max();
+  bool foundAny = false;
+  
+  for (const auto& [fragmentId, fragmentList] : fragmentQueue->storedFragments) {
+    if (!fragmentList.empty()) {
+      // Use timestamp of first piece in the fragment
+      auto fragmentTime = fragmentList[0].timestamp;
+      if (fragmentTime < oldestTime) {
+        oldestTime = fragmentTime;
+        foundAny = true;
+      }
+    }
+  }
+  
+  return foundAny ? oldestTime : std::chrono::steady_clock::time_point{};
+}
+
 
 void ComponentReceivePackageManager::teardown() {
   TRACE_METHOD();
 
+  shutdownRequested = true;
+  if (cleanupThread.joinable()) {
+    cleanupThread.join();
+  }
+
   pendingDecodings.clear();
-  pendingPackages.clear(); // Add cleanup for new data structure
 }
 
-void ComponentReceivePackageManager::setup() { TRACE_METHOD(); }
+void ComponentReceivePackageManager::cleanupWorker() {
+  TRACE_METHOD();
+  while (!shutdownRequested) {
+    std::this_thread::sleep_for(cleanupCheckInterval);
+    
+    if (shutdownRequested) break;
+    
+    try {
+      runCleanupOnAllQueues();
+    } catch (const std::exception& e) {
+      helper::logError(logPrefix + "Exception in cleanup worker: " + e.what());
+    }
+  }
+}
+
+void ComponentReceivePackageManager::runCleanupOnAllQueues() {
+  TRACE_METHOD();
+  helper::logDebug(logPrefix + "Running periodic cleanup check");
+  
+  bool foundWorkToDo = false;
+  
+  // Iterate through all links and their producer queues
+  for (auto& link : manager.getLinks()) {
+    for (auto& [producer, queue] : link->producerQueues) {
+      if (shouldRunCleanup(&queue)) {
+        foundWorkToDo = true;
+        helper::logDebug(logPrefix + "Running cleanup for link " + link->linkId);
+        
+        cleanupExpiredFragments(&queue);
+        
+        // After cleanup, try to process any newly available sequences
+        std::vector<std::string> connVec(link->connections.begin(), link->connections.end());
+        processCompleteSequences(&queue, connVec);
+      }
+    }
+  }
+  
+  if (foundWorkToDo) {
+    helper::logDebug(logPrefix + "Cleanup cycle completed with work done");
+  }
+}
+
+bool ComponentReceivePackageManager::shouldRunCleanup(ProducerQueue* fragmentQueue) {
+  auto now = std::chrono::steady_clock::now();
+  uint32_t nextExpected = fragmentQueue->lastFragmentReceived + 1;
+  
+  // Check condition 1: Do we have fragments with greater IDs?
+  bool hasLaterFragments = false;
+  for (const auto& [fragmentId, fragmentList] : fragmentQueue->storedFragments) {
+    if (fragmentId > nextExpected) {
+      hasLaterFragments = true;
+      break;
+    }
+  }
+  
+  if (!hasLaterFragments) {
+    return false; // No point in cleanup if we don't have later fragments
+  }
+  
+  // Check condition 2: Has timeout passed since oldest fragment was received?
+  auto oldestFragmentTime = findOldestFragmentTime(fragmentQueue);
+  if (oldestFragmentTime == std::chrono::steady_clock::time_point{}) {
+    return false; // No fragments stored
+  }
+  
+  return (now - oldestFragmentTime > fragmentTimeout);
+}
+
+void ComponentReceivePackageManager::setup() { 
+  TRACE_METHOD(); 
+  
+  shutdownRequested = false;
+  cleanupThread = std::thread(&ComponentReceivePackageManager::cleanupWorker, this);
+}
 
 static std::ostream &
 operator<<(std::ostream &out,

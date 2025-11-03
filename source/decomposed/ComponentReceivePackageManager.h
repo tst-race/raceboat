@@ -66,6 +66,10 @@ public:
   void teardown();
   void setup();
 
+  // Configuration methods
+  void setFragmentTimeout(std::chrono::seconds timeout);
+  void setCleanupCheckInterval(std::chrono::seconds interval);
+
 protected:
   CMTypes::CmInternalStatus receiveSingle(std::vector<uint8_t> &&bytes,
                                           std::vector<std::string> &&connVec);
@@ -99,7 +103,7 @@ protected:
 private:
   // New members for fragment management
   std::unordered_map<std::string, PackageAssembly> pendingPackages; // producer -> assembly
-  std::chrono::seconds fragmentTimeout{30}; // Configurable timeout
+  std::chrono::seconds fragmentTimeout{10}; // Configurable timeout
 
   // New helper methods
   CMTypes::CmInternalStatus processOutOfOrderFragment(
@@ -113,5 +117,15 @@ private:
   void processCompleteSequences(ProducerQueue* fragmentQueue, 
                                  const std::vector<std::string>& connVec);
   void cleanupExpiredFragments(ProducerQueue* fragmentQueue);
+  std::chrono::steady_clock::time_point findOldestFragmentTime(ProducerQueue* fragmentQueue);
+  void skipMissingFragmentsUntilAvailable(ProducerQueue* fragmentQueue);
+
+  // Cleanup thread management
+  std::thread cleanupThread;
+  std::atomic<bool> shutdownRequested{false};
+  std::chrono::seconds cleanupCheckInterval{1}; // Check every 1 second
+  void cleanupWorker();
+  void runCleanupOnAllQueues();
+  bool shouldRunCleanup(ProducerQueue* fragmentQueue);
 };
 } // namespace Raceboat
