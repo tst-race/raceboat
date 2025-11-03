@@ -54,6 +54,7 @@ void ComponentActionManager::setup() {
 
   auto transportProps = manager.getTransport()->getTransportProperties();
   helper::logDebug("Tranpsort Props:" + transportPropertiesToString(transportProps));
+  helper::logDebug("Tranpsort Props:" + transportPropertiesToString(transportProps));
   maxEncodingTime = 0;
   for (auto &action : transportProps.supportedActions) {
     double encodingTime = 0;
@@ -78,6 +79,8 @@ void ComponentActionManager::setup() {
                        encodingType + ", it is now: " + std::to_string(encodingTime));
     }
     maxEncodingTime = std::max(maxEncodingTime, encodingTime);
+    helper::logDebug("maxEncodingTime calculated=" + 
+                     std::to_string(maxEncodingTime));
     helper::logDebug("maxEncodingTime calculated=" + 
                      std::to_string(maxEncodingTime));
   }
@@ -350,6 +353,9 @@ void ComponentActionManager::updateEncodeTimestamp() {
     helper::logDebug("set nextEncodeTime to: " + std::to_string(nextEncodeTime) +
                      " (" + std::to_string((*it)->action.timestamp) + " - " +
                      std::to_string(maxEncodingTime));
+    helper::logDebug("set nextEncodeTime to: " + std::to_string(nextEncodeTime) +
+                     " (" + std::to_string((*it)->action.timestamp) + " - " +
+                     std::to_string(maxEncodingTime));
   }
 }
 
@@ -366,6 +372,8 @@ void ComponentActionManager::runActionThread() {
     //
     // Each iteration of the while loop will perform one of these, and then
     // check again for any other work
+    helper::logDebug(logPrefix + " setting wait_until, nextEncodeTime is: " +
+                     std::to_string(nextEncodeTime));
     helper::logDebug(logPrefix + " setting wait_until, nextEncodeTime is: " +
                      std::to_string(nextEncodeTime));
     double wait_until =
