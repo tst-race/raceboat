@@ -321,7 +321,15 @@ void ComponentPackageManager::encodeForAction(CMTypes::ActionInfo *actionInfo) {
 
     pendingEncodings[encodingHandle] = &encodingInfo;
     encodingInfo.params.linkId = actionInfo->linkId;
-    encoding->encodeBytes(encodingHandle, encodingInfo.params, bytesToEncode);
+    
+    // Copy data from front of total action buffer to this particular encodeBytes call
+    size_t bytesToCopy = std::min(static_cast<size_t>(encodingInfo.props.maxBytes), bytesToEncode.size());
+    std::vector<uint8_t> bytesForEncodingItem(bytesToEncode.begin(), bytesToEncode.begin() + bytesToCopy);
+
+    encoding->encodeBytes(encodingHandle, encodingInfo.params, bytesForEncodingItem);
+
+    // Erase data that has been dispatched for encoding
+    bytesToEncode.erase(bytesToEncode.begin(), bytesToEncode.begin() + bytesToCopy);
   }
 }
 
