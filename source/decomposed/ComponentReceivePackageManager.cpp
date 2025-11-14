@@ -48,7 +48,7 @@ CmInternalStatus ComponentReceivePackageManager::onReceive(
     const EncodingParameters &params, std::vector<uint8_t> &&bytes) {
   TRACE_METHOD(postId, linkId, bytes.size());
 
-  // TODO: decode packages based on multiple encoding parameters
+  // Each encoding is received as a separate message with its own encoding parameters
   auto matchingEncodings = manager.encodingComponentFromEncodingParams(params);
   if (matchingEncodings.empty()) {
     helper::logError(
@@ -76,9 +76,8 @@ CmInternalStatus ComponentReceivePackageManager::onBytesDecoded(
     return OK;
   }
 
-  // TODO: handle packages encoded with multiple encodings. This works if they
-  // are each separate EncPkgs, but if stuff ever gets fragmented across
-  // multiple encode calls, we need a way to recombine them.
+  // Each encoding is received as a separate message, so no need to handle multiple
+  // encodings per received message. Fragment reassembly happens per encoding stream.
   try {
     auto linkId = pendingDecodings.at(handle);
     pendingDecodings.erase(handle);

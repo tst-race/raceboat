@@ -156,6 +156,7 @@ enum EncodingFlags {
 
 struct ActionInfo;
 struct PackageInfo;
+struct PackageFragmentInfo;
 
 // This struct is owned by the ActionInfo and will live until the action has
 // been executed by the ComponentActionManager.
@@ -166,6 +167,8 @@ struct EncodingInfo {
   EncodingState state;
   // The parent ActionInfo instance
   ActionInfo *info;
+  // The fragment assigned to this specific encoding (1:1 relationship)
+  PackageFragmentInfo *assignedFragment = nullptr;
 };
 
 std::ostream &operator<<(std::ostream &out, const EncodingInfo &encodingInfo);

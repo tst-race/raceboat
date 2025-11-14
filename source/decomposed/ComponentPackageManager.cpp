@@ -73,29 +73,20 @@ bool ComponentPackageManager::isPackageFinished(PackageInfo *packageInfo) {
   return true;
 }
 
-size_t ComponentPackageManager::spaceAvailableInAction(ActionInfo *actionInfo) {
+size_t ComponentPackageManager::spaceAvailableForEncoding(CMTypes::EncodingInfo *encodingInfo) {
   MAKE_LOG_PREFIX();
-  if (actionInfo->toBeRemoved) {
+  
+  if (encodingInfo->state != EncodingState::UNENCODED) {
     return 0;
-  }
-
-  if (manager.mode == EncodingMode::SINGLE && !actionInfo->fragments.empty()) {
-    return 0;
-  }
-
-  for (auto &encodingInfo : actionInfo->encoding) {
-    if (encodingInfo.state != EncodingState::UNENCODED) {
-      return 0;
-    }
   }
 
   size_t perFragmentOverhead =
       (manager.mode == EncodingMode::SINGLE) ? 0 : FRAGMENT_LEN_SIZE;
-  size_t perActionOverhead = 0;
+  size_t perEncodingOverhead = 0;
   if (manager.mode == EncodingMode::FRAGMENT_SINGLE_PRODUCER) {
-    perActionOverhead = FRAGMENT_SINGLE_PRODUCER_OVERHEAD;
+    perEncodingOverhead = FRAGMENT_SINGLE_PRODUCER_OVERHEAD;
   } else if (manager.mode == EncodingMode::FRAGMENT_MULTIPLE_PRODUCER) {
-    perActionOverhead = FRAGMENT_MULTIPLE_PRODUCER_OVERHEAD;
+    perEncodingOverhead = FRAGMENT_MULTIPLE_PRODUCER_OVERHEAD;
   } else if (manager.mode != EncodingMode::SINGLE &&
              manager.mode != EncodingMode::BATCH) {
     helper::logError(logPrefix +
@@ -103,17 +94,12 @@ size_t ComponentPackageManager::spaceAvailableInAction(ActionInfo *actionInfo) {
     return 0;
   }
 
-  // TODO: cache this
-  size_t maxBytes = 0;
-  for (auto &encodingInfo : actionInfo->encoding) {
-    maxBytes += static_cast<size_t>(encodingInfo.props.maxBytes);
-  }
-
-  // TODO: cache this
-  size_t filled = perActionOverhead;
-  for (auto &packageFragment : actionInfo->fragments) {
-    filled += perFragmentOverhead;
-    filled += packageFragment->len;
+  size_t maxBytes = static_cast<size_t>(encodingInfo->props.maxBytes);
+  size_t filled = perEncodingOverhead;
+  
+  // If this encoding already has a fragment, account for its size
+  if (encodingInfo->assignedFragment != nullptr) {
+    filled += perFragmentOverhead + encodingInfo->assignedFragment->len;
   }
 
   // watch out for underflow
@@ -124,18 +110,47 @@ size_t ComponentPackageManager::spaceAvailableInAction(ActionInfo *actionInfo) {
   }
 }
 
+size_t ComponentPackageManager::spaceAvailableInAction(ActionInfo *actionInfo) {
+  MAKE_LOG_PREFIX();
+  if (actionInfo->toBeRemoved) {
+    return 0;
+  }
+
+  if (manager.mode == EncodingMode::SINGLE && !actionInfo->fragments.empty()) {
+    return 0;
+  }
+
+  // Sum up available space from all unassigned encodings
+  size_t totalAvailable = 0;
+  for (auto &encodingInfo : actionInfo->encoding) {
+    if (encodingInfo.state == EncodingState::UNENCODED && 
+        encodingInfo.assignedFragment == nullptr) {
+      totalAvailable += spaceAvailableForEncoding(&encodingInfo);
+    }
+  }
+
+  return totalAvailable;
+}
+
 bool ComponentPackageManager::isActionAbleToFit(ActionInfo *actionInfo,
                                                 const EncPkg &pkg) {
-  size_t spaceAvailable = spaceAvailableInAction(actionInfo);
-  size_t minFragmentSize = 1;
-  if (manager.mode == EncodingMode::SINGLE ||
-      manager.mode == EncodingMode::BATCH) {
-    if (spaceAvailable > pkg.getSize()) {
-      return true;
-    }
-  } else {
-    if (spaceAvailable > minFragmentSize) {
-      return true;
+  // Check if at least one encoding in this action has available space
+  for (auto &encodingInfo : actionInfo->encoding) {
+    if (encodingInfo.state == EncodingState::UNENCODED && 
+        encodingInfo.assignedFragment == nullptr) {
+      size_t spaceAvailable = spaceAvailableForEncoding(&encodingInfo);
+      size_t minFragmentSize = 1;
+      
+      if (manager.mode == EncodingMode::SINGLE ||
+          manager.mode == EncodingMode::BATCH) {
+        if (spaceAvailable >= pkg.getSize()) {
+          return true;
+        }
+      } else {
+        if (spaceAvailable >= minFragmentSize) {
+          return true;
+        }
+      }
     }
   }
   return false;
@@ -181,32 +196,49 @@ bool ComponentPackageManager::generateFragmentsForPackage(
 
   for (auto actionInfo : link->actionQueue) {
     if ((actionInfo->linkId == link->linkId or actionInfo->linkId.empty()) &&
-        isActionAbleToFit(actionInfo, packageInfo->pkg) &&
         isTimeToEncode(now, actionInfo)) {
-      size_t spaceAvailable = spaceAvailableInAction(actionInfo);
-      size_t bytesToEncode =
-          std::min(spaceAvailable, packageInfo->pkg.getSize() - offset);
+      
+      // Iterate through each encoding in the action
+      for (auto &encodingInfo : actionInfo->encoding) {
+        if (encodingInfo.state != EncodingState::UNENCODED || 
+            encodingInfo.assignedFragment != nullptr) {
+          continue; // Skip encodings that are already assigned or being processed
+        }
 
-      helper::logDebug(logPrefix + "creating fragment with fragmentId: " + std::to_string(nextFragmentHandle));
-      auto packageFragment = std::make_unique<PackageFragmentInfo>(
-          PackageFragmentInfo{{nextFragmentHandle++},
-                              packageInfo,
-                              PackageFragmentState::UNENCODED,
-                              actionInfo,
-                              offset,
-                              bytesToEncode,
-                              false});
-      helper::logDebug(logPrefix + "nextFragmentHandle = " + std::to_string(nextFragmentHandle));
+        size_t spaceAvailable = spaceAvailableForEncoding(&encodingInfo);
+        if (spaceAvailable == 0) {
+          continue; // No space available for this encoding
+        }
 
-      offset += bytesToEncode;
+        size_t bytesToEncode =
+            std::min(spaceAvailable, packageInfo->pkg.getSize() - offset);
+        
+        if (bytesToEncode == 0) {
+          continue; // Nothing to encode
+        }
 
-      fragments[packageFragment->handle] = packageFragment.get();
-      actionInfo->fragments.push_back(packageFragment.get());
-      packageInfo->packageFragments.push_back(std::move(packageFragment));
-      actionInfo->linkId = link->linkId;
+        auto packageFragment = std::make_unique<CMTypes::PackageFragmentInfo>(
+            CMTypes::PackageFragmentInfo{{nextFragmentHandle++},
+                                packageInfo,
+                                PackageFragmentState::UNENCODED,
+                                actionInfo,
+                                offset,
+                                bytesToEncode,
+                                false});
 
-      if (offset == packageInfo->pkg.getSize()) {
-        return true;
+        offset += bytesToEncode;
+
+        // Establish 1:1 relationship between encoding and fragment
+        encodingInfo.assignedFragment = packageFragment.get();
+        
+        fragments[packageFragment->handle] = packageFragment.get();
+        actionInfo->fragments.push_back(packageFragment.get());
+        packageInfo->packageFragments.push_back(std::move(packageFragment));
+        actionInfo->linkId = link->linkId;
+
+        if (offset == packageInfo->pkg.getSize()) {
+          return true;
+        }
       }
     }
   }
@@ -250,8 +282,29 @@ void ComponentPackageManager::encodeForAction(CMTypes::ActionInfo *actionInfo) {
         "Got multiple fragments in an action with mode == SINGLE");
   }
 
-  std::vector<uint8_t> bytesToEncode;
-  if (!actionInfo->fragments.empty()) {
+  
+  // Process each encoding individually with its assigned fragment
+  for (auto &encodingInfo : actionInfo->encoding) {
+    if (encodingInfo.state != EncodingState::UNENCODED) {
+      continue;
+    }
+
+    // Skip encodings that don't have an assigned fragment
+    if (encodingInfo.assignedFragment == nullptr) {
+      continue;
+    }
+
+    EncodingHandle encodingHandle{++nextEncodingHandle};
+    encodingInfo.pendingEncodeHandle = encodingHandle;
+    encodingInfo.state = EncodingState::ENCODING;
+
+    // Build the bytes to encode for this specific encoding
+    std::vector<uint8_t> bytesToEncode;
+
+    // Add header information specific to this encoding   
+    helper::logDebug(logPrefix +
+                       "calling getLink on " +
+                       actionInfo->linkId);
     auto link = manager.getLink(actionInfo->linkId);
     if (manager.mode == EncodingMode::FRAGMENT_MULTIPLE_PRODUCER) {
       bytesToEncode.insert(bytesToEncode.end(), link->producerId.begin(),
@@ -266,44 +319,33 @@ void ComponentPackageManager::encodeForAction(CMTypes::ActionInfo *actionInfo) {
       link->fragmentCount += 1;
 
       uint8_t flags = 0;
-      if (actionInfo->fragments.front()->offset != 0) {
+      if (encodingInfo.assignedFragment->offset != 0) {
         flags |= EncodingFlags::CONTINUE_LAST_PACKAGE;
       }
-      if (!isLastFragment(actionInfo->fragments.back())) {
+      if (!isLastFragment(encodingInfo.assignedFragment)) {
         flags |= EncodingFlags::CONTINUE_NEXT_PACKAGE;
       }
       bytesToEncode.push_back(flags);
     }
 
-    for (auto packageFragment : actionInfo->fragments) {
-      auto data = packageFragment->package->pkg.getRawData();
-      uint32_t offset = packageFragment->offset;
-      uint32_t len = packageFragment->len;
-      auto begin = data.data() + offset;
-      auto end = data.data() + offset + len;
-      if (manager.mode != EncodingMode::SINGLE) {
-        uint8_t *lenPtr = reinterpret_cast<uint8_t *>(&len);
-        bytesToEncode.insert(bytesToEncode.end(), lenPtr, lenPtr + sizeof(len));
-      }
-
-      bytesToEncode.insert(bytesToEncode.end(), begin, end);
-      packageFragment->state = PackageFragmentState::ENCODING;
-    }
-  }
-
-  for (auto &encodingInfo : actionInfo->encoding) {
-    if (encodingInfo.state != EncodingState::UNENCODED) {
-      continue;
+    // Add the fragment data for this encoding
+    auto packageFragment = encodingInfo.assignedFragment;
+    auto data = packageFragment->package->pkg.getRawData();
+    uint32_t offset = packageFragment->offset;
+    uint32_t len = packageFragment->len;
+    auto begin = data.data() + offset;
+    auto end = data.data() + offset + len;
+    
+    if (manager.mode != EncodingMode::SINGLE) {
+      uint8_t *lenPtr = reinterpret_cast<uint8_t *>(&len);
+      bytesToEncode.insert(bytesToEncode.end(), lenPtr, lenPtr + sizeof(len));
     }
 
-    EncodingHandle encodingHandle{++nextEncodingHandle};
-    encodingInfo.pendingEncodeHandle = encodingHandle;
-    encodingInfo.state = EncodingState::ENCODING;
+    bytesToEncode.insert(bytesToEncode.end(), begin, end);
+    packageFragment->state = PackageFragmentState::ENCODING;
 
-    // get the next package(s) to encode
-    for (auto packageFragment : actionInfo->fragments) {
-      packageFragment->package->pendingEncodeHandle = encodingHandle;
-    }
+    // Set the package's pending encode handle for this encoding
+    packageFragment->package->pendingEncodeHandle = encodingHandle;
 
     auto matchingEncodings =
         manager.encodingComponentFromEncodingParams(encodingInfo.params);
@@ -321,15 +363,9 @@ void ComponentPackageManager::encodeForAction(CMTypes::ActionInfo *actionInfo) {
 
     pendingEncodings[encodingHandle] = &encodingInfo;
     encodingInfo.params.linkId = actionInfo->linkId;
-    
-    // Copy data from front of total action buffer to this particular encodeBytes call
-    size_t bytesToCopy = std::min(static_cast<size_t>(encodingInfo.props.maxBytes), bytesToEncode.size());
-    std::vector<uint8_t> bytesForEncodingItem(bytesToEncode.begin(), bytesToEncode.begin() + bytesToCopy);
 
-    encoding->encodeBytes(encodingHandle, encodingInfo.params, bytesForEncodingItem);
-
-    // Erase data that has been dispatched for encoding
-    bytesToEncode.erase(bytesToEncode.begin(), bytesToEncode.begin() + bytesToCopy);
+    // Send the complete buffer for this encoding
+    encoding->encodeBytes(encodingHandle, encodingInfo.params, bytesToEncode);
   }
 }
 
@@ -347,6 +383,7 @@ CMTypes::CmInternalStatus ComponentPackageManager::onLinkStatusChanged(
         for (auto &encodingInfo : actionInfo->encoding) {
           pendingEncodings.erase(encodingInfo.pendingEncodeHandle);
           encodingInfo.state = EncodingState::UNENCODED;
+          encodingInfo.assignedFragment = nullptr;
         }
         actionInfo->fragments.clear();
       }
@@ -446,6 +483,14 @@ CMTypes::CmInternalStatus ComponentPackageManager::onPackageStatusChanged(
             packageFragment2->action = nullptr;
           }
           action->fragments.clear();
+
+          // Clear encoding assignments for fragments being removed
+          for (auto &encodingInfo : action->encoding) {
+            if (encodingInfo.assignedFragment != nullptr && 
+                encodingInfo.assignedFragment->markForDeletion) {
+              encodingInfo.assignedFragment = nullptr;
+            }
+          }
         }
 
         // remove any remaining fragments
@@ -521,6 +566,14 @@ void ComponentPackageManager::generateFragmentsForAllPackages() {
         packageFragment->action = nullptr;
       }
       actionInfo->fragments.clear();
+      
+      // Clear encoding-fragment assignments
+      for (auto &encodingInfo : actionInfo->encoding) {
+        if (encodingInfo.state == EncodingState::UNENCODED) {
+          encodingInfo.assignedFragment = nullptr;
+        }
+      }
+      
       if (actionInfo->wildcardLink) {
         actionInfo->linkId.clear();
       }
@@ -581,6 +634,7 @@ void ComponentPackageManager::actionDone(CMTypes::ActionInfo *actionInfo) {
       pendingEncodings.erase(iter);
     }
     encodingInfo.state = EncodingState::DONE;
+    encodingInfo.assignedFragment = nullptr;
   }
 
   for (auto packageFragment : actionInfo->fragments) {

@@ -73,3 +73,9 @@ some-file-in-tar-gz.txt
 test/input-files/usr/*
 rrlog*
 srlog*
+
+client-kits/
+client-tmp/
+server-kits/
+server-tmp/
+test-data/
