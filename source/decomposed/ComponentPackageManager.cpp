@@ -1,10 +1,10 @@
-
 //
 // Copyright 2023 Two Six Technologies
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
+//
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
@@ -253,19 +253,20 @@ PluginResponse ComponentPackageManager::sendPackage(
   auto linkId = manager.getConnection(connId)->linkId;
   auto link = manager.getLink(linkId);
 
+  // Remove this check:
   if (!isPackageAbleToFit(link, pkg)) {
-    return PLUGIN_TEMP_ERROR;
+    helper::logDebug("Package cannot fit in any CURRENTLY KNOWN action on link " +
+                         link->linkId + " still enqueueing assuming new actions will appear");
   }
 
   auto packageInfo = std::make_unique<PackageInfo>(
       PackageInfo{link, std::move(pkg), handle, {NULL_RACE_HANDLE}, {}});
 
-  if (!generateFragmentsForPackage(now, link, packageInfo.get())) {
-    helper::logError("Failed to generate fragments for package");
-  }
+  // Try to fragment now, but it's OK if it doesn't fit yet
+  generateFragmentsForPackage(now, link, packageInfo.get());
   link->packageQueue.push_back(std::move(packageInfo));
 
-  // TODO: TimeoutTimestamp? batchId?
+  // Always return PLUGIN_OK (or consider a new status like PLUGIN_QUEUED)
   return PLUGIN_OK;
 }
 
