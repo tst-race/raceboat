@@ -290,11 +290,6 @@ void ComponentPackageManager::encodeForAction(CMTypes::ActionInfo *actionInfo) {
       continue;
     }
 
-    // Skip encodings that don't have an assigned fragment
-    if (encodingInfo.assignedFragment == nullptr) {
-      continue;
-    }
-
     EncodingHandle encodingHandle{++nextEncodingHandle};
     encodingInfo.pendingEncodeHandle = encodingHandle;
     encodingInfo.state = EncodingState::ENCODING;
@@ -302,52 +297,57 @@ void ComponentPackageManager::encodeForAction(CMTypes::ActionInfo *actionInfo) {
     // Build the bytes to encode for this specific encoding
     std::vector<uint8_t> bytesToEncode;
 
-    // Add header information specific to this encoding   
-    helper::logDebug(logPrefix +
-                       "calling getLink on " +
-                       actionInfo->linkId);
-    auto link = manager.getLink(actionInfo->linkId);
-    if (manager.mode == EncodingMode::FRAGMENT_MULTIPLE_PRODUCER) {
-      bytesToEncode.insert(bytesToEncode.end(), link->producerId.begin(),
-                           link->producerId.end());
-    }
-
-    if (manager.mode == EncodingMode::FRAGMENT_MULTIPLE_PRODUCER ||
-        manager.mode == EncodingMode::FRAGMENT_SINGLE_PRODUCER) {
-      uint8_t *lenPtr = reinterpret_cast<uint8_t *>(&link->fragmentCount);
-      bytesToEncode.insert(bytesToEncode.end(), lenPtr,
-                           lenPtr + sizeof(link->fragmentCount));
-      link->fragmentCount += 1;
-
-      uint8_t flags = 0;
-      if (encodingInfo.assignedFragment->offset != 0) {
-        flags |= EncodingFlags::CONTINUE_LAST_PACKAGE;
+    if (encodingInfo.assignedFragment != nullptr) {
+      // Add header information specific to this encoding   
+      helper::logDebug(logPrefix +
+                        "calling getLink on " +
+                        actionInfo->linkId);
+      auto link = manager.getLink(actionInfo->linkId);
+      if (manager.mode == EncodingMode::FRAGMENT_MULTIPLE_PRODUCER) {
+        bytesToEncode.insert(bytesToEncode.end(), link->producerId.begin(),
+                            link->producerId.end());
       }
-      if (!isLastFragment(encodingInfo.assignedFragment)) {
-        flags |= EncodingFlags::CONTINUE_NEXT_PACKAGE;
+
+      if (manager.mode == EncodingMode::FRAGMENT_MULTIPLE_PRODUCER ||
+          manager.mode == EncodingMode::FRAGMENT_SINGLE_PRODUCER) {
+        uint8_t *lenPtr = reinterpret_cast<uint8_t *>(&link->fragmentCount);
+        bytesToEncode.insert(bytesToEncode.end(), lenPtr,
+                            lenPtr + sizeof(link->fragmentCount));
+        link->fragmentCount += 1;
+
+        uint8_t flags = 0;
+        if (encodingInfo.assignedFragment->offset != 0) {
+          flags |= EncodingFlags::CONTINUE_LAST_PACKAGE;
+        }
+        if (!isLastFragment(encodingInfo.assignedFragment)) {
+          flags |= EncodingFlags::CONTINUE_NEXT_PACKAGE;
+        }
+        bytesToEncode.push_back(flags);
       }
-      bytesToEncode.push_back(flags);
+
+      // Add the fragment data for this encoding
+      auto packageFragment = encodingInfo.assignedFragment;
+      auto data = packageFragment->package->pkg.getRawData();
+      uint32_t offset = packageFragment->offset;
+      uint32_t len = packageFragment->len;
+      auto begin = data.data() + offset;
+      auto end = data.data() + offset + len;
+      
+      if (manager.mode != EncodingMode::SINGLE) {
+        uint8_t *lenPtr = reinterpret_cast<uint8_t *>(&len);
+        bytesToEncode.insert(bytesToEncode.end(), lenPtr, lenPtr + sizeof(len));
+      }
+
+      bytesToEncode.insert(bytesToEncode.end(), begin, end);
+      packageFragment->state = PackageFragmentState::ENCODING;
+
+      // Set the package's pending encode handle for this encoding
+      packageFragment->package->pendingEncodeHandle = encodingHandle;
+    } else {
+      // No assigned fragment, so encode an empty payload (cover traffic)
+      helper::logDebug(logPrefix + "Encoding cover traffic (no data) for action " +
+                        std::to_string(actionInfo->action.actionId));
     }
-
-    // Add the fragment data for this encoding
-    auto packageFragment = encodingInfo.assignedFragment;
-    auto data = packageFragment->package->pkg.getRawData();
-    uint32_t offset = packageFragment->offset;
-    uint32_t len = packageFragment->len;
-    auto begin = data.data() + offset;
-    auto end = data.data() + offset + len;
-    
-    if (manager.mode != EncodingMode::SINGLE) {
-      uint8_t *lenPtr = reinterpret_cast<uint8_t *>(&len);
-      bytesToEncode.insert(bytesToEncode.end(), lenPtr, lenPtr + sizeof(len));
-    }
-
-    bytesToEncode.insert(bytesToEncode.end(), begin, end);
-    packageFragment->state = PackageFragmentState::ENCODING;
-
-    // Set the package's pending encode handle for this encoding
-    packageFragment->package->pendingEncodeHandle = encodingHandle;
-
     auto matchingEncodings =
         manager.encodingComponentFromEncodingParams(encodingInfo.params);
     if (matchingEncodings.empty()) {
