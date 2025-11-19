@@ -25,8 +25,15 @@ function(setup_component_target)
     target_include_directories(
         ${COMPONENT_TARGET}
         PRIVATE 
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../../include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/race>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../../include>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/race>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/race/unified>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/race/decomposed>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/race/common>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race/common>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race/unified>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race/decomposed>
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     )
 

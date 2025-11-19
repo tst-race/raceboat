@@ -1,7 +1,7 @@
 ComponentActionManagerTestFixture_test_onSendPackage_existing_actions_Test::TestBody:  with actionManager=ActionManager{maxEncodingTime: 0.1000000000000000, nextFetchTime: 0.0000000000000000, nextActionTime: inf, nextEncodeTime: inf, lastEncodeTime: 0.0000000000000000, actions: [ActionInfo{action: Action{ id:2}, linkId: , encoding size: 0, fragments: [], toBeRemoved: 0}, ActionInfo{action: Action{ id:1}, linkId: , encoding size: 0, fragments: [], toBeRemoved: 0}, ]}
 MockComponentManagerInternal::getConnection:  with connId=mockConnId
 MockComponentManagerInternal::getUserModel: 
-ComponentActionManagerTestFixture_test_onSendPackage_existing_actions_Test::onSendPackage:  with linkId=mockLinkId, bytes=25
+ComponentActionManagerTestFixture_test_onSendPackage_existing_actions_Test::onSendPackage:  with linkId=mockLinkId, bytes=9
 MockComponentManagerInternal::getTransport: 
 MockTransportComponentWrapper::getActionParams:  with action=Action{ id:4}
 MockComponentManagerInternal::getTransport: 

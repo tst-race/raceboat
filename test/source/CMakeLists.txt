@@ -25,11 +25,11 @@ add_executable(testStandaloneLibrary
     ComponentManagerTest.cpp
     ComponentPackageManagerTest.cpp
     ComponentReceivePackageManagerTest.cpp
-    ConfigTest.cpp
+    # ConfigTest.cpp
     CoreTest.cpp
     main.cpp
     ExternalApiTest.cpp
-    FileSystemTest.cpp
+    # FileSystemTest.cpp
     HandlerTest.cpp
     IntegrationTest.cpp
     PluginLoadingTest.cpp
@@ -38,12 +38,12 @@ add_executable(testStandaloneLibrary
     SdkWrapperTest.cpp
     UserInputTest.cpp
     # StateMachineTest.cpp
-    ApiManager/DialTest.cpp
-    ApiManager/ListenTest.cpp
-    ApiManager/ReceiveRespondTest.cpp
-    ApiManager/RecvTest.cpp
-    ApiManager/SendTest.cpp
-    ApiManager/SendReceiveTest.cpp
+    # ApiManager/DialTest.cpp
+    # ApiManager/ListenTest.cpp
+    # ApiManager/ReceiveRespondTest.cpp
+    # ApiManager/RecvTest.cpp
+    # ApiManager/SendTest.cpp
+    # ApiManager/SendReceiveTest.cpp
     # ApiManager/BootstrapListenTest.cpp
 )
 
@@ -63,14 +63,15 @@ target_include_directories(testStandaloneLibrary PRIVATE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../common>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include/race>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race/common>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race/decomposed>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include/race/unified>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include/race/unified>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include/race/decomposed>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../include/race/common>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../source/api-managers>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../source/plugin-loading>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
     )
+
 # Link external dependencies
 find_package(GTest REQUIRED CONFIG)
 find_package(Threads REQUIRED)

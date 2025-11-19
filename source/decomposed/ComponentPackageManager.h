@@ -1,4 +1,3 @@
-
 //
 // Copyright 2023 Two Six Technologies
 //
@@ -72,6 +71,7 @@ protected:
   bool isPackageAbleToFit(CMTypes::Link *link, const EncPkg &pkg);
   bool isTimeToEncode(double now, CMTypes::ActionInfo *actionInfo);
 
+  size_t spaceAvailableForEncoding(CMTypes::EncodingInfo *encodingInfo);
   size_t spaceAvailableInAction(CMTypes::ActionInfo *actionInfo);
   bool generateFragmentsForPackage(double now, CMTypes::Link *link,
                                    CMTypes::PackageInfo *packageInfo);

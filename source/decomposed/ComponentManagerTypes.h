@@ -1,4 +1,3 @@
-
 //
 // Copyright 2023 Two Six Technologies
 //
@@ -157,6 +156,7 @@ enum EncodingFlags {
 
 struct ActionInfo;
 struct PackageInfo;
+struct PackageFragmentInfo;
 
 // This struct is owned by the ActionInfo and will live until the action has
 // been executed by the ComponentActionManager.
@@ -167,6 +167,8 @@ struct EncodingInfo {
   EncodingState state;
   // The parent ActionInfo instance
   ActionInfo *info;
+  // The fragment assigned to this specific encoding (1:1 relationship)
+  PackageFragmentInfo *assignedFragment = nullptr;
 };
 
 std::ostream &operator<<(std::ostream &out, const EncodingInfo &encodingInfo);
@@ -251,6 +253,23 @@ struct PackageInfo {
 
 std::ostream &operator<<(std::ostream &out, const PackageInfo &packageInfo);
 
+struct StoredFragment {
+    std::vector<uint8_t> data;
+    uint8_t flags;
+    std::chrono::steady_clock::time_point timestamp;
+};
+struct ProducerQueue {
+  // uint32_t lastFragmentReceived;
+  // std::vector<uint8_t> pendingBytes;
+  uint32_t lastFragmentReceived = 0;
+  std::vector<uint8_t> pendingBytes;
+  
+  // Store fragments by ID until we can process them
+  std::map<uint32_t, std::vector<StoredFragment>> storedFragments;
+  std::chrono::steady_clock::time_point lastActivity = std::chrono::steady_clock::now();
+
+};
+
 // This struct is owned by the ComponentLinkManager
 struct Link {
   explicit Link(const LinkID &linkId) : linkId(linkId) {}
@@ -267,12 +286,8 @@ struct Link {
   std::deque<std::unique_ptr<PackageInfo>> packageQueue;
   LinkProperties props;
   std::vector<uint8_t> producerId;
-  uint32_t fragmentCount = 0;
+  uint32_t fragmentCount = 1;
 
-  struct ProducerQueue {
-    uint32_t lastFragmentReceived;
-    std::vector<uint8_t> pendingBytes;
-  };
   std::unordered_map<std::string, ProducerQueue> producerQueues;
 };
 

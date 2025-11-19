@@ -144,12 +144,12 @@ TEST(Config, manifest_parsing) {
     EXPECT_EQ(props.reliable, false);
     EXPECT_EQ(props.isFlushable, false);
     EXPECT_EQ(props.sendType, ST_EPHEM_SYNC);
-    EXPECT_EQ(props.supported_hints.size(), 1);
-    EXPECT_STREQ(props.supported_hints.at(0).c_str(), "hint");
+    EXPECT_EQ(props.supportedHints.size(), 1);
+    EXPECT_STREQ(props.supportedHints.at(0).c_str(), "hint");
     EXPECT_EQ(props.transmissionType, TT_UNICAST);
     EXPECT_EQ(props.maxLinks, 2000);
-    EXPECT_EQ(props.creatorsPerLoader, -1);
-    EXPECT_EQ(props.loadersPerCreator, -1);
+    EXPECT_EQ(props.maxCreatorsPerLoader, -1);
+    EXPECT_EQ(props.maxLoadersPerCreator, -1);
 
     EXPECT_EQ(props.roles.size(), 1);
     EXPECT_EQ(props.roles[0].roleName, "default");

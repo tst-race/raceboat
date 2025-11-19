@@ -242,8 +242,8 @@ TEST_F(PythonCommsDecompositionTextFixture, transport_getLinkProperties) {
     EXPECT_EQ(prop.best.receive.latency_ms, 202);
     EXPECT_EQ(prop.best.receive.loss, 0.5);
 
-    EXPECT_EQ(prop.supported_hints.size(), 1);
-    EXPECT_EQ(prop.supported_hints.front(), "hint1");
+    EXPECT_EQ(prop.supportedHints.size(), 1);
+    EXPECT_EQ(prop.supportedHints.front(), "hint1");
     EXPECT_EQ(prop.channelGid, "mockChannel");
     EXPECT_EQ(prop.linkAddress, "mockLinkAddress");
 }

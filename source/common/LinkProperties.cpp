@@ -40,8 +40,8 @@ std::string linkPropertiesToString(const LinkProperties &props) {
   ss << " best = " + linkPropertyPairToString(props.best);
   ss << " channelGid = " + props.channelGid;
   ss << " linkAddress = " + props.linkAddress;
-  ss << " supported_hints = " + std::accumulate(props.supported_hints.begin(),
-                                                props.supported_hints.end(),
+  ss << " supportedHints = " + std::accumulate(props.supportedHints.begin(),
+                                                props.supportedHints.end(),
                                                 std::string{});
   ss << "}";
 
