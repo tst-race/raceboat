@@ -54,7 +54,7 @@
       "secondsPerInterval": -1,
       "sendType": "ST_EPHEM_SYNC",
       "sendsRemainingInInterval": -1,
-      "supported_hints": [],
+      "supportedHints": [],
       "transmissionType": "TT_UNICAST"
     }
   ],

@@ -960,7 +960,7 @@ LinkProperties JavaShimUtils::jLinkPropertiesToLinkProperties(JNIEnv *env, jobje
     for (jsize i = 0; i < stringCount; i++) {
         jstring string = static_cast<jstring>(env->GetObjectArrayElement(hints, i));
         std::string rawString = JavaShimUtils::jstring2string(env, string);
-        linkProperties.supported_hints.push_back(rawString);
+        linkProperties.supportedHints.push_back(rawString);
     }
 
     jstring jChannelGid = static_cast<jstring>(
@@ -1001,16 +1001,16 @@ jobject JavaShimUtils::linkPropertiesToJobject(JNIEnv *env, const LinkProperties
         return nullptr;
     }
 
-    // Create the supported_hints
+    // Create the supportedHints
     jobjectArray supportedHints = static_cast<jobjectArray>(env->NewObjectArray(
-        properties.supported_hints.size(), JavaIds::jStringClassId, env->NewStringUTF("")));
+        properties.supportedHints.size(), JavaIds::jStringClassId, env->NewStringUTF("")));
     if (supportedHints == nullptr) {
         RaceLog::logError(logLabel, "failed to create supported hints array", "");
         return nullptr;
     }
-    for (unsigned int index = 0; index < properties.supported_hints.size(); ++index) {
+    for (unsigned int index = 0; index < properties.supportedHints.size(); ++index) {
         env->SetObjectArrayElement(supportedHints, static_cast<jint>(index),
-                                   env->NewStringUTF(properties.supported_hints[index].c_str()));
+                                   env->NewStringUTF(properties.supportedHints[index].c_str()));
     }
     jstring channelGid = env->NewStringUTF(properties.channelGid.c_str());
     jstring linkAddress = env->NewStringUTF(properties.linkAddress.c_str());
@@ -1115,7 +1115,7 @@ ChannelProperties JavaShimUtils::jChannelPropertiesToChannelProperties(JNIEnv *e
     for (jsize i = 0; i < stringCount; i++) {
         jstring string = static_cast<jstring>(env->GetObjectArrayElement(hints, i));
         std::string rawString = JavaShimUtils::jstring2string(env, string);
-        channelProperties.supported_hints.push_back(rawString);
+        channelProperties.supportedHints.push_back(rawString);
     }
     jstring jChannelGid = static_cast<jstring>(
         env->CallObjectMethod(jChannelProps, JavaIds::jChannelPropertiesGetChannelGidMethodId));
@@ -1175,16 +1175,16 @@ jobject JavaShimUtils::channelPropertiesToJobject(JNIEnv *env,
         return nullptr;
     }
 
-    // Create the supported_hints
+    // Create the supportedHints
     jobjectArray supportedHints = static_cast<jobjectArray>(env->NewObjectArray(
-        properties.supported_hints.size(), JavaIds::jStringClassId, env->NewStringUTF("")));
+        properties.supportedHints.size(), JavaIds::jStringClassId, env->NewStringUTF("")));
     if (supportedHints == nullptr) {
         RaceLog::logError(logLabel, "failed to create supported hints array", "");
         return nullptr;
     }
-    for (unsigned int index = 0; index < properties.supported_hints.size(); ++index) {
+    for (unsigned int index = 0; index < properties.supportedHints.size(); ++index) {
         env->SetObjectArrayElement(supportedHints, static_cast<jint>(index),
-                                   env->NewStringUTF(properties.supported_hints[index].c_str()));
+                                   env->NewStringUTF(properties.supportedHints[index].c_str()));
     }
 
     jstring channelGid = env->NewStringUTF(properties.channelGid.c_str());
