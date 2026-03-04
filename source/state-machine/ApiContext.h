@@ -46,7 +46,7 @@ public:
   ApiContext(const ApiContext &) = delete;
 
   bool shouldCreate(const ChannelId &channelId,
-                    bool useForRecv);
+                    LinkType linkType, ConduitSide side);
   bool shouldCreateSender(const ChannelId &channelId);
   bool shouldCreateReceiver(const ChannelId &channelId);
    virtual void updateSend(const SendOptions & /* sendOptions */,

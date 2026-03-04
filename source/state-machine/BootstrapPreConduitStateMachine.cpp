@@ -125,7 +125,14 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
 
     // Determine what connections/links we still need to get started
     // We should definitely have initRecv because we received the Hello from the client
-    // We _may not_ have initSend if it is loader-to-creator
+    // What about initSend?
+    // 1. initSend is creator-to-loader --> we should have already created it
+    // 2. initSend is loader-to-creator --> the client should have sent us the address
+    // 3. initSend is bidirectional and the same as initRecv --> re-use the initRecv connection
+    // 4. initSend is bidirectional but NOT the same as initRecv -->
+    //    4a. the client created and sent us the address
+    //    4b. the client sent us nothing, so we should have already created it...
+
     // We _must not_ have finalSend or finalRecv becasue they should be per-connection
 
     // *** INIT SEND ***

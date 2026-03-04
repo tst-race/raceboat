@@ -87,7 +87,7 @@ docker run --rm -it --name=rbserver \
        --network=raceboat-network \
        --ip=10.11.1.3 \
        -v $(pwd)/kits:/server-kits \
-       raceboat:latest bash -c \
+       raceboat-runtime:latest bash -c \
        'race-cli -m --recv --quiet \
        --dir /server-kits \
        --recv-channel=twoSixDirectCpp \
@@ -105,7 +105,7 @@ docker run --rm -it --name=rbclient \
        --network=raceboat-network \
        --ip=10.11.1.4 \
        -v $(pwd)/kits:/client-kits -v $(pwd):/code -w /code \
-       raceboat:latest bash -c \
+       raceboat-runtime:latest bash -c \
        'echo "Raceboat Client says Hello " \
        | race-cli -m --send --quiet \
        --dir /client-kits \
@@ -130,7 +130,7 @@ docker run --rm -it --name=rbserver \
        --network=raceboat-network \
        --ip=10.11.1.3 \
        -v $(pwd)/kits:/server-kits \
-       raceboat:latest bash -c \
+       raceboat-runtime:latest bash -c \
        'echo "Welcome, I am the Raceboat Server" \
        | race-cli -m --recv-reply --quiet \
        --dir /server-kits \
@@ -147,7 +147,7 @@ docker run --rm -it --name=rbclient \
        --network=raceboat-network \
        --ip=10.11.1.4 \
        -v $(pwd)/kits:/client-kits \
-       raceboat:latest bash -c \
+       raceboat-runtime:latest bash -c \
        'echo "Raceboat Client says Hello " \
        | race-cli -m --send-recv --quiet \
        --dir /client-kits \
@@ -174,7 +174,7 @@ docker run --rm --name=rbserver -d \
        --network=raceboat-network \
        --ip=10.11.1.3 \
        -v $(pwd)/kits:/server-kits \
-       raceboat:latest bash -c \
+       raceboat-runtime:latest bash -c \
        'race-cli -m --server-bootstrap-connect --quiet \
        --dir /server-kits \
        --recv-channel=twoSixDirectCpp \
@@ -195,7 +195,7 @@ docker run --rm -it --name=rbclient -d \
        --network=raceboat-network \
        --ip=10.11.1.4 \
        -v $(pwd)/kits:/client-kits \
-       raceboat:latest bash -c \
+       raceboat-runtime:latest bash -c \
        'race-cli -m --client-bootstrap-connect --quiet \
        --dir /client-kits \
        --recv-channel=twoSixDirectCpp \
@@ -222,7 +222,7 @@ docker run --rm -it --name=rbserver \
        --ip=10.11.1.3 \
        -v $(pwd)/kits:/server-kits \
        -v $(pwd)/scripts:/scripts \
-       raceboat:latest bash -c \
+       raceboat-runtime:latest bash -c \
        'echo "Welcome, I am the Raceboat Server" \
        | bridge-distro --quiet \
        --passphrase bridge-please \
@@ -242,7 +242,7 @@ docker run --rm -it --name=rbclient \
        --network=raceboat-network \
        --ip=10.11.1.4 \
        -v $(pwd)/kits:/client-kits \
-       raceboat:latest bash -c \
+       raceboat-runtime:latest bash -c \
        'echo "bridge-please" \
        | race-cli -m --send-recv --quiet \
        --dir /client-kits \

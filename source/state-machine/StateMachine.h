@@ -52,6 +52,12 @@
 
 namespace Raceboat {
 
+enum ConduitSide {
+  CS_UNDEF = 0,             // undefined
+  CS_DIALER = 1,            // the "client" side of a conduit
+  CS_LISTENER = 2           // the "server" side of a conduit
+};
+
 enum struct EventResult {
   NOT_SUPPORTED, // state does not handle event
   SUCCESS        // success

@@ -25,8 +25,15 @@ ApiContext::ApiContext(ApiManagerInternal &_manager, StateEngine &_engine)
     : manager(_manager), engine(_engine),
       handle(manager.getCore().generateHandle()) {}
 
-bool ApiContext::shouldCreate(const ChannelId &channelId, bool useForRecv) {
+bool ApiContext::shouldCreate(const ChannelId &channelId, LinkType linkType, ConduitSide side) {
   ChannelProperties props = manager.getCore().getChannelManager().getChannelProperties(channelId);
+
+  // Assume we always pass LT_RECV or LT_SEND, not LT_BIDI
+  if (linkType == LT_RECV) {
+    if (props
+  } else {
+
+  }
 
   // Treat LOADER_TO_CREATOR and BIDIRECTIONAL as the same
   // If sending, we create for CREATOR_TO_LOADER and otherwise load
