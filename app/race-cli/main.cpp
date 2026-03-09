@@ -956,7 +956,7 @@ void client_connection_loop(int server_sock,
               send_opt.recv_role = conn_opt.init_recv_role;
               send_opt.alt_channel = conn_opt.final_send_channel;
 
-              std::tie(status, tmp_connection) = race.dial_str(send_opt, "hello");
+              std::tie(status, tmp_connection) = race.dial_str(send_opt, "");
           } 
           connection = std::make_shared<Conduit>(tmp_connection);
           if (status != ApiStatus::OK) {
