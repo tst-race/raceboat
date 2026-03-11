@@ -90,6 +90,20 @@ struct StatePreConduitAccepted : public PreConduitState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
+    // Check if we should use a single bidirectional connection
+    ctx.usingSingleBidiConnection = ctx.shouldUseSingleBidiLink(ctx.sendChannel, ctx.recvChannel);
+    
+    if (ctx.usingSingleBidiConnection) {
+      helper::logInfo(logPrefix + "Using existing bidirectional connection for send");
+      // Reuse the receive connection for sending
+      ctx.sendConnSMHandle = ctx.recvConnSMHandle;
+      ctx.sendConnId = ctx.recvConnId;
+      // Transition to opening state, which will detect connection is already open
+      ctx.pendingEvents.push(EVENT_ALWAYS);
+      return EventResult::SUCCESS;
+    }
+
+    // Original behavior: create separate send connection
     ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
                                                              ctx.handle, ctx.sendChannel, ctx.sendRole, ctx.sendLinkAddress, false, true);
 
@@ -108,8 +122,16 @@ struct StatePreConduitAccepted : public PreConduitState {
 struct StatePreConduitOpening : public PreConduitState {
   explicit StatePreConduitOpening(StateType id = STATE_PRE_CONN_OBJ_OPENING)
       : PreConduitState(id, "STATE_PRE_CONN_OBJ_OPENING") {}
-  virtual EventResult enter(Context & /* context */) {
+  virtual EventResult enter(Context &context) {
     TRACE_METHOD();
+    auto &ctx = getContext(context);
+    
+    // If using bidirectional connection, it's already connected
+    if (ctx.usingSingleBidiConnection && !ctx.sendConnId.empty()) {
+      helper::logDebug(logPrefix + "Bidirectional connection already established");
+      ctx.pendingEvents.push(EVENT_CONN_STATE_MACHINE_CONNECTED);
+    }
+    
     return EventResult::SUCCESS;
   }
 };

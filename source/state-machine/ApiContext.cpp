@@ -45,5 +45,27 @@ bool ApiContext::shouldCreateReceiver(const ChannelId &channelId) {
   return shouldCreate(channelId, true);
 }
 
+bool ApiContext::shouldUseSingleBidiLink(const ChannelId &sendChannel, 
+                                         const ChannelId &recvChannel) {
+  // Can only use single bidirectional link if both channels are the same
+  if (sendChannel != recvChannel) {
+    return false;
+  }
+  
+  ChannelProperties props = manager.getCore().getChannelManager().getChannelProperties(sendChannel);
+  
+  // Channel must support bidirectional communication
+  if (props.linkDirection != LD_BIDI) {
+    return false;
+  }
+  
+  // Currently only support unicast bidirectional (could be extended)
+  if (props.transmissionType != TT_UNICAST) {
+    return false;
+  }
+  
+  return true;
+}
+
 
 } // namespace Raceboat

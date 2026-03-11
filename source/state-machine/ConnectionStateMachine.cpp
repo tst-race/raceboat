@@ -44,6 +44,22 @@ void ApiConnContext::updateConnStateMachineStart(RaceHandle _contextHandle,
   this->linkAddress = _linkAddress;
   this->create = _creating;
   this->send = _sending;
+  this->bidirectional = false;
+}
+
+void ApiConnContext::updateConnStateMachineStartBidi(RaceHandle _contextHandle,
+                                                     ChannelId _channelId,
+                                                     std::string _role,
+                                                     std::string _linkAddress,
+                                                     bool _creating) {
+  this->dependents.insert(_contextHandle);
+  this->newestDependent = _contextHandle;
+  this->channelId = _channelId;
+  this->channelRole = _role;
+  this->linkAddress = _linkAddress;
+  this->create = _creating;
+  this->send = true;  // bidirectional implies both send and recv
+  this->bidirectional = true;
 }
 
 void ApiConnContext::updateChannelStatusChanged(
@@ -179,7 +195,15 @@ struct StateConnLinkEstablished : public ConnState {
       }
     }
 
-    LinkType linkType = ctx.send ? LT_SEND : LT_RECV;
+    // Determine link type based on whether this connection is bidirectional
+    LinkType linkType;
+    if (ctx.bidirectional) {
+      linkType = LT_BIDI;
+      helper::logDebug(logPrefix + "Opening bidirectional connection");
+    } else {
+      linkType = ctx.send ? LT_SEND : LT_RECV;
+    }
+    
     SdkResponse response = plugin.openConnection(openConnHandle, linkType,
                                                  ctx.linkId, "{}", 0, 0, 0);
 

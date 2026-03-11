@@ -49,6 +49,10 @@ public:
                     bool useForRecv);
   bool shouldCreateSender(const ChannelId &channelId);
   bool shouldCreateReceiver(const ChannelId &channelId);
+  
+  // Detects if a single bidirectional link should be used for both send and receive
+  bool shouldUseSingleBidiLink(const ChannelId &sendChannel, 
+                               const ChannelId &recvChannel);
    virtual void updateSend(const SendOptions & /* sendOptions */,
                           std::vector<uint8_t> && /* data */,
                           std::function<void(ApiStatus)> /* cb */){};

@@ -1042,6 +1042,43 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
   return context->handle;
 }
 
+RaceHandle ApiManagerInternal::startConnStateMachineBidi(RaceHandle contextHandle,
+                                                         ChannelId channelId,
+                                                         std::string role,
+                                                         std::string linkAddress,
+                                                         bool creating) {
+  TRACE_METHOD(contextHandle);
+
+  // For bidirectional connections, check if we already made this connection
+  if (linkAddress != "") {
+    std::string normalized_address = nlohmann::json::parse(linkAddress).dump();
+    helper::logDebug(logPrefix + " compare normalized (bidi): " + linkAddress + " vs " + normalized_address);
+    auto connContextIt = linkConnMap.find(channelId + normalized_address);
+    if (connContextIt != linkConnMap.end()) {
+      helper::logDebug(logPrefix + "got existing entry for $" + channelId + "$ $" + normalized_address + "$ in the linkConnMap with ConnID=" + connContextIt->second.second);
+      RaceHandle callHandle = getCore().generateHandle();
+      manager.onConnStateMachineConnectedForContext(contextHandle,
+                                                    callHandle,
+                                                    connContextIt->second.first,
+                                                    connContextIt->second.second,
+                                                    linkAddress);
+      return connContextIt->second.first;
+    }
+  }
+
+  // Create a connection context for bidirectional use
+  auto context = newConnContext();
+  context->updateConnStateMachineStartBidi(contextHandle, channelId, role,
+                                           linkAddress, creating);
+
+  EventResult result = connEngine.start(*context);
+  if (result != EventResult::SUCCESS) {
+    return NULL_RACE_HANDLE;
+  }
+
+  return context->handle;
+}
+
 RaceHandle ApiManagerInternal::startConduitectStateMachine(
     RaceHandle contextHandle, RaceHandle recvHandle,
     const ConnectionID &recvConnId, RaceHandle sendHandle,
@@ -1251,11 +1288,11 @@ void ApiManagerInternal::unregisterHandle(ApiContext &context,
 //--------------------------------------------------------
 // internal helpers
 //--------------------------------------------------------
-ApiContext *ApiManagerInternal::newConnContext() {
+ApiConnContext *ApiManagerInternal::newConnContext() {
   auto newContext = std::make_unique<ApiConnContext>(*this, connEngine);
   auto handle = newContext->handle;
   activeContexts[handle] = (std::move(newContext));
-  return activeContexts[handle].get();
+  return static_cast<ApiConnContext*>(activeContexts[handle].get());
 }
 
 ApiContext *ApiManagerInternal::newConduitectContext() {
