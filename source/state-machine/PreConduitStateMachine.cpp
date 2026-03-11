@@ -95,6 +95,15 @@ struct StatePreConduitAccepted : public PreConduitState {
     
     if (ctx.usingSingleBidiConnection) {
       helper::logInfo(logPrefix + "Using existing bidirectional connection for send");
+      
+      // Validation: Ensure channels are actually the same (defense in depth)
+      if (ctx.sendChannel != ctx.recvChannel) {
+        helper::logError(logPrefix + "Bidirectional mode requires sendChannel ('" + 
+                        ctx.sendChannel + "') to match recvChannel ('" + 
+                        ctx.recvChannel + "')");
+        return EventResult::NOT_SUPPORTED;
+      }
+      
       // Reuse the receive connection for sending
       ctx.sendConnSMHandle = ctx.recvConnSMHandle;
       ctx.sendConnId = ctx.recvConnId;

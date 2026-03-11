@@ -99,17 +99,27 @@ struct StateDialInitial : public DialState {
     if (ctx.usingSingleBidiConnection) {
       helper::logInfo(logPrefix + "Using single bidirectional connection for send and recv");
       
-      // Create a single bidirectional connection state machine
-      // For LD_BIDI channels, dialer should load (creating=false) not create
-      // Only create if recvChannel is LD_LOADER_TO_CREATOR or sendChannel is LD_CREATOR_TO_LOADER
-      // In bidirectional case, use send_address as the address of the single bidirectional link
+      // Validation: Ensure send_address is provided for bidirectional dial
       if (ctx.opts.send_address.empty()) {
-        helper::logError(logPrefix + "send_address must be provided for bidirectional dial");
+        helper::logError(logPrefix + "Bidirectional dial requires send_address to be provided");
         ctx.dialCallback(ApiStatus::INVALID_ARGUMENT, {}, {});
         ctx.dialCallback = {};
         return EventResult::NOT_SUPPORTED;
       }
       
+      // Validation: Ensure channels are actually the same (defense in depth)
+      if (ctx.opts.send_channel != ctx.opts.recv_channel) {
+        helper::logError(logPrefix + "Bidirectional mode requires send_channel ('" + 
+                        ctx.opts.send_channel + "') to match recv_channel ('" + 
+                        ctx.opts.recv_channel + "')");
+        ctx.dialCallback(ApiStatus::INVALID_ARGUMENT, {}, {});
+        ctx.dialCallback = {};
+        return EventResult::NOT_SUPPORTED;
+      }
+      
+      // Create a single bidirectional connection state machine
+      // For LD_BIDI channels, dialer should load (creating=false) not create
+      // Only create if recvChannel is LD_LOADER_TO_CREATOR or sendChannel is LD_CREATOR_TO_LOADER
       ctx.recvConnSMHandle = ctx.manager.startConnStateMachineBidi(
           ctx.handle, recvChannelId, recvRole, ctx.opts.send_address, false);
       

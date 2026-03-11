@@ -49,6 +49,8 @@ bool ApiContext::shouldUseSingleBidiLink(const ChannelId &sendChannel,
                                          const ChannelId &recvChannel) {
   // Can only use single bidirectional link if both channels are the same
   if (sendChannel != recvChannel) {
+    helper::logDebug("shouldUseSingleBidiLink: Different channels (send: '" + sendChannel + 
+                     "', recv: '" + recvChannel + "') - using separate connections");
     return false;
   }
   
@@ -56,14 +58,19 @@ bool ApiContext::shouldUseSingleBidiLink(const ChannelId &sendChannel,
   
   // Channel must support bidirectional communication
   if (props.linkDirection != LD_BIDI) {
+    helper::logDebug("shouldUseSingleBidiLink: Channel '" + sendChannel + 
+                     "' linkDirection is not LD_BIDI - using separate connections");
     return false;
   }
   
   // Currently only support unicast bidirectional (could be extended)
   if (props.transmissionType != TT_UNICAST) {
+    helper::logDebug("shouldUseSingleBidiLink: Channel '" + sendChannel + 
+                     "' transmissionType is not TT_UNICAST - using separate connections");
     return false;
   }
   
+  helper::logInfo("shouldUseSingleBidiLink: Using single bidirectional link for channel '" + sendChannel + "'");
   return true;
 }
 
