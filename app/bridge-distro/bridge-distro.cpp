@@ -129,7 +129,7 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
   while (1) {
     int option_index = 0;
 
-    c = getopt_long(argc, argv, "R:r:S:s:T:t:a:e:p:c:f:mdhwn:", long_options,
+    c = getopt_long(argc, argv, "o:R:r:S:s:T:t:a:e:p:c:f:mdhwn:", long_options,
                     &option_index);
 
     /* Detect the end of the options. */
@@ -141,6 +141,10 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       /* If this option set a flag, do nothing else now. */
       break;
 
+    case 'o':
+      opts.log_file = optarg;
+      break;
+ 
     case 'R':
       opts.init_recv_channel = optarg;
       break;
