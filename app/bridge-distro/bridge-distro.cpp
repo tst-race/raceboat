@@ -70,6 +70,7 @@ enum class Mode : int {
 struct CmdOptions {
   Mode mode;
   RaceLog::LogLevel log_level;
+  std::string log_file = "";
   std::vector<std::pair<std::string, std::string>> params;
 
   std::string plugin_path = "/etc/race";
@@ -361,6 +362,11 @@ int main(int argc, char **argv) {
   }
 
   RaceLog::setLogLevel(opts->log_level);
+  RaceLog::setLogFile(opts->log_file);
+
+  if (opts->log_file != "") {
+      RaceLog::setLogLevelStdout(RaceLog::LogLevel::LL_NONE);
+  }
 
   int result = -1;
   result = handle_recv_respond(*opts);

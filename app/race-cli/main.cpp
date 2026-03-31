@@ -171,6 +171,7 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
 
     case 'o':
       opts.log_file = optarg;
+      break;
 
     case 'R':
       opts.init_recv_channel = optarg;
