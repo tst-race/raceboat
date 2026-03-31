@@ -33,6 +33,11 @@ public:
                                            std::string linkAddress,
                                            bool creating,
                                            bool sending) override;
+  virtual void updateConnStateMachineStartBidi(RaceHandle contextHandle,
+                                               ChannelId channelId,
+                                               std::string role,
+                                               std::string linkAddress,
+                                               bool creating);
   // virtual void updateConnStateMachineStop(RaceHandle /* contextHandle */)
   // override;
   virtual void
@@ -57,6 +62,7 @@ public:
   RaceHandle detachedDependent = NULL_RACE_HANDLE;
   bool create = false;
   bool send = false;
+  bool bidirectional = false;  // true if this connection serves both send and recv
   ChannelId channelId;
   std::string channelRole;
   std::string linkAddress;

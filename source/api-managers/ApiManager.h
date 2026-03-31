@@ -187,6 +187,11 @@ public:
                                            std::string linkAddress,
                                            bool creating,
                                            bool sending);
+  virtual RaceHandle startConnStateMachineBidi(RaceHandle contextHandle,
+                                               ChannelId channelId,
+                                               std::string role,
+                                                std::string linkAddress,
+                                                bool creating);
   virtual RaceHandle startConduitectStateMachine(
       RaceHandle contextHandle, RaceHandle recvHandle,
       const ConnectionID &recvConnId, RaceHandle sendHandle,
@@ -238,7 +243,7 @@ protected:
   virtual ApiContext *newRecvContext();
   virtual ApiContext *newDialContext();
   virtual ApiContext *newListenContext();
-  virtual ApiContext *newConnContext();
+  virtual ApiConnContext *newConnContext();
   virtual ApiContext *newConduitectContext();
   virtual ApiContext *newPreConduitContext();
   virtual ApiContext *newBootstrapDialContext();

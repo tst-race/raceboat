@@ -48,6 +48,8 @@ public:
   std::string recvLinkAddress;
 
   std::string packageId;
+  
+  bool usingSingleBidiConnection = false;  // true if using one connection for both send/recv
 };
 
 class DialStateEngine : public StateEngine {

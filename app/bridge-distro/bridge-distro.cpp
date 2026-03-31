@@ -70,6 +70,7 @@ enum class Mode : int {
 struct CmdOptions {
   Mode mode;
   RaceLog::LogLevel log_level;
+  std::string log_file = "";
   std::vector<std::pair<std::string, std::string>> params;
 
   std::string plugin_path = "/etc/race";
@@ -129,7 +130,7 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
   while (1) {
     int option_index = 0;
 
-    c = getopt_long(argc, argv, "R:r:S:s:T:t:a:e:p:c:f:mdhwn:", long_options,
+    c = getopt_long(argc, argv, "o:R:r:S:s:T:t:a:e:p:c:f:mdhwn:", long_options,
                     &option_index);
 
     /* Detect the end of the options. */
@@ -141,6 +142,10 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       /* If this option set a flag, do nothing else now. */
       break;
 
+    case 'o':
+      opts.log_file = optarg;
+      break;
+ 
     case 'R':
       opts.init_recv_channel = optarg;
       break;
@@ -357,6 +362,11 @@ int main(int argc, char **argv) {
   }
 
   RaceLog::setLogLevel(opts->log_level);
+  RaceLog::setLogFile(opts->log_file);
+
+  if (opts->log_file != "") {
+      RaceLog::setLogLevelStdout(RaceLog::LogLevel::LL_NONE);
+  }
 
   int result = -1;
   result = handle_recv_respond(*opts);

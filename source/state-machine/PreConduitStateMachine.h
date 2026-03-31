@@ -62,6 +62,8 @@ public:
 
   std::string packageId;
   RaceHandle apiHandle;
+  
+  bool usingSingleBidiConnection = false;  // true if using one connection for both send/recv
 };
 
 class PreConduitStateEngine : public StateEngine {

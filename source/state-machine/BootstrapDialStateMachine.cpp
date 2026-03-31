@@ -120,7 +120,11 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
     // Skip initial recv channel if it is empty
     // This SHOULD indicate the init_send_channel is bidirectional, otherwise this is a mistake and should be caught earlier during input validation
     if (ctx.opts.init_recv_channel.empty()) {
-      // TODO handle opening a receiving connection in addition to the sending connection on the "send" link above
+      // Use bidirectional init_send connection for receiving as well
+      helper::logInfo(logPrefix + "Using bidirectional init_send connection for receiving");
+      ctx.initUsingSingleBidiConnection = true;
+      ctx.initRecvConnSMHandle = ctx.initSendConnSMHandle;
+      ctx.initRecvConnId = ctx.initSendConnId;
     }
     else {
       // Handle initial server->client aka init_recv
@@ -187,7 +191,11 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
     // Skip final recv channel if it is empty
     // This SHOULD indicate the final_send_channel is bidirectional, otherwise this is a mistake and should be caught earlier during input validation
     if (ctx.opts.final_recv_channel.empty()) {
-      // TODO handle opening a receiving connection in addition to the sending connection on the "send" link above
+      // Use bidirectional final_send connection for receiving as well
+      helper::logInfo(logPrefix + "Using bidirectional final_send connection for receiving");
+      ctx.finalUsingSingleBidiConnection = true;
+      ctx.finalRecvConnSMHandle = ctx.finalSendConnSMHandle;
+      ctx.finalRecvConnId = ctx.finalSendConnId;
     }
     else {
       // Handle finalial server->client aka final_recv

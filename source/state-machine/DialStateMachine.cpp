@@ -93,15 +93,56 @@ struct StateDialInitial : public DialState {
         ctx.manager.getCore().getEntropy(packageIdLen);
     ctx.packageId = std::string(packageIdBytes.begin(), packageIdBytes.end());
 
-    ctx.recvConnSMHandle = ctx.manager.startConnStateMachine(
-                                                             ctx.handle, recvChannelId, recvRole, "", true, false);
+    // Check if we should use a single bidirectional connection
+    ctx.usingSingleBidiConnection = ctx.shouldUseSingleBidiLink(ctx.opts.send_channel, ctx.opts.recv_channel);
+    
+    if (ctx.usingSingleBidiConnection) {
+      helper::logInfo(logPrefix + "Using single bidirectional connection for send and recv");
+      
+      // Validation: Ensure send_address is provided for bidirectional dial
+      if (ctx.opts.send_address.empty()) {
+        helper::logError(logPrefix + "Bidirectional dial requires send_address to be provided");
+        ctx.dialCallback(ApiStatus::INVALID_ARGUMENT, {}, {});
+        ctx.dialCallback = {};
+        return EventResult::NOT_SUPPORTED;
+      }
+      
+      // Validation: Ensure channels are actually the same (defense in depth)
+      if (ctx.opts.send_channel != ctx.opts.recv_channel) {
+        helper::logError(logPrefix + "Bidirectional mode requires send_channel ('" + 
+                        ctx.opts.send_channel + "') to match recv_channel ('" + 
+                        ctx.opts.recv_channel + "')");
+        ctx.dialCallback(ApiStatus::INVALID_ARGUMENT, {}, {});
+        ctx.dialCallback = {};
+        return EventResult::NOT_SUPPORTED;
+      }
+      
+      // Create a single bidirectional connection state machine
+      // For LD_BIDI channels, dialer should load (creating=false) not create
+      // Only create if recvChannel is LD_LOADER_TO_CREATOR or sendChannel is LD_CREATOR_TO_LOADER
+      ctx.recvConnSMHandle = ctx.manager.startConnStateMachineBidi(
+          ctx.handle, recvChannelId, recvRole, ctx.opts.send_address, false);
+      
+      if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
+        helper::logError(logPrefix + " starting bidirectional connection state machine failed");
+        return EventResult::NOT_SUPPORTED;
+      }
+      
+      // Use the same handle for both send and recv
+      ctx.sendConnSMHandle = ctx.recvConnSMHandle;
+      ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
+    } else {
+      // Original behavior: separate receive connection
+      ctx.recvConnSMHandle = ctx.manager.startConnStateMachine(
+          ctx.handle, recvChannelId, recvRole, "", true, false);
 
-    if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
-      helper::logError(logPrefix + " starting connection state machine failed");
-      return EventResult::NOT_SUPPORTED;
+      if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
+        helper::logError(logPrefix + " starting connection state machine failed");
+        return EventResult::NOT_SUPPORTED;
+      }
+
+      ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
     }
-
-    ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
 
     return EventResult::SUCCESS;
   }
@@ -114,6 +155,20 @@ struct StateDialWaitingForSendConnection : public DialState {
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
+
+    // If using single bidirectional connection, reuse the recv connection for send
+    if (ctx.usingSingleBidiConnection) {
+      helper::logDebug(logPrefix + "Reusing bidirectional connection for send");
+      // Check if the connection is already established
+      if (!ctx.recvConnId.empty()) {
+        ctx.sendConnId = ctx.recvConnId;
+        ctx.pendingEvents.push(EVENT_SATISFIED);
+        return EventResult::SUCCESS;
+      }
+      // Otherwise, wait for EVENT_CONN_STATE_MACHINE_CONNECTED to populate recvConnId
+      helper::logDebug(logPrefix + "Waiting for bidirectional connection to be established");
+      return EventResult::SUCCESS;
+    }
 
     // Send connection exists, progress state
     if (not ctx.sendConnId.empty()) {

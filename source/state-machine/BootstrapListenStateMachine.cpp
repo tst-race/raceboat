@@ -130,7 +130,11 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
     // Skip initial recv channel if it is empty
     // This SHOULD indicate the init_send_channel is bidirectional, otherwise this is a mistake and should be caught earlier during input validation
     if (ctx.opts.init_recv_channel.empty()) {
-      // TODO handle opening a receiving connection in addition to the sending connection on the "send" link above
+      // Use bidirectional init_send connection for receiving as well
+      helper::logInfo(logPrefix + "Using bidirectional init_send connection for receiving");
+      ctx.initUsingSingleBidiConnection = true;
+      ctx.initRecvConnSMHandle = ctx.initSendConnSMHandle;
+      ctx.initRecvConnId = ctx.initSendConnId;
     }
     else {
       // Handle initial client->server aka init_recv

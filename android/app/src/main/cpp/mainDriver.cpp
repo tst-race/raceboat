@@ -469,7 +469,7 @@ int handle_client_connect(const RaceboatOptions &opts, int javaClientSocket) {
     send_opt.recv_role = opts.recv_role;
     send_opt.alt_channel = opts.alt_channel;
 
-    std::string introductionMsg = "hello";
+    std::string introductionMsg = "";
 
     auto [status, connection] = race.dial_str(send_opt, introductionMsg);
     if (status != ApiStatus::OK) {

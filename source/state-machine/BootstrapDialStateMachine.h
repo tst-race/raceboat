@@ -61,6 +61,9 @@ public:
   std::string finalRecvLinkAddress;
 
   std::string packageId;
+  
+  bool initUsingSingleBidiConnection = false;  // true if init uses one bidi connection
+  bool finalUsingSingleBidiConnection = false;  // true if final uses one bidi connection
 };
 
 class BootstrapDialStateEngine : public StateEngine {

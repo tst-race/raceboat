@@ -171,6 +171,7 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
 
     case 'o':
       opts.log_file = optarg;
+      break;
 
     case 'R':
       opts.init_recv_channel = optarg;
@@ -956,7 +957,7 @@ void client_connection_loop(int server_sock,
               send_opt.recv_role = conn_opt.init_recv_role;
               send_opt.alt_channel = conn_opt.final_send_channel;
 
-              std::tie(status, tmp_connection) = race.dial_str(send_opt, "hello");
+              std::tie(status, tmp_connection) = race.dial_str(send_opt, "");
           } 
           connection = std::make_shared<Conduit>(tmp_connection);
           if (status != ApiStatus::OK) {
@@ -1051,7 +1052,7 @@ int handle_client_connect(const CmdOptions &opts) {
   check_for_host_override(opts, host);
 
   int server_sock;
-  printf("CREATING LOCAL SOCKET\n");
+  printf("CREATING LOCAL SOCKET HELLO \n");
   // start server for client app to connect to
   server_sock = create_listening_socket(local_port, host);
   if (server_sock < 0) {
