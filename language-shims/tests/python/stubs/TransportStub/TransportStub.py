@@ -85,7 +85,7 @@ class TransportStub(ITransportComponent):
             prop.worst = pp
             prop.expected = pp
             prop.best = pp
-            prop.supported_hints = ["hint1"]
+            prop.supportedHints = ["hint1"]
             prop.channelGid = "mockChannel"
             prop.linkAddress = "mockLinkAddress"
             return prop
