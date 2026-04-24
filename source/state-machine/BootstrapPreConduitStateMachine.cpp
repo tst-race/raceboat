@@ -71,7 +71,7 @@ void BootstrapPreConduitContext::updateReceiveEncPkg(
   // TODO Code Reuse
 void BootstrapPreConduitContext::updateConnStateMachineConnected(
     RaceHandle contextHandle, ConnectionID connId,
-    std::string linkAddress) {
+    std::string linkAddress, LinkID /* linkId */) {
   if (this->initRecvConnSMHandle == contextHandle) {
     this->initRecvConnId = connId;
     this->initRecvLinkAddress = linkAddress;

@@ -55,7 +55,7 @@ void ApiBootstrapListenContext::updateReceiveEncPkg(
   // TODO Code Reuse
 void ApiBootstrapListenContext::updateConnStateMachineConnected(
     RaceHandle contextHandle, ConnectionID connId,
-    std::string linkAddress) {
+    std::string linkAddress, LinkID /* linkId */) {
   if (this->initRecvConnSMHandle == contextHandle) {
     this->initRecvConnId = connId;
     this->initRecvLinkAddress = linkAddress;

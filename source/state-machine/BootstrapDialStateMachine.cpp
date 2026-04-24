@@ -45,7 +45,8 @@ void ApiBootstrapDialContext::updateReceiveEncPkg(
   // TODO Code Reuse
 void ApiBootstrapDialContext::updateConnStateMachineConnected(RaceHandle contextHandle,
                                                      ConnectionID connId,
-                                                     std::string linkAddress) {
+                                                     std::string linkAddress,
+                                                     LinkID /* linkId */) {
   helper::logDebug(" Received ConnStateMachineConnected for handle " + std::to_string(contextHandle) + " and ConnID: " + connId);
   if (this->initRecvConnSMHandle == contextHandle) {
     this->initRecvConnId = connId;

@@ -56,7 +56,7 @@ void PreConduitContext::updateReceiveEncPkg(
 
 void PreConduitContext::updateConnStateMachineConnected(
     RaceHandle /* contextHandle */, ConnectionID connId,
-    std::string /* linkAddress */) {
+    std::string /* linkAddress */, LinkID /* linkId */) {
   this->sendConnId = connId;
 }
 

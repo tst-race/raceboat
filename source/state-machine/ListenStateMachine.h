@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <unordered_map>
 #include "ApiContext.h"
 
 namespace Raceboat {
@@ -37,7 +38,7 @@ public:
                       std::shared_ptr<std::vector<uint8_t>> data) override;
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
-                                  std::string linkAddress) override;
+                                  std::string linkAddress, LinkID linkId) override;
 
 public:
   ReceiveOptions opts;
@@ -46,9 +47,23 @@ public:
   std::deque<std::function<void(ApiStatus, RaceHandle, ConduitProperties)>> acceptCb;
   std::function<void(ApiStatus)> closeCb;
 
+  // Legacy single connection handle (for backwards compatibility)
   RaceHandle recvConnSMHandle;
   ConnectionID recvConnId;
   std::string recvLinkAddress;
+
+  // Support for multiple accept() calls - each creates a connection SM
+  std::queue<RaceHandle> pendingConnSMHandles;
+  std::unordered_map<RaceHandle, std::function<void(ApiStatus, RaceHandle, ConduitProperties)>> 
+      connSMToAcceptCallback;
+  
+  // Store channel info for creating new connections on each accept()
+  ChannelId recvChannelId;
+  std::string recvRole;
+  LinkAddress recvLinkAddressStored;
+  
+  // Store the LinkID from the first connection - all accepts share this link
+  LinkID firstLinkId;
 
   std::queue<RaceHandle> preConduitSM;
 };

@@ -39,7 +39,7 @@ public:
 
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
-                                  std::string linkAddress) override;
+                                  std::string linkAddress, LinkID linkId) override;
   virtual void
   updateListenAccept(std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) override;
 
