@@ -1,0 +1,60 @@
+---
+# Example docker-compose.yml for race-cli integration testing
+# This demonstrates the required structure for plugin integration tests
+
+services:
+  rbserver:
+    image: ghcr.io/tst-race/raceboat/raceboat-runtime:latest
+    container_name: rbserver
+    volumes:
+      - ./kits:/server-kits
+      - ./server-logs:/tmp
+    networks:
+      test-network:
+        ipv4_address: 10.18.1.3
+    # REQUIRED: race-cli must run in --server-connect mode
+    # This mode connects TO localhost:7777 when receiving data from the RACE channel
+    command: >
+      race-cli -m --server-connect --debug
+      --logto /tmp/raceboat_server.log
+      --dir /server-kits
+      --recv-channel=YOUR_CHANNEL
+      --send-channel=YOUR_CHANNEL
+      --param hostname="10.18.1.3"
+      --param YOUR_PLUGIN_PARAMS_HERE
+
+  rbclient:
+    image: ghcr.io/tst-race/raceboat/raceboat-runtime:latest
+    container_name: rbclient
+    depends_on:
+      - rbserver
+    volumes:
+      - ./kits:/client-kits
+      - ./client-logs:/tmp
+    networks:
+      test-network:
+        ipv4_address: 10.18.1.2
+    # REQUIRED: race-cli must run in --client-connect mode  
+    # This mode listens ON localhost:9999 for application connections
+    command: >
+      race-cli -m --client-connect --debug
+      --logto /tmp/raceboat_client.log
+      --dir /client-kits
+      --recv-channel=YOUR_CHANNEL
+      --send-channel=YOUR_CHANNEL
+      --param hostname="10.18.1.2"
+      --send-address="YOUR_LINK_ADDRESS_HERE"
+
+networks:
+  test-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.18.0.0/16
+
+# Notes:
+# 1. Container names MUST be rbserver and rbclient (or use --server-container and --client-container flags)
+# 2. race-cli MUST use --server-connect on server and --client-connect on client
+# 3. Both containers MUST have python3 available
+# 4. Server must have plugin kits that can establish a RACE channel with the client
+# 5. Client must have correct --send-address to reach the server's link
