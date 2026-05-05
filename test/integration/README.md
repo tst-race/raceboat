@@ -2,6 +2,35 @@
 
 This directory contains generic infrastructure for testing raceboat plugins end-to-end using Docker Compose.
 
+## Quick Start
+
+**For most development workflows**, use the `build-test.py` orchestrator which handles rebuilds and testing:
+
+```bash
+# Test without rebuilding (fastest)
+python3 build-test.py --plugin-dir ../../racebird
+
+# Rebuild plugin only, then test
+python3 build-test.py --plugin-dir ../../racebird --rebuild-plugin
+
+# Rebuild everything, then test
+python3 build-test.py --plugin-dir ../../racebird --rebuild-all
+
+# Works with any plugin directory (relative or absolute path)
+python3 build-test.py --plugin-dir /path/to/my-custom-plugin --rebuild-plugin
+
+# See full options
+python3 build-test.py --help
+```
+
+See [BUILD_TEST_GUIDE.md](BUILD_TEST_GUIDE.md) for detailed build-test workflow documentation.
+
+**For direct test execution** (without rebuilding), use `run-integration-test.py` directly:
+
+```bash
+python3 run-integration-test.py --compose-file /path/to/docker-compose.yml
+```
+
 ## Overview
 
 The integration test validates bidirectional message delivery through raceboat's socket modes:
@@ -45,15 +74,13 @@ Detailed sequence:
 ### Basic Usage
 
 ```bash
-./run-integration-test.py --compose-file /path/to/docker-compose.yml
-# or
 python3 run-integration-test.py --compose-file /path/to/docker-compose.yml
 ```
 
 ### With Options
 
 ```bash
-./run-integration-test.py \
+python3 run-integration-test.py \
     --compose-file docker-compose.yml \
     --wait-time 15 \
     --name "My Plugin Test" \
