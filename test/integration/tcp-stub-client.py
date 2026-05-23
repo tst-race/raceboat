@@ -5,6 +5,7 @@ Connects to port 9999 where race-cli --client-connect listens.
 Sends a message, receives a reply, and exits with a clear status.
 Retries to allow time for race-cli to establish the RACE channel.
 Automatically handles both IPv4 and IPv6.
+Supports optional client identification for multi-client testing.
 """
 
 import socket
@@ -12,7 +13,8 @@ import sys
 import time
 
 PORT = 9999
-MESSAGE = b"hello from client\n"
+CLIENT_ID = sys.argv[1] if len(sys.argv) > 1 else "client"
+MESSAGE = f"hello from {CLIENT_ID}\n".encode()
 EXPECTED = b"hello from server"
 TIMEOUT = 30
 MAX_RETRIES = 60

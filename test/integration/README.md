@@ -95,6 +95,53 @@ python3 run-integration-test.py \
 - `--name <name>`: Test name for display (default: raceboat Integration Test)
 - `--server-container <name>`: Server container name (default: rbserver)
 - `--client-container <name>`: Client container name (default: rbclient)
+- `--additional-clients <name1> <name2> ...`: Additional client containers for multi-client testing (optional)
+- `--clear-logs`: Clear log directories before running test
+- `--log-dirs <dir1> <dir2> ...`: Log directories to clear (relative to compose file directory)
+
+### Clearing Logs Before Tests
+
+To automatically clear logs before each test run:
+
+```bash
+# Auto-detect log directories (any directory ending with '-logs')
+python3 run-integration-test.py \
+    --compose-file docker-compose.yml \
+    --clear-logs
+
+# Or specify log directories explicitly
+python3 run-integration-test.py \
+    --compose-file docker-compose.yml \
+    --clear-logs \
+    --log-dirs server-logs client-logs client2-logs
+```
+
+When `--clear-logs` is used without `--log-dirs`, the script automatically detects and clears any directories ending with `-logs` in the same directory as the docker-compose file. This ensures each test run starts with fresh log files, making it easier to debug issues.
+
+**Note:** The `build-test.py` orchestrator automatically enables log clearing.
+
+### Multi-Client Testing
+
+To test multiple simultaneous client connections, use the `--additional-clients` option:
+
+```bash
+python3 run-integration-test.py \
+    --compose-file docker-compose.yml \
+    --client-container rbclient \
+    --additional-clients rbclient2 rbclient3
+```
+
+This will:
+- Start all specified client containers
+- Verify the server can handle multiple simultaneous connections
+- Ensure bidirectional communication works for all clients
+- Report success only if all clients successfully exchange messages with the server
+
+The test validates that:
+1. Each client can send messages to the server
+2. The server receives messages from all clients
+3. The server sends replies to all clients
+4. Each client receives the reply from the server
 
 ## Docker Compose Requirements
 

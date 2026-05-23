@@ -261,7 +261,8 @@ class BuildTestOrchestrator:
                 str(test_runner),
                 '--compose-file', str(compose_file),
                 '--wait-time', str(wait_time),
-                '--name', f'{self.plugin_name} Plugin Integration Test'
+                '--name', f'{self.plugin_name} Plugin Integration Test',
+                '--clear-logs'
             ],
             cwd=Path(__file__).parent
         )
