@@ -779,14 +779,31 @@ void ApiManagerInternal::onConnStateMachineConnected(uint64_t postId,
                                                      LinkID linkId) {
   TRACE_METHOD(postId, contextHandle, connId, linkAddress, channelId, linkId);
 
-  // Map for when additional SMs want to re-use this link/connection
+  // Get the connection context to check if this is client-side (create=true) or server-side (create=false)
+  auto contextIt = activeContexts.find(contextHandle);
+  bool isClientSide = false;
+  if (contextIt != activeContexts.end()) {
+    auto connContext = dynamic_cast<ApiConnContext*>(contextIt->second.get());
+    if (connContext) {
+      isClientSide = connContext->create;
+    }
+  }
+
+  // Map for CLIENT-SIDE connection reuse only
+  // When a client dials to the same destination multiple times, reuse the existing connection
   // Note: this logic means we expect the channel to _always_ return a
   // _unique_ link when we ask for a link without providing an address.
-  if (linkAddress != "") {
+  // IMPORTANT: Do NOT insert SERVER-SIDE accepts into this map!
+  // - Server-side accepts all have the same linkAddress (server's own address)
+  // - Multiple clients need separate connections, not reuse
+  // - Inserting server accepts would cause key collisions and interfere with client-side lookups
+  if (linkAddress != "" && isClientSide) {
     std::string normalized_address = nlohmann::json::parse(linkAddress).dump();
     helper::logDebug(logPrefix + " compare normalized: " + linkAddress + " vs " + normalized_address);
-    helper::logDebug(logPrefix + "Inserting $" + channelId + "$ + $" + normalized_address + "$ into the linkConnMap with connID " + connId);
+    helper::logDebug(logPrefix + "Inserting CLIENT-SIDE: $" + channelId + "$ + $" + normalized_address + "$ into the linkConnMap with connID " + connId);
     linkConnMap.insert({channelId+normalized_address, {contextHandle, connId}});
+  } else if (!isClientSide) {
+    helper::logDebug(logPrefix + "Skipping linkConnMap insertion for SERVER-SIDE accept (connID " + connId + ")");
   }
   
   auto contexts = getContexts(contextHandle);
@@ -1023,6 +1040,7 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
   if (linkAddress != "" && creating) {
     std::string normalized_address = nlohmann::json::parse(linkAddress).dump();
     helper::logDebug(logPrefix + " compare normalized: " + linkAddress + " vs " + normalized_address);
+    helper::logDebug(logPrefix + "CLIENT-SIDE connection reuse check for linkConnMap");
     auto connContextIt = linkConnMap.find(channelId + normalized_address);
     if (connContextIt != linkConnMap.end()) {
       helper::logDebug(logPrefix + "got existing entry for $" + channelId + "$ $" + normalized_address + "$ in the linkConnMap with ConnID=" + connContextIt->second.second);

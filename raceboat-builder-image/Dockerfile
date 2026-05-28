@@ -14,7 +14,7 @@
 # limitations under the License.
 # 
 
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ARG TARGETARCH
 ARG TARGETPLATFORM
@@ -32,15 +32,16 @@ RUN for OS in linux android; do \
             mkdir -p /${OS}/${ARCH}; \
         done; \
     done;
-            
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add - && \
-    add-apt-repository "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main"
+
+# Note: Skipping Kitware repository due to certificate issues with corporate proxy
+# Ubuntu 24.04 includes cmake 3.28.3 which is sufficient            
 
 RUN apt-get update -y && apt-get install -y \
     cmake \
     clang-15 \
     clang-format-15 \
-    clang-tidy-15
+    clang-tidy-15 \
+    swig
 
 # Go
 ARG GO_VERSION=1.23.0
@@ -48,7 +49,7 @@ RUN case ${TARGETPLATFORM} in \
         "linux/amd64") LINUX_ARCH=amd64 ;; \
         "linux/arm64") LINUX_ARCH=arm64 ;; \
     esac && \
-    wget \
+    wget --no-check-certificate \
         --output-document=/tmp/go${GO_VERSION}.linux-${LINUX_ARCH}.tar.gz \
         https://go.dev/dl/go${GO_VERSION}.linux-${LINUX_ARCH}.tar.gz && \
     tar --extract \
@@ -63,19 +64,19 @@ ENV GOROOT=/usr/local/go \
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 1 && \
     update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-15 1
 
-# SWIG (Linux-only)
-ARG SWIG_VERSION=4.0.1-2
-RUN case ${TARGETPLATFORM} in \
-        "linux/amd64") LINUX_ARCH=x86_64    ;; \
-        "linux/arm64") LINUX_ARCH=arm64-v8a ;; \
-    esac && \
-    wget \
-        --output-document=/tmp/swig-${SWIG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
-        https://github.com/tst-race/ext-swig/releases/download/${SWIG_VERSION}/swig-${SWIG_VERSION}-linux-${LINUX_ARCH}.tar.gz && \
-    tar --extract \
-        --file=/tmp/swig-${SWIG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
-        --directory=/usr/local && \
-    rm /tmp/swig-*.tar.gz
+# # SWIG (Linux-only)
+# ARG SWIG_VERSION=4.4.1
+# RUN case ${TARGETPLATFORM} in \
+#         "linux/amd64") LINUX_ARCH=x86_64    ;; \
+#         "linux/arm64") LINUX_ARCH=arm64-v8a ;; \
+#     esac && \
+#     wget --no-check-certificate \
+#         --output-document=/tmp/swig-${SWIG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
+#         https://github.com/tst-race/ext-swig/releases/download/${SWIG_VERSION}/swig-${SWIG_VERSION}-linux-${LINUX_ARCH}.tar.gz && \
+#     tar --extract \
+#         --file=/tmp/swig-${SWIG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
+#         --directory=/usr/local && \
+#     rm /tmp/swig-*.tar.gz
 
 # non-interactive install mode workaround to python prerequisite tzdata
 ENV DEBIAN_FRONTEND=noninteractive
@@ -101,7 +102,7 @@ RUN apt-get install -y \
 
 ARG GOOGLETEST_VERSION=1.12.0-1
 RUN for ARCH in x86_64 arm64-v8a; do \
-        wget \
+        wget --no-check-certificate \
             --output-document=/tmp/googletest-${GOOGLETEST_VERSION}-linux-${ARCH}.tar.gz \
             https://github.com/tst-race/ext-googletest/releases/download/${GOOGLETEST_VERSION}/googletest-${GOOGLETEST_VERSION}-linux-${ARCH}.tar.gz && \
         tar --extract \
@@ -114,7 +115,7 @@ RUN for ARCH in x86_64 arm64-v8a; do \
 ARG NLOHMANN_JSON_VERSION=3.10.5-1
 RUN for OS in linux android; do \
         for ARCH in x86_64 arm64-v8a; do \
-            wget \
+            wget --no-check-certificate \
                 --output-document=/tmp/nlohmann-json-${NLOHMANN_JSON_VERSION}-${OS}-${ARCH}.tar.gz \
                 https://github.com/tst-race/ext-nlohmann-json/releases/download/${NLOHMANN_JSON_VERSION}/nlohmann-json-${NLOHMANN_JSON_VERSION}-${OS}-${ARCH}.tar.gz && \
             tar --extract \
@@ -132,38 +133,39 @@ RUN apt-get install -y \
         wget \
         unzip
 
+# TODO - bring android development/build support back in
 # Install Android NDK
-ARG ANDROID_TOOLS_VERSION=6609375
-RUN mkdir -p /opt/android/cmdline-tools && \
-    cd /opt/android/cmdline-tools && \
-    wget https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_TOOLS_VERSION}_latest.zip && \
-    unzip commandlinetools-*.zip && \
-    rm commandlinetools-*.zip
-ARG ANDROID_NDK_VERSION=23.2.8568313
-RUN yes | /opt/android/cmdline-tools/tools/bin/sdkmanager --licenses && \
-    /opt/android/cmdline-tools/tools/bin/sdkmanager --install "ndk;${ANDROID_NDK_VERSION}" && \
-    ln -s /opt/android/ndk/${ANDROID_NDK_VERSION} /opt/android/ndk/default
+# ARG ANDROID_TOOLS_VERSION=6609375
+# RUN mkdir -p /opt/android/cmdline-tools && \
+#     cd /opt/android/cmdline-tools && \
+#     wget --no-check-certificate https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_TOOLS_VERSION}_latest.zip && \
+#     unzip commandlinetools-*.zip && \
+#     rm commandlinetools-*.zip
+# ARG ANDROID_NDK_VERSION=23.2.8568313
+# RUN yes | /opt/android/cmdline-tools/tools/bin/sdkmanager --licenses && \
+#     /opt/android/cmdline-tools/tools/bin/sdkmanager --install "ndk;${ANDROID_NDK_VERSION}" && \
+#     ln -s /opt/android/ndk/${ANDROID_NDK_VERSION} /opt/android/ndk/default
 
-ENV ANDROID_NDK=/opt/android/ndk/default \
-    MIN_SDK_VERSION=34 \
-    CC=clang \
-    CXX=clang++ \
-    PATH=${PATH}:/opt/android/cmdline-tools/tools/bin
+# ENV ANDROID_NDK=/opt/android/ndk/default \
+#     MIN_SDK_VERSION=34 \
+#     CC=clang \
+#     CXX=clang++ \
+#     PATH=${PATH}:/opt/android/cmdline-tools/tools/bin
 
-ARG ANDROID_PYTHON_VERSION=3.7.16-3
-RUN for ARCH in x86_64 arm64-v8a; do \
-        mkdir -p /android/${ARCH} && \
-        wget \
-            --output-document=/tmp/python-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz \
-            https://github.com/tst-race/ext-python/releases/download/${ANDROID_PYTHON_VERSION}/python-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz && \
-        tar --extract \
-            --file=/tmp/python-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz \
-            --directory=/android/${ARCH} && \
-        wget \
-            --output-document=/android/${ARCH}/python-packages-android-${ARCH}.tar.gz \
-            https://github.com/tst-race/ext-python/releases/download/${ANDROID_PYTHON_VERSION}/python-packages-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz; \
-    done && \
-    rm /tmp/python-*.tar.gz
+# ARG ANDROID_PYTHON_VERSION=3.7.16-3
+# RUN for ARCH in x86_64 arm64-v8a; do \
+#         mkdir -p /android/${ARCH} && \
+#         wget --no-check-certificate \
+#             --output-document=/tmp/python-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz \
+#             https://github.com/tst-race/ext-python/releases/download/${ANDROID_PYTHON_VERSION}/python-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz && \
+#         tar --extract \
+#             --file=/tmp/python-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz \
+#             --directory=/android/${ARCH} && \
+#         wget --no-check-certificate \
+#             --output-document=/android/${ARCH}/python-packages-android-${ARCH}.tar.gz \
+#             https://github.com/tst-race/ext-python/releases/download/${ANDROID_PYTHON_VERSION}/python-packages-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz; \
+#     done && \
+#     rm /tmp/python-*.tar.gz
 
 # Cppcheck (Linux-only)
 ARG CPPCHECK_VERSION=2.4.1-1
@@ -171,7 +173,7 @@ RUN case ${TARGETPLATFORM} in \
         "linux/amd64") LINUX_ARCH=x86_64    ;; \
         "linux/arm64") LINUX_ARCH=arm64-v8a ;; \
     esac && \
-    wget \
+    wget --no-check-certificate \
         --output-document=/tmp/cppcheck-${CPPCHECK_VERSION}-linux-${LINUX_ARCH}.tar.gz \
         https://github.com/tst-race/ext-cppcheck/releases/download/${CPPCHECK_VERSION}/cppcheck-${CPPCHECK_VERSION}-linux-${LINUX_ARCH}.tar.gz && \
     tar --extract \

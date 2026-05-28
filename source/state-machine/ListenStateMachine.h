@@ -64,6 +64,9 @@ public:
   
   // Store the LinkID from the first connection - all accepts share this link
   LinkID firstLinkId;
+  
+  // Track whether the initial connection SM (recvConnSMHandle) has been used for an accept
+  bool initialConnSMUsed = false;
 
   std::queue<RaceHandle> preConduitSM;
 };

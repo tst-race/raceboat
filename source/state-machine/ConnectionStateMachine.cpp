@@ -145,6 +145,8 @@ struct StateConnActivated : public ConnState {
       ctx.linkId = ctx.existingLinkId;
       ctx.updatedLinkAddress = ctx.linkAddress;  // Use the provided address
       // Skip link creation/loading and proceed directly to opening connection
+      // Trigger the event to transition to the next state
+      ctx.pendingEvents.push(EVENT_LINK_ESTABLISHED);
       return EventResult::SUCCESS;
     }
     

@@ -72,6 +72,12 @@ void ApiListenContext::updateConnStateMachineConnected(
   // Store connection info - conduit will be created when dial message arrives
   this->recvConnId = connId;
   this->recvLinkAddress = linkAddress;
+  
+  // CRITICAL: Register packageId (all zeros) for this connection so dial messages route to ListenStateMachine
+  // This must be done for EVERY connection, not just the first one
+  std::string packageId(packageIdLen, '\0');
+  manager.registerPackageId(*this, connId, packageId);
+  helper::logDebug(logPrefix + "Registered packageId for " + connId + " to route dial messages");
 };
 
 //-----------------------------------------------------------------------------------------------
@@ -175,6 +181,10 @@ struct StateListenWaiting : public ListenState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
+    helper::logDebug(logPrefix + "StateListenWaiting::enter: acceptCb.size()=" + std::to_string(ctx.acceptCb.size()) + 
+                     ", connSMToAcceptCallback.size()=" + std::to_string(ctx.connSMToAcceptCallback.size()) +
+                     ", recvConnSMHandle=" + std::to_string(ctx.recvConnSMHandle));
+
     // Handle accept() calls by starting openConnection() for each accept
     // Each accept() waits for a client to connect, then waits for a dial message
     while (!ctx.acceptCb.empty()) {
@@ -183,25 +193,46 @@ struct StateListenWaiting : public ListenState {
       
       RaceHandle connSMHandle = NULL_RACE_HANDLE;
       
-      // Check if this is the first accept() and we have the initial connection SM
-      if (ctx.recvConnSMHandle != NULL_RACE_HANDLE && 
-          ctx.connSMToAcceptCallback.find(ctx.recvConnSMHandle) == ctx.connSMToAcceptCallback.end()) {
+      // Check if this is the first accept() and we have the initial connection SM that hasn't been used yet
+      bool initialSMAvailable = (ctx.recvConnSMHandle != NULL_RACE_HANDLE && !ctx.initialConnSMUsed);
+      helper::logDebug(logPrefix + "Processing accept(): recvConnSMHandle=" + std::to_string(ctx.recvConnSMHandle) + 
+                       ", initialSMAvailable=" + std::to_string(initialSMAvailable) + 
+                       ", initialConnSMUsed=" + std::to_string(ctx.initialConnSMUsed));
+      
+      if (initialSMAvailable) {
         // Use the existing connection SM from StateListenInitial for the first accept
         connSMHandle = ctx.recvConnSMHandle;
+        ctx.initialConnSMUsed = true;  // Mark it as used
         helper::logDebug(logPrefix + "Mapping initial connection SM " + std::to_string(connSMHandle) + 
                          " to first accept() call");
+        // Map it immediately so subsequent accepts in this loop know it's been used
+        ctx.connSMToAcceptCallback[connSMHandle] = std::move(cb);
+        ctx.pendingConnSMHandles.push(connSMHandle);
       } else {
         // Create a new connection SM for subsequent accepts
         helper::logDebug(logPrefix + "Creating new connection SM for accept() call");
         
+        // Verify we have the necessary information from the first connection
+        if (ctx.firstLinkId.empty()) {
+          helper::logError(logPrefix + "Cannot create additional connection SM: firstLinkId not set yet");
+          cb(ApiStatus::INTERNAL_ERROR, {}, {});
+          continue;
+        }
+        if (ctx.recvLinkAddress.empty()) {
+          helper::logWarning(logPrefix + "recvLinkAddress is empty for additional connection SM");
+        }
+        
+        helper::logDebug(logPrefix + "Reusing LinkID: " + ctx.firstLinkId + ", linkAddress: " + ctx.recvLinkAddress);
+        
         // Start a new connection state machine for this accept
         // Pass the existing LinkID from the first connection - all accepts share the same link
         // Each openConnection() on that link will get a new ConnectionID
+        // Use the ACTUAL link address from the first connection (not the initial empty/placeholder)
         connSMHandle = ctx.manager.startConnStateMachineBidi(
             ctx.handle, 
             ctx.recvChannelId, 
             ctx.recvRole, 
-            ctx.recvLinkAddress,  // Link address from first connection
+            ctx.recvLinkAddress,  // Use the actual link address from first connection
             false,  // NOT creating - reusing existing link
             ctx.firstLinkId  // Reuse the existing LinkID_0
         );
@@ -214,12 +245,11 @@ struct StateListenWaiting : public ListenState {
         
         ctx.manager.registerHandle(ctx, connSMHandle);
         helper::logDebug(logPrefix + "Created connection SM " + std::to_string(connSMHandle) + " for accept()");
+        
+        // Map this connection SM to its accept callback
+        ctx.connSMToAcceptCallback[connSMHandle] = std::move(cb);
+        ctx.pendingConnSMHandles.push(connSMHandle);
       }
-      
-      // Map this connection SM to its accept callback
-      // Conduit will be created when dial message arrives
-      ctx.connSMToAcceptCallback[connSMHandle] = std::move(cb);
-      ctx.pendingConnSMHandles.push(connSMHandle);
     }
 
     // Process dial messages from clients
@@ -273,7 +303,7 @@ struct StateListenWaiting : public ListenState {
 
         ctx.preConduitSM.push(preConnSMHandle);
 
-        break;
+        // Continue processing remaining dial messages (removed break for multi-client support)
       } catch (std::exception &e) {
         helper::logError(logPrefix +
                          "Failed to process received message: " + e.what());

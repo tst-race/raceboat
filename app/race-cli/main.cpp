@@ -44,6 +44,7 @@
 #include <sys/wait.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <pthread.h>
 #define READ 0
 #define WRITE 1
 
@@ -1156,30 +1157,55 @@ ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_o
 
   while (1) {
     printf("server calling accept\n");
+    fflush(stdout);
     auto [status2, connection] = listener.accept();
     if (status2 != ApiStatus::OK) {
       printf("accept failed with status: %i\n", status2);
+      fflush(stdout);
       status = status2;
       break;
     }
   
-    printf("conduit accept success\n");
-    printf("AWAITING LOCAL CLIENT\n");
+    printf("conduit accept success (handle=%lu)\n", connection.getHandle());
+    fflush(stdout);
     
-    // create client connection for listening socket to connect on
-    // assume listening local app process is or will be running
-    int client_sock = -1;
-    while (client_sock < 0) {
-      printf("accepted client sonnection, connecting to %s:%d\n", host.c_str(), local_port);
-      client_sock = create_client_connection(host, local_port);
-      if (client_sock < 0) {
-        printf("Awaiting listening socket \n");
-        sleep(5);
+    // Create shared_ptr to allow safe thread capture
+    auto conduit_ptr = std::make_shared<Conduit>(connection);
+    printf("created conduit shared_ptr, spawning thread...\n");
+    fflush(stdout);
+    
+    // Spawn a thread to handle TCP connection and data relay
+    // This allows the loop to immediately accept the next conduit
+    std::thread connection_handler([conduit_ptr, local_port, host, timeoutSeconds]() {
+      printf("[THREAD %lu] Started for conduit handle=%lu\n", pthread_self(), conduit_ptr->getHandle());
+      fflush(stdout);
+      printf("[THREAD %lu] AWAITING LOCAL CLIENT\n", pthread_self());
+      fflush(stdout);
+      
+      // create client connection for listening socket to connect on
+      // assume listening local app process is or will be running
+      int client_sock = -1;
+      while (client_sock < 0) {
+        printf("[THREAD %lu] connecting to %s:%d\n", pthread_self(), host.c_str(), local_port);
+        fflush(stdout);
+        client_sock = create_client_connection(host, local_port);
+        if (client_sock < 0) {
+          printf("[THREAD %lu] Awaiting listening socket, retrying in 5s\n", pthread_self());
+          fflush(stdout);
+          sleep(5);
+        }
       }
-    }
 
-    printf("SOCKET client_sock: %d\n", client_sock);
-    relay_data_loop(client_sock, std::make_shared<Conduit>(connection), timeoutSeconds, false);
+      printf("[THREAD %lu] SOCKET client_sock: %d\n", pthread_self(), client_sock);
+      fflush(stdout);
+      relay_data_loop(client_sock, conduit_ptr, timeoutSeconds, false);
+      printf("[THREAD %lu] relay_data_loop completed\n", pthread_self());
+      fflush(stdout);
+    });
+    
+    connection_handler.detach();
+    printf("thread detached, looping back to accept next connection\n");
+    fflush(stdout);
   }
 
   printf("closing race sockets\n");
