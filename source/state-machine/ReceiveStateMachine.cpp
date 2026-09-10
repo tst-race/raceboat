@@ -53,7 +53,7 @@ void ApiRecvContext::updateReceiveEncPkg(
 };
 void ApiRecvContext::updateConnStateMachineConnected(
     RaceHandle /* _contextHandle */, ConnectionID _connId,
-    std::string _linkAddress) {
+    std::string _linkAddress, LinkID /* _linkId */) {
   this->connId = _connId;
   this->linkAddress = _linkAddress;
 };

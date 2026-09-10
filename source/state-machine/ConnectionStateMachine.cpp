@@ -138,6 +138,19 @@ struct StateConnActivated : public ConnState {
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
+    
+    // If an existing link ID was provided, reuse it instead of creating/loading
+    if (!ctx.existingLinkId.empty()) {
+      helper::logDebug(logPrefix + "Reusing existing LinkID: " + ctx.existingLinkId);
+      ctx.linkId = ctx.existingLinkId;
+      ctx.updatedLinkAddress = ctx.linkAddress;  // Use the provided address
+      // Skip link creation/loading and proceed directly to opening connection
+      // Trigger the event to transition to the next state
+      ctx.pendingEvents.push(EVENT_LINK_ESTABLISHED);
+      return EventResult::SUCCESS;
+    }
+    
+    // Normal flow: create or load a new link
     RaceHandle linkHandle = ctx.manager.getCore().generateHandle();
     PluginWrapper &plugin = getPlugin(ctx, ctx.channelId);
 
@@ -230,7 +243,8 @@ struct StateConnConnectionOpen : public ConnState {
     ctx.manager.registerId(ctx, ctx.connId);
     ctx.manager.connStateMachineConnected(ctx.handle, ctx.connId,
                                           ctx.updatedLinkAddress,
-                                          ctx.channelId);
+                                          ctx.channelId,
+                                          ctx.linkId);
 
     ctx.pendingEvents.push(EVENT_ALWAYS);
 

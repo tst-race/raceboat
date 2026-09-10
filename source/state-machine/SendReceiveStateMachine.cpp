@@ -46,7 +46,7 @@ void ApiSendReceiveContext::updateConnStateMachineLinkEstablished(
   }
 };
 void ApiSendReceiveContext::updateConnStateMachineConnected(
-    RaceHandle contextHandle, ConnectionID connId, std::string linkAddress) {
+    RaceHandle contextHandle, ConnectionID connId, std::string linkAddress, LinkID /* linkId */) {
   if (this->recvConnSMHandle == contextHandle) {
     this->recvConnId = connId;
     this->recvLinkAddress = linkAddress;

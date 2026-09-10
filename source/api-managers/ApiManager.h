@@ -140,7 +140,8 @@ public:
   virtual void connStateMachineConnected(RaceHandle contextHandle,
                                          ConnectionID connId,
                                          std::string linkAddress,
-                                         std::string channelId);
+                                         std::string channelId,
+                                         LinkID linkId);
 
   virtual void onStateMachineFailed(uint64_t postId, RaceHandle contextHandle);
   virtual void onStateMachineFinished(uint64_t postId,
@@ -154,7 +155,8 @@ public:
                                            RaceHandle contextHandle,
                                            ConnectionID connId,
                                            std::string linkAddress,
-                                           std::string channelId);
+                                           std::string channelId,
+                                           LinkID linkId);
 
   virtual void onChannelStatusChangedForContext(
       uint64_t postId, RaceHandle contextHandle, RaceHandle callHandle,
@@ -162,7 +164,8 @@ public:
       const ChannelProperties &properties);
   virtual void onConnStateMachineConnectedForContext(
       uint64_t postId, RaceHandle contextHandle, RaceHandle callHandle,
-      RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress);
+      RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress,
+      LinkID linkId);
   // Plugin callbacks
   virtual void onChannelStatusChanged(uint64_t postId, RaceHandle handle,
                                       const ChannelId &channelGid,
@@ -186,12 +189,14 @@ public:
                                            std::string role,
                                            std::string linkAddress,
                                            bool creating,
-                                           bool sending);
+                                           bool sending,
+                                           LinkID existingLinkId = "");
   virtual RaceHandle startConnStateMachineBidi(RaceHandle contextHandle,
                                                ChannelId channelId,
                                                std::string role,
                                                 std::string linkAddress,
-                                                bool creating);
+                                                bool creating,
+                                                LinkID existingLinkId = "");
   virtual RaceHandle startConduitectStateMachine(
       RaceHandle contextHandle, RaceHandle recvHandle,
       const ConnectionID &recvConnId, RaceHandle sendHandle,
@@ -351,7 +356,8 @@ public:
   virtual SdkResponse onConnStateMachineConnected(RaceHandle contextHandle,
                                                   ConnectionID connId,
                                                   std::string linkAddress,
-                                                  std::string channelId);
+                                                  std::string channelId,
+                                                  LinkID linkId);
   virtual SdkResponse onChannelStatusChangedForContext(
       RaceHandle contextHandle, RaceHandle callHandle,
       const ChannelId &channelGid, ChannelStatus status,
@@ -360,7 +366,8 @@ public:
   virtual SdkResponse onConnStateMachineConnectedForContext(
       RaceHandle contextHandle,
       RaceHandle callHandle,
-      RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress);
+      RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress,
+      LinkID linkId);
 
 
   // Plugin callbacks

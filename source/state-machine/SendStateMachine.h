@@ -30,7 +30,7 @@ public:
                           std::function<void(ApiStatus)> cb) override;
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
-                                  std::string linkAddress) override;
+                                  std::string linkAddress, LinkID linkId) override;
 
 public:
   SendOptions opts;

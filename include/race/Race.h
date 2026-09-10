@@ -239,7 +239,7 @@ private:
 class AcceptObject {
 public:
   AcceptObject(std::shared_ptr<Core> core, OpHandle handle);
-  AcceptObject() {}
+  AcceptObject() : handle(0) {}
   std::pair<ApiStatus, Conduit> accept();
 
 private:

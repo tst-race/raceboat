@@ -45,7 +45,8 @@ void ApiDialContext::updateConnStateMachineLinkEstablished(
 };
 void ApiDialContext::updateConnStateMachineConnected(RaceHandle contextHandle,
                                                      ConnectionID connId,
-                                                     std::string linkAddress) {
+                                                     std::string linkAddress,
+                                                     LinkID /* linkId */) {
   if (this->recvConnSMHandle == contextHandle) {
     this->recvConnId = connId;
     this->recvLinkAddress = linkAddress;

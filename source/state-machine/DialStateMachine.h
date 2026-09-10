@@ -33,7 +33,7 @@ public:
                                   std::string linkAddress) override;
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
-                                  std::string linkAddress) override;
+                                  std::string linkAddress, LinkID linkId) override;
 
 public:
   SendOptions opts;

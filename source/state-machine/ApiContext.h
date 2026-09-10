@@ -118,7 +118,8 @@ public:
                                                std::string /* linkAddress */){};
   virtual void updateConnStateMachineConnected(RaceHandle /* contextHandle */,
                                                ConnectionID /* connId */,
-                                               std::string /* linkAddress */){};
+                                               std::string /* linkAddress */,
+                                               LinkID /* linkId */){};
   virtual void updateConnStateMachineStart(RaceHandle /* contextHandle */,
                                            ChannelId /* channelId */,
                                            std::string /* role */,

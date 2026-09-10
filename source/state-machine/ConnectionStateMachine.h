@@ -68,6 +68,7 @@ public:
   std::string linkAddress;
   std::string updatedLinkAddress;
   LinkID linkId;
+  LinkID existingLinkId;  // If set, reuse this existing link instead of creating/loading
   ConnectionID connId;
   bool connected = false;
 };
