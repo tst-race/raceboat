@@ -28,6 +28,9 @@ Examples:
   
   # Granular control
   python3 build-test.py --plugin-dir ../../racebird --rebuild-raceboat-code --rebuild-plugin
+
+    # Multi-client integration test
+    python3 build-test.py --plugin-dir ../../racebird --integration-test-args-passthrough --additional-clients rbclient2
 """
 
 import argparse
@@ -261,11 +264,14 @@ class BuildTestOrchestrator:
         print(f"  {colored('✓', GREEN)} Logs cleared")
         return True
     
-    def run_integration_test(self, wait_time: int = 10, dry_run: bool = False) -> bool:
+    def run_integration_test(self, wait_time: int = 10,
+                             integration_test_args: Optional[List[str]] = None,
+                             dry_run: bool = False) -> bool:
         """Run integration test for plugin."""
         compose_file = self.plugin_dir / 'test' / 'docker-compose.yml'
         
         test_runner = Path(__file__).parent / 'run-integration-test.py'
+        integration_test_args = integration_test_args or []
         
         stage = BuildStage(
             name=f'{self.plugin_name}-test',
@@ -277,7 +283,7 @@ class BuildTestOrchestrator:
                 '--wait-time', str(wait_time),
                 '--name', f'{self.plugin_name} Plugin Integration Test',
                 '--clear-logs'
-            ],
+            ] + integration_test_args,
             cwd=Path(__file__).parent
         )
         
@@ -378,7 +384,11 @@ class BuildTestOrchestrator:
             self.clear_plugin_logs(dry_run)
             
             # Run integration test
-            if not self.run_integration_test(config['wait_time'], dry_run):
+            if not self.run_integration_test(
+                config['wait_time'],
+                config['integration_test_args'],
+                dry_run
+            ):
                 return 1
         
         # Success
@@ -416,6 +426,9 @@ Examples:
   
   # Build only (skip test)
   python3 build-test.py --plugin-dir ../../racebird --rebuild-plugin --skip-test
+
+    # Multi-client integration test
+    python3 build-test.py --plugin-dir ../../racebird --integration-test-args --additional-clients rbclient2
 
 Plugin Directory Structure:
   The plugin directory must contain:
@@ -493,6 +506,13 @@ Plugin Directory Structure:
         type=int,
         default=10,
         help='Wait time for channel establishment (default: 10)'
+    )
+    test_group.add_argument(
+        '--integration-test-args',
+        nargs=argparse.REMAINDER,
+        default=[],
+        metavar='ARG',
+        help='Forward remaining arguments to run-integration-test.py (place this option last)'
     )
     
     # General options
