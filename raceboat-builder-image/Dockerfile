@@ -133,39 +133,38 @@ RUN apt-get install -y \
         wget \
         unzip
 
-# TODO - bring android development/build support back in
 # Install Android NDK
-# ARG ANDROID_TOOLS_VERSION=6609375
-# RUN mkdir -p /opt/android/cmdline-tools && \
-#     cd /opt/android/cmdline-tools && \
-#     wget --no-check-certificate https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_TOOLS_VERSION}_latest.zip && \
-#     unzip commandlinetools-*.zip && \
-#     rm commandlinetools-*.zip
-# ARG ANDROID_NDK_VERSION=23.2.8568313
-# RUN yes | /opt/android/cmdline-tools/tools/bin/sdkmanager --licenses && \
-#     /opt/android/cmdline-tools/tools/bin/sdkmanager --install "ndk;${ANDROID_NDK_VERSION}" && \
-#     ln -s /opt/android/ndk/${ANDROID_NDK_VERSION} /opt/android/ndk/default
+ARG ANDROID_TOOLS_VERSION=6609375
+RUN mkdir -p /opt/android/cmdline-tools && \
+    cd /opt/android/cmdline-tools && \
+    wget --no-check-certificate https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_TOOLS_VERSION}_latest.zip && \
+    unzip commandlinetools-*.zip && \
+    rm commandlinetools-*.zip
+ARG ANDROID_NDK_VERSION=23.2.8568313
+RUN yes | /opt/android/cmdline-tools/tools/bin/sdkmanager --licenses && \
+    /opt/android/cmdline-tools/tools/bin/sdkmanager --install "ndk;${ANDROID_NDK_VERSION}" && \
+    ln -s /opt/android/ndk/${ANDROID_NDK_VERSION} /opt/android/ndk/default
 
-# ENV ANDROID_NDK=/opt/android/ndk/default \
-#     MIN_SDK_VERSION=34 \
-#     CC=clang \
-#     CXX=clang++ \
-#     PATH=${PATH}:/opt/android/cmdline-tools/tools/bin
+ENV ANDROID_NDK=/opt/android/ndk/default \
+    MIN_SDK_VERSION=34 \
+    CC=clang \
+    CXX=clang++ \
+    PATH=${PATH}:/opt/android/cmdline-tools/tools/bin
 
-# ARG ANDROID_PYTHON_VERSION=3.7.16-3
-# RUN for ARCH in x86_64 arm64-v8a; do \
-#         mkdir -p /android/${ARCH} && \
-#         wget --no-check-certificate \
-#             --output-document=/tmp/python-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz \
-#             https://github.com/tst-race/ext-python/releases/download/${ANDROID_PYTHON_VERSION}/python-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz && \
-#         tar --extract \
-#             --file=/tmp/python-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz \
-#             --directory=/android/${ARCH} && \
-#         wget --no-check-certificate \
-#             --output-document=/android/${ARCH}/python-packages-android-${ARCH}.tar.gz \
-#             https://github.com/tst-race/ext-python/releases/download/${ANDROID_PYTHON_VERSION}/python-packages-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz; \
-#     done && \
-#     rm /tmp/python-*.tar.gz
+ARG ANDROID_PYTHON_VERSION=3.7.16-3
+RUN for ARCH in x86_64 arm64-v8a; do \
+        mkdir -p /android/${ARCH} && \
+        wget --no-check-certificate \
+            --output-document=/tmp/python-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz \
+            https://github.com/tst-race/ext-python/releases/download/${ANDROID_PYTHON_VERSION}/python-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz && \
+        tar --extract \
+            --file=/tmp/python-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz \
+            --directory=/android/${ARCH} && \
+        wget --no-check-certificate \
+            --output-document=/android/${ARCH}/python-packages-android-${ARCH}.tar.gz \
+            https://github.com/tst-race/ext-python/releases/download/${ANDROID_PYTHON_VERSION}/python-packages-${ANDROID_PYTHON_VERSION}-android-${ARCH}.tar.gz; \
+    done && \
+    rm /tmp/python-*.tar.gz
 
 # Cppcheck (Linux-only)
 ARG CPPCHECK_VERSION=2.4.1-1
