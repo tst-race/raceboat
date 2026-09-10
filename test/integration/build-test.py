@@ -32,6 +32,7 @@ Examples:
 
 import argparse
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -169,6 +170,19 @@ class BuildTestOrchestrator:
         )
         return stage.execute(dry_run, self.verbose)
     
+    @staticmethod
+    def detect_host_architecture() -> str:
+        """Return the Docker target architecture for the current host."""
+        machine = platform.machine().lower()
+        if machine in {'x86_64', 'amd64'}:
+            return '--platform-x86_64'
+        if machine in {'arm64', 'aarch64'}:
+            return '--platform-arm64'
+        raise ValueError(
+            f'Unsupported host architecture for Docker builds: {platform.machine()}. '
+            'Expected x86_64 or arm64/aarch64.'
+        )
+
     def build_plugin_builder_image(self, dry_run: bool = False) -> bool:
         """Stage 2: Build plugin builder Docker image."""
         stage = BuildStage(
@@ -177,7 +191,7 @@ class BuildTestOrchestrator:
             command=[
                 './build_image.sh',
                 '-n', 'ghcr.io/tst-race/raceboat',
-                '--platform-arm64'
+                self.detect_host_architecture()
             ],
             cwd=self.raceboat_root / 'raceboat-plugin-builder-image'
         )
@@ -191,7 +205,7 @@ class BuildTestOrchestrator:
             command=[
                 './build_image.sh',
                 '-n', 'ghcr.io/tst-race/raceboat',
-                '--platform-arm64'
+                self.detect_host_architecture()
             ],
             cwd=self.raceboat_root / 'raceboat-runtime-image'
         )
