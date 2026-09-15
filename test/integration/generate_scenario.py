@@ -43,6 +43,8 @@ SLOT_CHANNEL_FLAGS = {
     "final": ("final-recv-channel", "final-send-channel"),
 }
 
+ADDRESS_FLAGS = {"send-address", "recv-address"}
+
 
 def load_registry() -> Dict[str, Path]:
     registry = json.loads(REGISTRY_PATH.read_text())
@@ -122,10 +124,12 @@ def _build_command(scenario: dict, node: Node) -> str:
         parts.append(f"--{send_flag}={contribution.channel_name}")
     if "timeout" in scenario:
         parts.append(f"--timeout={scenario['timeout']}")
-    for contribution in node.contributions.values():
+    for slot, contribution in node.contributions.items():
         for key, value in contribution.params.items():
             parts.append(f"--param {key}={_quote_shell_arg(str(value))}")
         for flag, value in contribution.cli_flags.items():
+            if slot == "final" and flag in ADDRESS_FLAGS:
+                continue
             parts.append(f"--{flag}={_quote_shell_arg(value)}")
     # YAML folded scalars (">") join lines with a single space on their own -
     # no shell-style "\" continuations, which would end up as literal
@@ -158,12 +162,18 @@ def _render_compose(scenario: dict, nodes: List[Node], output_dir: Path, image_t
         lines.append(f"  {node.id}:")
         lines.append(f"    image: ghcr.io/tst-race/raceboat/raceboat-runtime:{image_tag}")
         lines.append(f"    container_name: {node.id}")
-        if node.role == "connector":
-            listener_ids = [n.id for n in nodes if n.role == "listener"]
-            if listener_ids:
-                lines.append("    depends_on:")
-                for listener_id in listener_ids:
-                    lines.append(f"      - {listener_id}")
+        listener_ids = [n.id for n in nodes if n.role == "listener"]
+        sidecars = _merge_sidecar_services(nodes)
+        has_dependencies = (node.role == "connector" and listener_ids) or sidecars
+        if has_dependencies:
+            lines.append("    depends_on:")
+        if node.role == "connector" and listener_ids:
+            for listener_id in listener_ids:
+                lines.append(f"      {listener_id}:")
+                lines.append("        condition: service_started")
+        for sidecar_name in sidecars:
+            lines.append(f"      {sidecar_name}:")
+            lines.append("        condition: service_healthy")
         lines.append("    volumes:")
         lines.append(f"      - ./kits/{node.id}:/kits")
         lines.append(f"      - ./logs/{node.id}:/tmp")

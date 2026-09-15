@@ -19,6 +19,7 @@
 #include "../../include/race/Race.h"
 #include "Core.h"
 #include "Events.h"
+#include "LinkAddressValidation.h"
 #include "PluginContainer.h"
 #include "PluginWrapper.h"
 #include "States.h"
@@ -198,11 +199,10 @@ struct StateConnLinkEstablished : public ConnState {
       nlohmann::json updatedJson =
           nlohmann::json::parse(ctx.updatedLinkAddress);
       nlohmann::json originalJson = nlohmann::json::parse(ctx.linkAddress);
-      if (updatedJson != originalJson) {
+      if (!detail::containsRequestedAddressFields(originalJson, updatedJson)) {
         helper::logError(logPrefix +
-                         "received link address does not match requested link "
-                         "address supplied "
-                         "by user. Requested: " +
+                         "received link address does not preserve requested "
+                         "fields supplied by user. Requested: " +
                          ctx.linkAddress + " got: " + ctx.updatedLinkAddress);
         return EventResult::NOT_SUPPORTED;
       }

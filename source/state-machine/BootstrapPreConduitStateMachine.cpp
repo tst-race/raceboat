@@ -86,7 +86,16 @@ void BootstrapPreConduitContext::updateConnStateMachineConnected(
     this->finalSendLinkAddress = linkAddress;
   }
 }
-     
+
+void BootstrapPreConduitContext::updateConnStateMachineLinkEstablished(
+    RaceHandle contextHandle, LinkID /* linkId */, std::string linkAddress) {
+  if (this->finalRecvConnSMHandle == contextHandle) {
+    this->finalRecvLinkAddress = linkAddress;
+  } else if (this->finalSendConnSMHandle == contextHandle) {
+    this->finalSendLinkAddress = linkAddress;
+  }
+}
+
 // void BootstrapPreConduitContext::updateConnStateMachineConnected(
 //     RaceHandle /* contextHandle */, ConnectionID connId,
 //     std::string /* linkAddress */) {
@@ -108,6 +117,11 @@ struct StateBootstrapPreConduitInitial : public BootstrapPreConduitState {
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
+    helper::logDebug(logPrefix + " readiness handles/ids: finalRecv=" +
+                     std::to_string(ctx.finalRecvConnSMHandle) + "/" +
+                     ctx.finalRecvConnId + " finalSend=" +
+                     std::to_string(ctx.finalSendConnSMHandle) + "/" +
+                     ctx.finalSendConnId);
 
     ctx.manager.registerPackageId(ctx, ctx.initRecvConnId, ctx.packageId);
     ctx.manager.registerHandle(ctx, ctx.parentHandle);
@@ -264,20 +278,27 @@ struct StateBootstrapPreConduitWaitingForConnections : public BootstrapPreCondui
     if (ctx.initSendConnSMHandle != NULL_RACE_HANDLE and ctx.initSendConnId.empty()) {
       return EventResult::SUCCESS;
     }
-    if (ctx.finalRecvConnSMHandle != NULL_RACE_HANDLE and ctx.finalRecvConnId.empty()) {
+    if (ctx.finalSendConnSMHandle != NULL_RACE_HANDLE && ctx.finalSendConnId.empty()) {
       return EventResult::SUCCESS;
     }
-    if (ctx.finalSendConnSMHandle != NULL_RACE_HANDLE and ctx.finalSendConnId.empty()) {
-      return EventResult::SUCCESS;
-    }
-    // No early returns indicate all expected connections are satisfied
 
-    // We created one of these, so we will need to send the address back as a response
-    if (ctx.shouldCreateSender(ctx.opts.final_send_channel) or
-        ctx.shouldCreateReceiver(ctx.opts.final_recv_channel)) {
-      ctx.pendingEvents.push(EVENT_NEEDS_SEND);
+    if (ctx.shouldCreateSender(ctx.opts.final_send_channel) &&
+        ctx.finalSendLinkAddress.empty()) {
+      return EventResult::SUCCESS;
     }
-    else {
+    if (ctx.shouldCreateReceiver(ctx.opts.final_recv_channel) &&
+        ctx.finalRecvLinkAddress.empty()) {
+      return EventResult::SUCCESS;
+    }
+
+    if (!ctx.responseSent &&
+        (ctx.shouldCreateSender(ctx.opts.final_send_channel) or
+       ctx.shouldCreateReceiver(ctx.opts.final_recv_channel))) {
+      ctx.pendingEvents.push(EVENT_NEEDS_SEND);
+    } else if (ctx.finalRecvConnSMHandle != NULL_RACE_HANDLE &&
+               ctx.finalRecvConnId.empty()) {
+      return EventResult::SUCCESS;
+    } else {
       ctx.pendingEvents.push(EVENT_SATISFIED);
     }
     return EventResult::SUCCESS;
@@ -334,6 +355,7 @@ struct StateBootstrapPreConduitSendResponse : public BootstrapPreConduitState {
     if (response.status != SdkStatus::SDK_OK) {
       return EventResult::NOT_SUPPORTED;
     }
+    ctx.responseSent = true;
     }
     return EventResult::SUCCESS;
   }
@@ -422,7 +444,7 @@ BootstrapPreConduitStateEngine::BootstrapPreConduitStateEngine() {
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_CONN_STATE_MACHINE_CONNECTED,              STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_NEEDS_SEND,              STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE);
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_SATISFIED,              STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED);
-    declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE,      EVENT_PACKAGE_SENT,              STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED);
+    declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE,      EVENT_PACKAGE_SENT,              STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS);
   // clang-format on
 }
 

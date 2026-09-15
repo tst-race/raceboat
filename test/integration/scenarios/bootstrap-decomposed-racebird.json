@@ -1,0 +1,27 @@
+{
+  "id": "bootstrap-decomposed-racebird",
+  "mode": "bootstrap-connect",
+  "wait_time": 20,
+  "timeout": 15,
+  "network": {"name": "bootstrap-decomposed-racebird-network", "subnet": "10.20.1.0/24"},
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "brserver",
+      "ip": "10.20.1.3",
+      "slots": {
+        "initial": "decomposed-exemplars",
+        "final": "racebird"
+      }
+    },
+    {
+      "role": "connector",
+      "id": "brclient",
+      "ip": "10.20.1.2",
+      "slots": {
+        "initial": "decomposed-exemplars",
+        "final": "racebird"
+      }
+    }
+  ]
+}

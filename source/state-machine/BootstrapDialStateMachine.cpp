@@ -62,6 +62,17 @@ void ApiBootstrapDialContext::updateConnStateMachineConnected(RaceHandle context
     this->finalSendLinkAddress = linkAddress;
   }
 }
+
+void ApiBootstrapDialContext::updateConnStateMachineLinkEstablished(
+  RaceHandle contextHandle, LinkID /* linkId */, std::string linkAddress) {
+  if (this->finalRecvConnSMHandle == contextHandle) {
+    this->finalRecvLinkReady = true;
+    this->finalRecvLinkAddress = linkAddress;
+  } else if (this->finalSendConnSMHandle == contextHandle) {
+    this->finalSendLinkReady = true;
+    this->finalSendLinkAddress = linkAddress;
+  }
+}
 //-----------------------------------------------------------------------------------------------
 // States
 //-----------------------------------------------------------------------------------------------
@@ -246,10 +257,12 @@ struct StateBootstrapDialWaitingForConnections : public BootstrapDialState {
     if (ctx.initSendConnSMHandle != NULL_RACE_HANDLE and ctx.initSendConnId.empty()) {
       return EventResult::SUCCESS;
     }
-    if (ctx.finalRecvConnSMHandle != NULL_RACE_HANDLE and ctx.finalRecvConnId.empty()) {
+    if (ctx.finalRecvConnSMHandle != NULL_RACE_HANDLE &&
+        !ctx.finalRecvLinkReady && ctx.finalRecvConnId.empty()) {
       return EventResult::SUCCESS;
     }
-    if (ctx.finalSendConnSMHandle != NULL_RACE_HANDLE and ctx.finalSendConnId.empty()) {
+    if (ctx.finalSendConnSMHandle != NULL_RACE_HANDLE &&
+        !ctx.finalSendLinkReady && ctx.finalSendConnId.empty()) {
       return EventResult::SUCCESS;
     }
 

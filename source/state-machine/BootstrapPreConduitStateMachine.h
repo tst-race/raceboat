@@ -47,6 +47,8 @@ public:
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
                                   std::string linkAddress, LinkID linkId) override;
+  virtual void updateConnStateMachineLinkEstablished(
+      RaceHandle contextHandle, LinkID linkId, std::string linkAddress) override;
   virtual void
   updateListenAccept(std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) override;
 
@@ -76,6 +78,7 @@ public:
 
   std::string packageId;
   RaceHandle apiHandle;
+  bool responseSent = false;
 };
 
 class BootstrapPreConduitStateEngine : public StateEngine {
