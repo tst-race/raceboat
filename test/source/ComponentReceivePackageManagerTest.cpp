@@ -145,7 +145,7 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
   mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
   auto bytes =
-      append({createHeader({}, 1, 0),
+      append({createHeader({1, 2, 3, 4}, 1, 0),
               createFragment(20, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
                                   0x39, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45,
                                   0x46, 0x47, 0x48, 0x49, 0x50, 0x51})});
@@ -162,7 +162,7 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
   mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
   auto bytes = append(
-      {createHeader({}, 1, 0),
+      {createHeader({1, 2, 3, 4}, 1, 0),
        createFragment(20, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38,
                            0x39, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45,
                            0x46, 0x47, 0x48, 0x49, 0x50, 0x51}),
@@ -181,11 +181,11 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
        test_onBytesDecoded_fragment_single_producer_two_fragments) {
   mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
-  auto bytes1 = append({createHeader({}, 1, CONTINUE_NEXT_PACKAGE),
+  auto bytes1 = append({createHeader({1, 2, 3, 4}, 1, CONTINUE_NEXT_PACKAGE),
                         createFragment(10, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
                                             0x38, 0x39, 0x40, 0x41})});
 
-  auto bytes2 = append({createHeader({}, 2, CONTINUE_LAST_PACKAGE),
+  auto bytes2 = append({createHeader({1, 2, 3, 4}, 2, CONTINUE_LAST_PACKAGE),
                         createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
                                             0x48, 0x49, 0x50, 0x51})});
 
@@ -203,11 +203,11 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
        test_onBytesDecoded_fragment_single_producer_two_fragments_out_of_order) {
   mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
-  auto bytes1 = append({createHeader({}, 1, CONTINUE_NEXT_PACKAGE),
+  auto bytes1 = append({createHeader({1, 2, 3, 4}, 1, CONTINUE_NEXT_PACKAGE),
                         createFragment(10, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
                                             0x38, 0x39, 0x40, 0x41})});
 
-  auto bytes2 = append({createHeader({}, 2, CONTINUE_LAST_PACKAGE),
+  auto bytes2 = append({createHeader({1, 2, 3, 4}, 2, CONTINUE_LAST_PACKAGE),
                         createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
                                             0x48, 0x49, 0x50, 0x51})});
 
@@ -226,17 +226,17 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
   mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
 
-  auto bytes1 = append({createHeader({}, 1, CONTINUE_NEXT_PACKAGE),
+  auto bytes1 = append({createHeader({1, 2, 3, 4}, 1, CONTINUE_NEXT_PACKAGE),
                         createFragment(10, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
                                             0x38, 0x39, 0x40, 0x41})});
 
   auto bytes2 = append(
-      {createHeader({}, 2, CONTINUE_NEXT_PACKAGE | CONTINUE_LAST_PACKAGE),
+      {createHeader({1, 2, 3, 4}, 2, CONTINUE_NEXT_PACKAGE | CONTINUE_LAST_PACKAGE),
        createFragment(20, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
                            0x49, 0x50, 0x51, 0x42, 0x43, 0x44, 0x45,
                            0x46, 0x47, 0x48, 0x49, 0x50, 0x51})});
 
-  auto bytes3 = append({createHeader({}, 3, CONTINUE_LAST_PACKAGE),
+  auto bytes3 = append({createHeader({1, 2, 3, 4}, 3, CONTINUE_LAST_PACKAGE),
                         createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
                                             0x48, 0x49, 0x50, 0x51})});
 
@@ -258,17 +258,17 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
   mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
 
-  auto bytes1 = append({createHeader({}, 1, CONTINUE_NEXT_PACKAGE),
+  auto bytes1 = append({createHeader({1, 2, 3, 4}, 1, CONTINUE_NEXT_PACKAGE),
                         createFragment(10, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
                                             0x38, 0x39, 0x40, 0x41})});
 
   auto bytes2 = append(
-      {createHeader({}, 2, CONTINUE_NEXT_PACKAGE | CONTINUE_LAST_PACKAGE),
+      {createHeader({1, 2, 3, 4}, 2, CONTINUE_NEXT_PACKAGE | CONTINUE_LAST_PACKAGE),
        createFragment(20, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
                            0x49, 0x50, 0x51, 0x42, 0x43, 0x44, 0x45,
                            0x46, 0x47, 0x48, 0x49, 0x50, 0x51})});
 
-  auto bytes3 = append({createHeader({}, 3, CONTINUE_LAST_PACKAGE),
+  auto bytes3 = append({createHeader({1, 2, 3, 4}, 3, CONTINUE_LAST_PACKAGE),
                         createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
                                             0x48, 0x49, 0x50, 0x51})});
 
@@ -290,20 +290,20 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
   mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
 
-  auto bytes1 = append({createHeader({}, 1, CONTINUE_NEXT_PACKAGE),
+  auto bytes1 = append({createHeader({1, 2, 3, 4}, 1, CONTINUE_NEXT_PACKAGE),
                         createFragment(10, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
                                             0x38, 0x39, 0x40, 0x41})});
 
   auto bytes2 = append(
-      {createHeader({}, 2, CONTINUE_LAST_PACKAGE),
+      {createHeader({1, 2, 3, 4}, 2, CONTINUE_LAST_PACKAGE),
        createFragment(20, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
                            0x49, 0x50, 0x51, 0x42, 0x43, 0x44, 0x45,
                            0x46, 0x47, 0x48, 0x49, 0x50, 0x51})});
 
-  auto bytes3 = append({createHeader({}, 3, CONTINUE_NEXT_PACKAGE),
+  auto bytes3 = append({createHeader({1, 2, 3, 4}, 3, CONTINUE_NEXT_PACKAGE),
                         createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
                                             0x48, 0x49, 0x50, 0x51})});
-  auto bytes4 = append({createHeader({}, 4, CONTINUE_LAST_PACKAGE),
+  auto bytes4 = append({createHeader({1, 2, 3, 4}, 4, CONTINUE_LAST_PACKAGE),
                         createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
                                             0x48, 0x49, 0x50, 0x51})});
 
@@ -328,10 +328,10 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
   mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
 
-  auto bytes1 = append({createHeader({}, 1, CONTINUE_NEXT_PACKAGE),
+  auto bytes1 = append({createHeader({1, 2, 3, 4}, 1, CONTINUE_NEXT_PACKAGE),
                         createFragment(10, {0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
                                             0x38, 0x39, 0x40, 0x41})});
-  auto bytes3 = append({createHeader({}, 3, CONTINUE_LAST_PACKAGE),
+  auto bytes3 = append({createHeader({1, 2, 3, 4}, 3, CONTINUE_LAST_PACKAGE),
                         createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
                                             0x48, 0x49, 0x50, 0x51})});
 
@@ -350,12 +350,12 @@ TEST_F(ComponentReceivePackageManagerTestFixture,
   mockComponentManager.mode = EncodingMode::FRAGMENT_SINGLE_PRODUCER;
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
 
-  auto bytes1 = append({createHeader({}, 1, CONTINUE_NEXT_PACKAGE),
+  auto bytes1 = append({createHeader({1, 2, 3, 4}, 1, CONTINUE_NEXT_PACKAGE),
                         createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
                                             0x48, 0x49, 0x50, 0x51})});
 
   auto bytes2 =
-      append({createHeader({}, 2, 0),
+      append({createHeader({1, 2, 3, 4}, 2, 0),
               createFragment(20, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
                                   0x49, 0x50, 0x51, 0x42, 0x43, 0x44, 0x45,
                                   0x46, 0x47, 0x48, 0x49, 0x50, 0x51})});
@@ -377,7 +377,7 @@ TEST_F(
   mockComponentManager.mockLink.connections = {"connection1", "connection2"};
 
   auto bytes3 =
-      append({createHeader({}, 3, CONTINUE_LAST_PACKAGE),
+      append({createHeader({1, 2, 3, 4}, 3, CONTINUE_LAST_PACKAGE),
               createFragment(10, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
                                   0x49, 0x50, 0x51}),
               createFragment(20, {0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,

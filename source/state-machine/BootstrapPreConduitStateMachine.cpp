@@ -36,19 +36,32 @@ namespace Raceboat {
 void BootstrapPreConduitContext::updateBootstrapPreConduitStateMachineStart(
     RaceHandle contextHandle,
     const ApiBootstrapListenContext &parentContext,
+    RaceHandle helloConnSMHandle,
+    const ConnectionID &helloConnId,
     const std::string &_packageId,
     std::vector<std::vector<uint8_t>> recvMessages) {
   this->parentHandle = contextHandle;
   this->opts = BootstrapConnectionOptions(parentContext.opts);
 
-  this->initSendConnSMHandle = parentContext.initSendConnSMHandle;
-  this->initSendConnId = parentContext.initSendConnId;
-  this->initSendLinkAddress = parentContext.initSendLinkAddress;
-  helper::logInfo("updateBootstrapPreConduitStateMachineStart initSendLinkAddress: " + parentContext.initSendLinkAddress);
-   
-  this->initRecvConnSMHandle = parentContext.initRecvConnSMHandle;
-  this->initRecvConnId = parentContext.initRecvConnId;
+  // Use the specific connSM/connId that delivered THIS client's hello,
+  // rather than the listen context's single (first-client-only) init
+  // handles - required for multiple concurrent clients sharing a merged
+  // single-bidi init link, where each client's own connection must be used
+  // to send that client's own hello response (see StateBootstrapPreConduitSendResponse).
+  this->initRecvConnSMHandle = helloConnSMHandle;
+  this->initRecvConnId = helloConnId;
   this->initRecvLinkAddress = parentContext.initRecvLinkAddress;
+
+  if (parentContext.initUsingSingleBidiConnection) {
+    this->initSendConnSMHandle = helloConnSMHandle;
+    this->initSendConnId = helloConnId;
+    this->initSendLinkAddress = parentContext.initSendLinkAddress;
+  } else {
+    this->initSendConnSMHandle = parentContext.initSendConnSMHandle;
+    this->initSendConnId = parentContext.initSendConnId;
+    this->initSendLinkAddress = parentContext.initSendLinkAddress;
+  }
+  helper::logInfo("updateBootstrapPreConduitStateMachineStart initSendLinkAddress: " + parentContext.initSendLinkAddress);
 
   this->finalSendConnSMHandle = parentContext.finalSendConnSMHandle;
   this->finalSendConnId = parentContext.finalSendConnId;
@@ -78,15 +91,37 @@ void BootstrapPreConduitContext::updateConnStateMachineConnected(
   } else if (this->initSendConnSMHandle == contextHandle) {
     this->initSendConnId = connId;
     this->initSendLinkAddress = linkAddress;
-  } else if (this->finalRecvConnSMHandle == contextHandle) {
-    this->finalRecvConnId = connId;
-    this->finalRecvLinkAddress = linkAddress;
   } else if (this->finalSendConnSMHandle == contextHandle) {
     this->finalSendConnId = connId;
     this->finalSendLinkAddress = linkAddress;
+    // For a single bidirectional final link, finalRecvConnSMHandle is
+    // aliased to the same handle - update both sides so neither is left
+    // permanently empty (see StateBootstrapPreConduitWaitingForConnections).
+    if (this->finalRecvConnSMHandle == contextHandle) {
+      this->finalRecvConnId = connId;
+      this->finalRecvLinkAddress = linkAddress;
+    }
+  } else if (this->finalRecvConnSMHandle == contextHandle) {
+    this->finalRecvConnId = connId;
+    this->finalRecvLinkAddress = linkAddress;
   }
 }
-     
+
+void BootstrapPreConduitContext::updateConnStateMachineLinkEstablished(
+    RaceHandle contextHandle, LinkID /* linkId */, std::string linkAddress) {
+  if (this->finalSendConnSMHandle == contextHandle) {
+    this->finalSendLinkAddress = linkAddress;
+    // For a single bidirectional final link, finalRecvConnSMHandle is
+    // aliased to the same handle - update both sides so neither is left
+    // permanently empty (see StateBootstrapPreConduitWaitingForConnections).
+    if (this->finalRecvConnSMHandle == contextHandle) {
+      this->finalRecvLinkAddress = linkAddress;
+    }
+  } else if (this->finalRecvConnSMHandle == contextHandle) {
+    this->finalRecvLinkAddress = linkAddress;
+  }
+}
+
 // void BootstrapPreConduitContext::updateConnStateMachineConnected(
 //     RaceHandle /* contextHandle */, ConnectionID connId,
 //     std::string /* linkAddress */) {
@@ -108,6 +143,11 @@ struct StateBootstrapPreConduitInitial : public BootstrapPreConduitState {
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
+    helper::logDebug(logPrefix + " readiness handles/ids: finalRecv=" +
+                     std::to_string(ctx.finalRecvConnSMHandle) + "/" +
+                     ctx.finalRecvConnId + " finalSend=" +
+                     std::to_string(ctx.finalSendConnSMHandle) + "/" +
+                     ctx.finalSendConnId);
 
     ctx.manager.registerPackageId(ctx, ctx.initRecvConnId, ctx.packageId);
     ctx.manager.registerHandle(ctx, ctx.parentHandle);
@@ -158,20 +198,85 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
     }
 
 
-     // *** FINAL SEND ***
-    // Handle final server->client aka final_send
-    bool create = ctx.shouldCreateSender(ctx.opts.final_send_channel);
+     // *** FINAL SEND/RECV ***
+    const bool finalUsesSingleBidiLink =
+        ctx.opts.final_recv_channel.empty() ||
+        ctx.shouldUseSingleBidiLink(ctx.opts.final_send_channel,
+                                   ctx.opts.final_recv_channel);
 
-    // We are creating, we will create and then send this address in a hello response
-    if (create) {
+    if (finalUsesSingleBidiLink) {
+      // shouldCreateSender() only consults the channel's static LD_BIDI
+      // manifest property, so it returns the same answer on both the
+      // listener and the dialer - it can't break the tie for a merged
+      // bidirectional link. Mirror the non-bootstrap convention instead
+      // (DialStateMachine/ListenStateMachine): the listener always creates
+      // the shared final link here and reports its address back to the
+      // dialer in the hello response (StateBootstrapPreConduitSendResponse);
+      // the dialer always loads it (StateBootstrapDialRecvResponse).
+      const bool create = true;
+      const bool sending = true;
+      helper::logInfo(logPrefix + "Using a single bidirectional final link for channel '" +
+                      ctx.opts.final_send_channel + "'");
+      if (create) {
+        ctx.finalSendConnSMHandle = ctx.manager.startConnStateMachine(
+            ctx.handle, ctx.opts.final_send_channel, ctx.opts.final_send_role,
+            "", create, sending);
+      } else if (ctx.finalSendLinkAddress.empty()) {
+        helper::logError(logPrefix + " finalSend address is missing (was it sent in the hello?)");
+        return EventResult::NOT_SUPPORTED;
+      } else {
+        ctx.finalSendConnSMHandle = ctx.manager.startConnStateMachine(
+            ctx.handle, ctx.opts.final_send_channel, ctx.opts.final_send_role,
+            ctx.finalSendLinkAddress, create, sending);
+      }
+      if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
+        helper::logError(logPrefix + " starting connection state machine failed");
+        return EventResult::NOT_SUPPORTED;
+      }
+      ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
+      ctx.finalRecvConnSMHandle = ctx.finalSendConnSMHandle;
+      ctx.finalRecvConnId = ctx.finalSendConnId;
+      ctx.finalRecvLinkAddress = ctx.finalSendLinkAddress;
+      ctx.finalUsingSingleBidiConnection = true;
+    } else {
+      // Handle final server->client aka final_send
+      // shouldCreateSender()/shouldCreateReceiver() only consult the channel's
+      // static LD_BIDI manifest property, so they return the same answer on
+      // both listener and dialer regardless of role - the listener must
+      // always create both final links here (and report their addresses in
+      // the hello response below) while the dialer always loads them.
+      bool create = true;
+
+      // We are creating, we will create and then send this address in a hello response
+      if (create) {
+        bool sending = true;
+        helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_send_channel);
+        ctx.finalSendConnSMHandle = ctx.manager.
+          startConnStateMachine(ctx.handle,
+                                ctx.opts.final_send_channel,
+                                ctx.opts.final_send_role,
+                                "",
+                                create, // is true
+                                sending // is true
+                                );
+        if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
+          helper::logError(logPrefix + " starting connection state machine failed");
+          return EventResult::NOT_SUPPORTED;
+        }
+        ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
+        // We are loading, we should have an address to load from the hello
+      } else if (ctx.initSendLinkAddress.empty()) {
+        helper::logError(logPrefix + " finalSend address is missing (was it sent in the hello?)");
+        return EventResult::NOT_SUPPORTED;
+      } else {
       bool sending = true;
-      helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_send_channel);
+      helper::logInfo(logPrefix + "Loading final-send link on " + ctx.opts.final_send_channel + " with address: " + ctx.finalSendLinkAddress);
       ctx.finalSendConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
                               ctx.opts.final_send_channel,
                               ctx.opts.final_send_role,
-                              "",
-                              create, // is true
+                              ctx.finalSendLinkAddress,
+                              create, // is false
                               sending // is true
                               );
       if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
@@ -179,42 +284,42 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
         return EventResult::NOT_SUPPORTED;
       }
       ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
+      } 
+      
+
+      // *** FINAL RECV ***
+      create = true;
+
+      // We are creating, we will create and then send this address in a hello response
+      if (create) {
+        bool sending = false;
+        helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_recv_channel);
+        ctx.finalRecvConnSMHandle = ctx.manager.
+          startConnStateMachine(ctx.handle,
+                                ctx.opts.final_recv_channel,
+                                ctx.opts.final_recv_role,
+                                "",
+                                create, // is true
+                                sending // is false
+                                );
+        if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
+          helper::logError(logPrefix + " starting connection state machine failed");
+          return EventResult::NOT_SUPPORTED;
+        }
+        ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
       // We are loading, we should have an address to load from the hello
-    } else if (ctx.initSendLinkAddress.empty()) {
-      helper::logError(logPrefix + " finalSend address is missing (was it sent in the hello?)");
+    } else if (ctx.initRecvLinkAddress.empty()) {
+      helper::logError(logPrefix + " finalRecv address is missing (was it sent in the hello?)");
       return EventResult::NOT_SUPPORTED;
     } else {
-    bool sending = true;
-    helper::logInfo(logPrefix + "Loading final-send link on " + ctx.opts.final_send_channel + " with address: " + ctx.finalSendLinkAddress);
-    ctx.finalSendConnSMHandle = ctx.manager.
-      startConnStateMachine(ctx.handle,
-                            ctx.opts.final_send_channel,
-                            ctx.opts.final_send_role,
-                            ctx.finalSendLinkAddress,
-                            create, // is false
-                            sending // is true
-                            );
-    if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
-      helper::logError(logPrefix + " starting connection state machine failed");
-      return EventResult::NOT_SUPPORTED;
-    }
-    ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
-    } 
-    
-
-    // *** FINAL RECV ***
-    create = ctx.shouldCreateReceiver(ctx.opts.final_recv_channel);
-
-    // We are creating, we will create and then send this address in a hello response
-    if (create) {
       bool sending = false;
-      helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_recv_channel);
+      helper::logInfo(logPrefix + "Loading final-recv link on " + ctx.opts.final_recv_channel + " with address: " + ctx.finalRecvLinkAddress);
       ctx.finalRecvConnSMHandle = ctx.manager.
         startConnStateMachine(ctx.handle,
                               ctx.opts.final_recv_channel,
                               ctx.opts.final_recv_role,
-                              "",
-                              create, // is true
+                              ctx.finalRecvLinkAddress,
+                              create, // is false
                               sending // is false
                               );
       if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
@@ -222,27 +327,8 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
         return EventResult::NOT_SUPPORTED;
       }
       ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
-    // We are loading, we should have an address to load from the hello
-  } else if (ctx.initRecvLinkAddress.empty()) {
-    helper::logError(logPrefix + " finalRecv address is missing (was it sent in the hello?)");
-    return EventResult::NOT_SUPPORTED;
-  } else {
-    bool sending = false;
-    helper::logInfo(logPrefix + "Loading final-recv link on " + ctx.opts.final_recv_channel + " with address: " + ctx.finalRecvLinkAddress);
-    ctx.finalRecvConnSMHandle = ctx.manager.
-      startConnStateMachine(ctx.handle,
-                            ctx.opts.final_recv_channel,
-                            ctx.opts.final_recv_role,
-                            ctx.finalRecvLinkAddress,
-                            create, // is false
-                            sending // is false
-                            );
-    if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
-      helper::logError(logPrefix + " starting connection state machine failed");
-      return EventResult::NOT_SUPPORTED;
     }
-    ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
-  } 
+    }
      
     ctx.manager.registerHandle(ctx, ctx.initSendConnSMHandle);
     ctx.pendingEvents.push(EVENT_ALWAYS);
@@ -264,20 +350,32 @@ struct StateBootstrapPreConduitWaitingForConnections : public BootstrapPreCondui
     if (ctx.initSendConnSMHandle != NULL_RACE_HANDLE and ctx.initSendConnId.empty()) {
       return EventResult::SUCCESS;
     }
-    if (ctx.finalRecvConnSMHandle != NULL_RACE_HANDLE and ctx.finalRecvConnId.empty()) {
+    if (ctx.finalSendConnSMHandle != NULL_RACE_HANDLE && ctx.finalSendConnId.empty() &&
+        !ctx.finalUsingSingleBidiConnection) {
+      // A single bidirectional final link we created is a listening socket;
+      // its "connection" won't exist until a peer dials in, which can't
+      // happen until we've told them the address via the hello response
+      // below. Only gate on the real connection for the non-merged case.
       return EventResult::SUCCESS;
     }
-    if (ctx.finalSendConnSMHandle != NULL_RACE_HANDLE and ctx.finalSendConnId.empty()) {
-      return EventResult::SUCCESS;
-    }
-    // No early returns indicate all expected connections are satisfied
 
-    // We created one of these, so we will need to send the address back as a response
-    if (ctx.shouldCreateSender(ctx.opts.final_send_channel) or
-        ctx.shouldCreateReceiver(ctx.opts.final_recv_channel)) {
-      ctx.pendingEvents.push(EVENT_NEEDS_SEND);
+    if (ctx.shouldCreateSender(ctx.opts.final_send_channel) &&
+        ctx.finalSendLinkAddress.empty()) {
+      return EventResult::SUCCESS;
     }
-    else {
+    if (ctx.shouldCreateReceiver(ctx.opts.final_recv_channel) &&
+        ctx.finalRecvLinkAddress.empty()) {
+      return EventResult::SUCCESS;
+    }
+
+    if (!ctx.responseSent &&
+        (ctx.shouldCreateSender(ctx.opts.final_send_channel) or
+       ctx.shouldCreateReceiver(ctx.opts.final_recv_channel))) {
+      ctx.pendingEvents.push(EVENT_NEEDS_SEND);
+    } else if (ctx.finalRecvConnSMHandle != NULL_RACE_HANDLE &&
+               ctx.finalRecvConnId.empty()) {
+      return EventResult::SUCCESS;
+    } else {
       ctx.pendingEvents.push(EVENT_SATISFIED);
     }
     return EventResult::SUCCESS;
@@ -298,25 +396,28 @@ struct StateBootstrapPreConduitSendResponse : public BootstrapPreConduitState {
 
     nlohmann::json json = {};
 
-    if (ctx.shouldCreateSender(ctx.opts.final_send_channel)) {
-      if (ctx.finalSendLinkAddress.empty()) {
-        helper::logError(logPrefix + "finalSend should have been created but there is no address");
-        return EventResult::NOT_SUPPORTED;
-      } else {
-      // Json name is relative to the recipient, so this is a "recv" link for them
-        json["finalRecvLinkAddress"] = ctx.finalSendLinkAddress;
-        json["finalRecvChannel"] = ctx.opts.final_send_channel;
-      }
+    // The listener always creates both final links (see
+    // StateBootstrapPreConduitAccepted) and reports their addresses here for
+    // the dialer to load - shouldCreateSender()/shouldCreateReceiver() can't
+    // gate this, they return the same answer regardless of role for LD_BIDI
+    // channels (this previously silently omitted finalRecvLinkAddress
+    // whenever shouldCreateSender() was false, which is unconditionally the
+    // case for every LD_BIDI channel).
+    if (ctx.finalSendLinkAddress.empty()) {
+      helper::logError(logPrefix + "finalSend should have been created but there is no address");
+      return EventResult::NOT_SUPPORTED;
     }
-    if (ctx.shouldCreateReceiver(ctx.opts.final_recv_channel)) {
-      if (ctx.finalRecvLinkAddress.empty()) {
-        helper::logError(logPrefix + "finalRecv should have been created but there is no address");
-        return EventResult::NOT_SUPPORTED;
-      } else {
-        // Json name is relative to the recipient, so this is a "send" link for them
-        json["finalSendLinkAddress"] = ctx.finalRecvLinkAddress;
-        json["finalSendChannel"] = ctx.opts.final_recv_channel;
-      }
+    // Json name is relative to the recipient, so this is a "recv" link for them
+    json["finalRecvLinkAddress"] = ctx.finalSendLinkAddress;
+    json["finalRecvChannel"] = ctx.opts.final_send_channel;
+
+    if (ctx.finalRecvLinkAddress.empty()) {
+      helper::logError(logPrefix + "finalRecv should have been created but there is no address");
+      return EventResult::NOT_SUPPORTED;
+    }
+    // Json name is relative to the recipient, so this is a "send" link for them
+    json["finalSendLinkAddress"] = ctx.finalRecvLinkAddress;
+    json["finalSendChannel"] = ctx.opts.final_recv_channel;
 
     std::string message = json.dump();
     std::vector<uint8_t> bytes(message.begin(), message.end());
@@ -334,7 +435,7 @@ struct StateBootstrapPreConduitSendResponse : public BootstrapPreConduitState {
     if (response.status != SdkStatus::SDK_OK) {
       return EventResult::NOT_SUPPORTED;
     }
-    }
+    ctx.responseSent = true;
     return EventResult::SUCCESS;
   }
 };
@@ -367,12 +468,15 @@ struct StateBootstrapPreConduitFinished : public BootstrapPreConduitState {
       return EventResult::NOT_SUPPORTED;
     }
 
-    // No longer using the initial recv link
-    ctx.manager.unregisterHandle(ctx, ctx.initRecvConnSMHandle);
-    success = ctx.manager.detachConnSM(ctx.handle, ctx.initRecvConnSMHandle);
-    if (!success) {
-      helper::logError(logPrefix + "detachConnSM failed");
-      return EventResult::NOT_SUPPORTED;
+    // No longer using the initial recv link - skip if aliased to the same
+    // handle as initSend (merged single-bidi init link), already detached above.
+    if (ctx.initRecvConnSMHandle != ctx.initSendConnSMHandle) {
+      ctx.manager.unregisterHandle(ctx, ctx.initRecvConnSMHandle);
+      success = ctx.manager.detachConnSM(ctx.handle, ctx.initRecvConnSMHandle);
+      if (!success) {
+        helper::logError(logPrefix + "detachConnSM failed");
+        return EventResult::NOT_SUPPORTED;
+      }
     }
 
     ctx.acceptCb(ApiStatus::OK, connObjectApiHandle, {});
@@ -422,7 +526,7 @@ BootstrapPreConduitStateEngine::BootstrapPreConduitStateEngine() {
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_CONN_STATE_MACHINE_CONNECTED,              STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_NEEDS_SEND,              STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE);
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_SATISFIED,              STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED);
-    declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE,      EVENT_PACKAGE_SENT,              STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED);
+    declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE,      EVENT_PACKAGE_SENT,              STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS);
   // clang-format on
 }
 

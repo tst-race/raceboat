@@ -1,0 +1,11 @@
+{
+  "id": "racebird-client-connect",
+  "mode": "client-connect",
+  "wait_time": 10,
+  "network": {"name": "racebird-network", "subnet": "10.18.1.0/24"},
+  "nodes": [
+    {"role": "listener", "id": "rbserver", "ip": "10.18.1.3", "slots": {"channel": "racebird"}},
+    {"role": "connector", "id": "rbclient", "ip": "10.18.1.2", "slots": {"channel": "racebird"}},
+    {"role": "connector", "id": "rbclient2", "ip": "10.18.1.4", "slots": {"channel": "racebird"}}
+  ]
+}

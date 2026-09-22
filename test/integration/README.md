@@ -25,7 +25,25 @@ python3 build-test.py --help
 
 See [BUILD_TEST_GUIDE.md](BUILD_TEST_GUIDE.md) for detailed build-test workflow documentation.
 
-**For direct test execution** (without rebuilding), use `run-integration-test.py` directly:
+> **Image tag gotcha:** `build-test.py`'s rebuild stages always update the
+> `:latest` docker tags, but the test step (`run_scenario.py`) defaults to
+> `--image-tag main`. After any `--rebuild-raceboat*`/`--rebuild-all`, forward
+> the matching tag explicitly, e.g.:
+> `python3 build-test.py --plugin-dir ../../racebird --rebuild-all --integration-test-args --image-tag latest`
+
+**For direct test execution against an already-built scenario** (no rebuild), use `run_scenario.py`:
+
+```bash
+# Run one of the predefined scenarios under scenarios/*.json
+python3 run_scenario.py --scenario-id racebird-client-connect --image-tag latest
+
+# List available scenarios
+ls scenarios/*.json
+```
+
+See [Scenario-Based Testing](#scenario-based-testing) below for details. For a
+plugin that still uses a hand-written `docker-compose.yml` (i.e. hasn't
+migrated to `test/adapter.py`), call `run-integration-test.py` directly instead:
 
 ```bash
 python3 run-integration-test.py --compose-file /path/to/docker-compose.yml
@@ -59,13 +77,61 @@ Detailed sequence:
 8. raceboat (client) receives the reply and delivers it to the client stub
 9. Both stubs exit with success codes
 
+## Scenario-Based Testing
+
+Modern plugins - and every multi-node or `bootstrap-connect` test - are driven
+by a JSON scenario file under `scenarios/*.json` describing the network
+topology (node roles, IPs, and which plugin fills each "slot"). It's rendered
+into a docker-compose file by `generate_scenario.py` (which calls each
+participating plugin's `test/adapter.py`) and executed by `run_scenario.py`:
+
+```bash
+python3 run_scenario.py --scenario-id <scenario-id> --image-tag <tag>
+```
+
+- `--scenario-id` (required): name of a file under `scenarios/` (without `.json`)
+- `--image-tag` (default: `main`): the `raceboat-runtime` tag to test against
+- `--wait-time` (optional): overrides the scenario's own `wait_time` (RACE channel establishment delay)
+
+Currently available scenarios:
+- `racebird-client-connect`, `decomposed-client-connect`,
+  `decomposed-client-connect-multi-client` - single-plugin `client-connect`/`server-connect` mode
+- `bootstrap-decomposed-racebird`, `bootstrap-racebird-multi-client`,
+  `bootstrap-racebird-racebird-multi-client`, `bootstrap-racebird-decomposed-multi-client`,
+  `bootstrap-decomposed-decomposed-multi-client` - `bootstrap-connect` mode (one listener plus one
+  or more connector nodes, each with an "initial" and "final" plugin slot)
+
+Each run's generated compose file, merged plugin kits, and per-node
+`raceboat_*.log` files are written to `generated/<scenario-id>/`. Containers
+(e.g. a whiteboard sidecar) can leave root-owned files there, so if a rerun's
+cleanup fails, remove it manually first:
+
+```bash
+docker compose -f generated/<scenario-id>/docker-compose.yml down
+sudo rm -rf generated/<scenario-id>
+```
+
+For `bootstrap-connect` scenarios, `run_scenario.py` also prints a link-topology
+summary (see `link_topology.py`) verifying the listener creates, and each
+connector loads, the expected number of "final"-slot links.
+
 ## Files
 
 ### Scripts
-- **`run-integration-test.py`**: Generic test orchestrator (plugin-agnostic) - Python version
+- **`build-test.py`**: Rebuild-and-test orchestrator (raceboat SDK + plugin builds, then runs a scenario or legacy compose test) - see [BUILD_TEST_GUIDE.md](BUILD_TEST_GUIDE.md)
+- **`run_scenario.py`**: Generates a scenario's docker-compose.yml and runs it through `run-integration-test.py`
+- **`generate_scenario.py`**: Renders a `scenarios/*.json` topology into a docker-compose file by calling each plugin's `test/adapter.py`
+- **`link_topology.py`**: Parses debug logs to verify bootstrap-connect final-link creator/loader counts
+- **`run-integration-test.py`**: Generic test orchestrator (plugin-agnostic) that drives an already-generated docker-compose.yml
 - **`tcp-stub-server.py`**: Server-side test stub that listens on port 7777
 - **`tcp-stub-client.py`**: Client-side test stub that connects to port 9999
-- **`example-docker-compose.yml`**: Template showing required Docker Compose structure
+- **`adapter_types.py`**: `NodeRequest`/`NodeContribution` dataclasses - the contract every `test/adapter.py` implements
+- **`plugin_registry.json`**: Maps plugin name -> plugin directory, so `generate_scenario.py` can find each plugin's `test/adapter.py`
+- **`example-docker-compose.yml`**: Template for legacy (non-adapter) plugin compose files
+
+### Data
+- **`scenarios/*.json`**: Declarative topology definitions (nodes, roles, plugin slots) consumed by `run_scenario.py`
+- **`generated/<scenario-id>/`**: Per-run output (compose file, merged kits, logs) - safe to delete between runs
 
 - **`README.md`**: This file
 
@@ -170,7 +236,63 @@ See `example-docker-compose.yml` for a complete template.
 
 ## Creating a Plugin Integration Test
 
-### Step 1: Create plugin-specific docker-compose.yml
+### Recommended: adapter-based plugin
+
+Current convention (see `racebird/test/adapter.py` or
+`decomposed-exemplars/test/adapter.py` for real examples): a plugin owns only
+a `test/adapter.py` module - no plugin-specific `docker-compose.yml`,
+`setup.py`, or wrapper script needed.
+
+#### Step 1: Implement `test/adapter.py`
+
+```python
+from adapter_types import NodeContribution, NodeRequest  # see plugin_registry.json for import path
+
+def generate_node_contribution(request: NodeRequest) -> NodeContribution:
+    return NodeContribution(
+        params={"YourPlugin.node-id": "..."},
+        channel_name="yourChannelGid",
+        kit_dir=script_dir / ".." / "kit" / "artifacts" / "linux-x86_64-server" / "PluginYourPlugin",
+        address_output={"...": "..."} if request.role == "listener" else None,
+        needs_peer_address=request.role == "connector",
+    )
+```
+
+`generate_node_contribution` is called once per active "slot"
+(`channel`/`initial`/`final`) for every node in the scenario; see
+`adapter_types.py` for the full field-by-field contract.
+
+#### Step 2: Register the plugin
+
+Add an entry to `plugin_registry.json`:
+
+```json
+{
+  "your-plugin": "../../../your-plugin"
+}
+```
+
+#### Step 3: Add a scenario
+
+Add `scenarios/your-plugin-client-connect.json` describing a listener and one
+or more connector nodes with `"slots": {"channel": "your-plugin"}` (or
+`"initial"`/`"final"` for `bootstrap-connect` scenarios).
+
+#### Step 4: Run it
+
+```bash
+python3 build-test.py --plugin-dir ../../your-plugin --rebuild-plugin
+# or, once built:
+python3 run_scenario.py --scenario-id your-plugin-client-connect
+```
+
+### Legacy: hand-written docker-compose.yml
+
+Plugins that haven't migrated to `test/adapter.py` still work via a
+plugin-owned `docker-compose.yml` + `setup.py`, run directly through
+`run-integration-test.py`.
+
+#### Step 1: Create plugin-specific docker-compose.yml
 
 Create a `docker-compose.yml` with your plugin's specific parameters:
 
@@ -194,7 +316,7 @@ services:
 
 This compose file will be invoked by the integration-test script to run the test. The rbclient and rbserver containers must exist and use the specified images (or images built on top of them), and the raceboat command must be invoked. However, the arguments to the race-cli command (e.g. the send address, the params, etc.) will be customized to the plugin being tested. Additionally, for channels reliant on additional self-hosted services (e.g. if testing a "localized" version of an email channel that relies on the existence of an email server) those can be added to the docker-compose file to support a fully automated test.
 
-### Step 2: Create setup script
+#### Step 2: Create setup script
 
 Create a `setup.py` that prepares plugin kits. This just copies the built plugin kits into a test directory that will be volume mounted by the test client and test server containers, to be used at runtime.
 
@@ -213,7 +335,7 @@ dest.parent.mkdir(parents=True, exist_ok=True)
 shutil.copytree(source, dest)
 ```
 
-### Step 3: Create wrapper integration test script
+#### Step 3: Create wrapper integration test script
 
 Create an `integration-test.py` that ties everything together. This handles invoking the setup script, clearing logs, and then invoking the raceboat integration test to test bidirectional communication over the raceboat plugin.
 
@@ -250,7 +372,7 @@ os.execv(sys.executable, [
 ])
 ```
 
-### Step 4: Run the test
+#### Step 4: Run the test
 
 ```bash
 cd your-plugin/scripts
@@ -310,20 +432,33 @@ If you encounter "Address family not supported" errors, it means your containers
 - The stubs automatically fall back to IPv4
 - No action needed unless both IPv4 and IPv6 fail
 
+### `PermissionError` when re-running a scenario
+- Containers (e.g. the whiteboard sidecar) leave root-owned files under
+  `generated/<scenario-id>/`, which `generate_scenario.py` can't clean up as
+  your own user. Remove it manually first: `sudo rm -rf generated/<scenario-id>`
+
+### Test silently runs against a stale image
+- `build-test.py`'s rebuild stages always update the `:latest` tag, but
+  `run_scenario.py` defaults to `--image-tag main`. Pass the matching tag
+  explicitly after any raceboat SDK rebuild (see the image tag gotcha in
+  [Quick Start](#quick-start)).
+
 ## Example: Racebird Plugin
 
-See the `racebird` plugin for a complete working example with both shell and Python versions:
+Racebird is an adapter-based plugin (see `racebird/test/README.md`):
 
 ```
 racebird/
-├── scripts/
-│   ├── integration-test.sh       # Shell: Thin wrapper calling raceboat test
-│   ├── integration-test.py       # Python: Thin wrapper calling raceboat test
-│   ├── setup.sh                  # Shell: Plugin-specific setup
-│   ├── setup.py                  # Python: Plugin-specific setup
-│   └── docker-compose.yml        # Plugin-specific configuration
+├── test/
+│   └── adapter.py                 # Generates race-cli params/channel/kit path for racebird
 └── kit/
-    └── artifacts/                # Built plugin artifacts
+    └── artifacts/                 # Built plugin artifacts
+```
+
+```bash
+cd raceboat/test/integration
+python3 build-test.py --plugin-dir ../../racebird --rebuild-plugin
+python3 run_scenario.py --scenario-id racebird-client-connect
 ```
 
 ## Architecture

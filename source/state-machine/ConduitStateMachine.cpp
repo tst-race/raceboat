@@ -128,29 +128,9 @@ struct StateConduitInitial : public ConduitState {
         ctx.manager.getCore().getChannelManager().getChannelProperties(
             channelId);
 
-    auto connId = ctx.recvConnId;
-    // If this is a bidirectional connection then just reuse the send connection ID since that
-    // connection will also be used for receiving.
-    helper::logDebug(logPrefix + " checking for bidirectional channel with send channel: " + ctx.sendChannel + " recv channel: " + ctx.recvChannel + " transmission type: " + std::to_string(props.transmissionType) + " link direction: " + std::to_string(props.linkDirection));  
-    if (ctx.sendChannel == ctx.recvChannel &&
-      props.transmissionType == TT_UNICAST &&
-      props.linkDirection == LD_BIDI) {
-      connId = ctx.sendConnId;
-      helper::logDebug(logPrefix + " using send connection ID for recvConnId since this is a bidirectional channel");
-      // TODO: should I just set recv to send? i.e.
-      // ctx.recvConnId = ctx.sendConnId;
-    }
-
-    // Map the context to the connection ID and package ID for properly routing received messages.
-    ctx.manager.registerPackageId(ctx, connId, ctx.packageId);
-
-    // auto connId = ctx.recvConnId;
-    // ChannelProperties properties = ctx.manager.getCore().getChannelManager().getChannelProperties(ctx.recvChannel);
-    // if (ctx.sendChannel == ctx.recvChannel && properties.transmissionType == TT_UNICAST && properties.linkDirection == LD_BIDI) {
-    //   connId = ctx.sendConnId;
-    // }
-  
-    // ctx.manager.registerPackageId(ctx, connId, ctx.packageId);
+    // Map the context to the connection that delivers received packages. A BIDI channel can
+    // still use distinct send and receive connections, as it does for multi-link transports.
+    ctx.manager.registerPackageId(ctx, ctx.recvConnId, ctx.packageId);
     std::vector<uint8_t> packageIdBytes{ctx.packageId.begin(),
                                         ctx.packageId.end()};
     helper::logDebug(logPrefix + "PackageId: " + json(packageIdBytes).dump());

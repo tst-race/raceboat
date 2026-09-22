@@ -79,3 +79,5 @@ client-tmp/
 server-kits/
 server-tmp/
 test-data/
+test/integration/generated/
+

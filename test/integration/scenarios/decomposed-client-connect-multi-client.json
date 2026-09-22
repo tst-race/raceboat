@@ -1,0 +1,11 @@
+{
+  "id": "decomposed-client-connect-multi-client",
+  "mode": "client-connect",
+  "wait_time": 15,
+  "network": {"name": "decomposed-multi-network", "subnet": "10.20.1.0/24"},
+  "nodes": [
+    {"role": "listener", "id": "dxserver", "ip": "10.20.1.3", "slots": {"channel": "decomposed-exemplars"}},
+    {"role": "connector", "id": "dxclient", "ip": "10.20.1.2", "slots": {"channel": "decomposed-exemplars"}},
+    {"role": "connector", "id": "dxclient2", "ip": "10.20.1.4", "slots": {"channel": "decomposed-exemplars"}}
+  ]
+}

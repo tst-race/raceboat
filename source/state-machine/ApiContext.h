@@ -147,11 +147,8 @@ public:
   virtual void updateBootstrapPreConduitStateMachineStart(
       RaceHandle /* contextHandle */,
       const ApiBootstrapListenContext &/* parentContext */,
-      // RaceHandle /* recvHandle */,
-      // const ConnectionID & /* _recvConnId */,
-      // const ChannelId & /* _recvChannel */,
-      // const ChannelId & /* _sendChannel */, const std::string & /* _sendRole */,
-      // const std::string & /* _sendLinkAddress */,
+      RaceHandle /* helloConnSMHandle */,
+      const ConnectionID &/* helloConnId */,
       const std::string & /* _packageId */,
       std::vector<std::vector<uint8_t>> /* recvMessages */){};
 

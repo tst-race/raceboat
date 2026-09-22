@@ -1,0 +1,36 @@
+{
+  "id": "bootstrap-racebird-multi-client",
+  "mode": "bootstrap-connect",
+  "wait_time": 20,
+  "timeout": 15,
+  "network": {"name": "bootstrap-racebird-multi-client-network", "subnet": "10.21.1.0/24"},
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "b2server",
+      "ip": "10.21.1.3",
+      "slots": {
+        "initial": "decomposed-exemplars",
+        "final": "racebird"
+      }
+    },
+    {
+      "role": "connector",
+      "id": "b2client",
+      "ip": "10.21.1.2",
+      "slots": {
+        "initial": "decomposed-exemplars",
+        "final": "racebird"
+      }
+    },
+    {
+      "role": "connector",
+      "id": "b2client2",
+      "ip": "10.21.1.4",
+      "slots": {
+        "initial": "decomposed-exemplars",
+        "final": "racebird"
+      }
+    }
+  ]
+}

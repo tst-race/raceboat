@@ -35,6 +35,9 @@ public:
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
                                   std::string linkAddress, LinkID linkId) override;
+  virtual void
+  updateConnStateMachineLinkEstablished(RaceHandle contextHandle, LinkID linkId,
+                                        std::string linkAddress) override;
   
   virtual void
   updateReceiveEncPkg(ConnectionID connId,
@@ -59,6 +62,8 @@ public:
   RaceHandle finalRecvConnSMHandle;
   ConnectionID finalRecvConnId;
   std::string finalRecvLinkAddress;
+  bool finalRecvLinkReady = false;
+  bool finalSendLinkReady = false;
 
   std::string packageId;
   
