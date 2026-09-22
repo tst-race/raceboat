@@ -25,8 +25,9 @@ namespace Raceboat {
 
 using namespace CMTypes;
 
-// This is the size of the <fragment id><flags> part of a fragmented message
-static const size_t FRAGMENT_SINGLE_PRODUCER_OVERHEAD = 5;
+// This is the size of the <stream tag><fragment id><flags> part of a
+// fragmented message
+static const size_t FRAGMENT_SINGLE_PRODUCER_OVERHEAD = 9;
 
 // This is the size of the <producer id><fragment id><flags> part of a
 // fragmented message
@@ -306,6 +307,14 @@ void ComponentPackageManager::encodeForAction(CMTypes::ActionInfo *actionInfo) {
       if (manager.mode == EncodingMode::FRAGMENT_MULTIPLE_PRODUCER) {
         bytesToEncode.insert(bytesToEncode.end(), link->producerId.begin(),
                             link->producerId.end());
+      }
+
+      if (manager.mode == EncodingMode::FRAGMENT_SINGLE_PRODUCER) {
+        // Tags this link instance so multiple remote senders sharing one
+        // link (e.g. an indirect/shared-whiteboard link) don't collide
+        // fragment sequence numbers with each other on receive.
+        bytesToEncode.insert(bytesToEncode.end(), link->streamTag.begin(),
+                            link->streamTag.end());
       }
 
       if (manager.mode == EncodingMode::FRAGMENT_MULTIPLE_PRODUCER ||

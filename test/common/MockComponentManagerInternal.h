@@ -47,6 +47,8 @@ public:
 
         mockLink.producerId = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
         mockLink2.producerId = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+        mockLink.streamTag = {0, 1, 2, 3};
+        mockLink2.streamTag = {1, 2, 3, 4};
 
         ON_CALL(*this, teardown()).WillByDefault([this]() {
             LOG_EXPECT(this->logger, "teardown");

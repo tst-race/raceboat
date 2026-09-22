@@ -1190,6 +1190,8 @@ RaceHandle ApiManagerInternal::startPreConduitStateMachine(
 RaceHandle ApiManagerInternal::startBootstrapPreConduitStateMachine(
                                                 RaceHandle contextHandle,
                                                 const ApiBootstrapListenContext &listenContext,
+                                                RaceHandle helloConnSMHandle,
+                                                const ConnectionID &helloConnId,
                                                 const std::string &packageId,
                                                 std::vector<std::vector<uint8_t>> recvMessages) {
         helper::logInfo(
@@ -1198,14 +1200,22 @@ RaceHandle ApiManagerInternal::startBootstrapPreConduitStateMachine(
   auto context = newBootstrapPreConduitContext();
   context->updateBootstrapPreConduitStateMachineStart(contextHandle,
                                                       listenContext,
+                                                      helloConnSMHandle,
+                                                      helloConnId,
                                                       packageId, recvMessages);
   EventResult result = bootstrapPreConduitEngine.start(*context);
   if (result != EventResult::SUCCESS) {
     return NULL_RACE_HANDLE;
   }
 
-  addDependent(listenContext.initSendConnSMHandle, context->handle);
-  addDependent(listenContext.initRecvConnSMHandle, context->handle);
+  // Mirror the send-handle resolution in updateBootstrapPreConduitStateMachineStart:
+  // for a merged single-bidi init link, this client's own connSM handles both
+  // send and recv; otherwise fall back to the listener's shared init-send handle.
+  RaceHandle initSendConnSMHandle = listenContext.initUsingSingleBidiConnection
+                                        ? helloConnSMHandle
+                                        : listenContext.initSendConnSMHandle;
+  addDependent(initSendConnSMHandle, context->handle);
+  addDependent(helloConnSMHandle, context->handle);
   return context->handle;
 }
 

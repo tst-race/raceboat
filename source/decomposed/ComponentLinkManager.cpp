@@ -87,6 +87,7 @@ CMTypes::CmInternalStatus ComponentLinkManager::onLinkStatusChanged(
     auto link = std::make_unique<CMTypes::Link>(linkId);
     link->props = props;
     link->producerId = manager.sdk.getEntropy(16);
+    link->streamTag = manager.sdk.getEntropy(4);
     links[linkId] = std::move(link);
     // TODO: onLinkStatusChange LINK_DESTROYED in case of failure? how to remove
     // from transport? should we just let the transport handle it instead?

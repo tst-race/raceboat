@@ -1,0 +1,27 @@
+{
+  "id": "bootstrap-decomposed-decomposed",
+  "mode": "bootstrap-connect",
+  "wait_time": 20,
+  "timeout": 120,
+  "network": {"name": "bootstrap-decomposed-decomposed-network", "subnet": "10.27.1.0/24"},
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "dd1server",
+      "ip": "10.27.1.3",
+      "slots": {
+        "initial": "decomposed-exemplars",
+        "final": "decomposed-exemplars"
+      }
+    },
+    {
+      "role": "connector",
+      "id": "dd1client",
+      "ip": "10.27.1.2",
+      "slots": {
+        "initial": "decomposed-exemplars",
+        "final": "decomposed-exemplars"
+      }
+    }
+  ]
+}

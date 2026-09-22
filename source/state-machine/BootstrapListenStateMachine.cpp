@@ -48,17 +48,37 @@ void ApiBootstrapListenContext::updateClose(RaceHandle /* handle */,
 }
 
 void ApiBootstrapListenContext::updateReceiveEncPkg(
-    ConnectionID /* _connId */, std::shared_ptr<std::vector<uint8_t>> _data) {
-  this->data.push(std::move(_data));
+    ConnectionID _connId, std::shared_ptr<std::vector<uint8_t>> _data) {
+  this->data.push({_connId, std::move(_data)});
 };
 
   // TODO Code Reuse
 void ApiBootstrapListenContext::updateConnStateMachineConnected(
     RaceHandle contextHandle, ConnectionID connId,
-    std::string linkAddress, LinkID /* linkId */) {
-  if (this->initRecvConnSMHandle == contextHandle) {
-    this->initRecvConnId = connId;
-    this->initRecvLinkAddress = linkAddress;
+    std::string linkAddress, LinkID linkId) {
+  if (this->initRecvConnSMHandles.count(contextHandle) > 0) {
+    // Store the LinkID from the first connection - additional connections
+    // (for additional concurrent bootstrapping clients) reuse this LinkID.
+    if (this->firstInitRecvLinkId.empty() && !linkId.empty()) {
+      this->firstInitRecvLinkId = linkId;
+    }
+    if (this->initRecvConnId.empty()) {
+      this->initRecvConnId = connId;
+      this->initRecvLinkAddress = linkAddress;
+    }
+    this->initRecvConnIdToHandle[connId] = contextHandle;
+    // For a single bidirectional init link, initSendConnSMHandle is aliased
+    // to the same handle - update both sides so neither is left permanently
+    // empty (see StateBootstrapListenWaitingForConnections).
+    if (this->initSendConnSMHandle == contextHandle && this->initSendConnId.empty()) {
+      this->initSendConnId = connId;
+      this->initSendLinkAddress = linkAddress;
+    }
+    // Register the all-zero packageId for EVERY init-recv connection, not
+    // just the first, so hello messages from additional concurrent
+    // bootstrapping clients get routed to this listen context.
+    std::string packageId(packageIdLen, '\0');
+    manager.registerPackageId(*this, connId, packageId);
   } else if (this->initSendConnSMHandle == contextHandle) {
     this->initSendConnId = connId;
     this->initSendLinkAddress = linkAddress;
@@ -100,7 +120,21 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
 
     // *** INIT SEND ***
     // Handle initial server->client aka init_send
-    bool create = ctx.shouldCreateSender(ctx.opts.init_send_channel);
+    // shouldCreateSender()/shouldCreateReceiver() only consult the channel's
+    // static manifest properties, so for a channel that supports a single
+    // merged bidirectional link (e.g. racebird's obfs4) they return the same
+    // answer on both listener and dialer - neither role is distinguished, so
+    // both sides would independently decide to create their own separate,
+    // unreachable init-recv link instead of reusing the one connection that
+    // actually gets dialed into (permanent bootstrap-dial hang). Mirror the
+    // already-working final-link convention instead: listener always creates.
+    const bool initUsesSingleBidiLink =
+        ctx.opts.init_recv_channel.empty() ||
+        ctx.shouldUseSingleBidiLink(ctx.opts.init_send_channel,
+                                    ctx.opts.init_recv_channel);
+    bool create = initUsesSingleBidiLink
+                     ? true
+                     : ctx.shouldCreateSender(ctx.opts.init_send_channel);
 
     // We are going to need to create this link and then transmit the address out-of-band to the dialer before they run dial
     if (create) {
@@ -138,14 +172,15 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
     } 
 
     // *** INIT RECV ***
-    // Skip initial recv channel if it is empty
-    // This SHOULD indicate the init_send_channel is bidirectional, otherwise this is a mistake and should be caught earlier during input validation
-    if (ctx.opts.init_recv_channel.empty()) {
+    // Skip initial recv channel if it is empty, or reuse the single merged
+    // bidirectional init_send connection for receiving too (see comment above).
+    if (initUsesSingleBidiLink) {
       // Use bidirectional init_send connection for receiving as well
       helper::logInfo(logPrefix + "Using bidirectional init_send connection for receiving");
       ctx.initUsingSingleBidiConnection = true;
       ctx.initRecvConnSMHandle = ctx.initSendConnSMHandle;
       ctx.initRecvConnId = ctx.initSendConnId;
+      ctx.initRecvConnSMHandles.insert(ctx.initRecvConnSMHandle);
     }
     else {
       // Handle initial client->server aka init_recv
@@ -189,6 +224,7 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
       }
 
       ctx.manager.registerHandle(ctx, ctx.initRecvConnSMHandle);
+      ctx.initRecvConnSMHandles.insert(ctx.initRecvConnSMHandle);
     }
 
     // // Handle final server->client aka final_send
@@ -304,8 +340,52 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
+    // Ensure every pending accept() has its own init-recv connection ready to
+    // receive a hello. The first accept() reuses the connection opened in
+    // StateBootstrapListenInitial; each additional accept() opens a new
+    // connection on that same (already established) link so that multiple
+    // clients can bootstrap concurrently against this listener, mirroring
+    // ApiListenContext's handling of multiple simultaneous accept()s.
+    while (!ctx.acceptCb.empty()) {
+      auto cb = std::move(ctx.acceptCb.front());
+      ctx.acceptCb.pop_front();
+
+      RaceHandle connSMHandle = NULL_RACE_HANDLE;
+      if (ctx.initRecvConnSMHandle != NULL_RACE_HANDLE && !ctx.initialInitRecvConnSMUsed) {
+        connSMHandle = ctx.initRecvConnSMHandle;
+        ctx.initialInitRecvConnSMUsed = true;
+      } else if (!ctx.firstInitRecvLinkId.empty()) {
+        ChannelId channelId = ctx.initUsingSingleBidiConnection
+                                  ? ctx.opts.init_send_channel
+                                  : ctx.opts.init_recv_channel;
+        std::string role = ctx.initUsingSingleBidiConnection
+                                ? ctx.opts.init_send_role
+                                : ctx.opts.init_recv_role;
+        connSMHandle = ctx.manager.startConnStateMachine(
+            ctx.handle, channelId, role, ctx.initRecvLinkAddress,
+            false /* creating: reuse existing link */,
+            false /* sending: this is a receive-side connection */,
+            ctx.firstInitRecvLinkId);
+        if (connSMHandle == NULL_RACE_HANDLE) {
+          helper::logError(logPrefix + "Failed to start additional init-recv connection state machine");
+          cb(ApiStatus::INTERNAL_ERROR, {}, {});
+          continue;
+        }
+        ctx.manager.registerHandle(ctx, connSMHandle);
+        ctx.initRecvConnSMHandles.insert(connSMHandle);
+      } else {
+        // Init-recv link isn't established yet; put the callback back and
+        // wait for EVENT_CONN_STATE_MACHINE_CONNECTED to re-trigger us.
+        ctx.acceptCb.push_front(std::move(cb));
+        break;
+      }
+
+      ctx.connSMToAcceptCallback[connSMHandle] = std::move(cb);
+      ctx.pendingConnSMHandles.push(connSMHandle);
+    }
+
     while (!ctx.data.empty()) {
-      auto data = std::move(ctx.data.front());
+      auto [helloConnId, data] = std::move(ctx.data.front());
       ctx.data.pop();
 
       try {
@@ -352,15 +432,23 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
 
         std::vector<uint8_t> dialMessage = base64::decode(messageB64);
 
-        // RaceHandle preBootstrapConnSMHandle = ctx.manager.startBootstrapPreConduitStateMachine(
-        //     ctx.handle, ctx.recvConnSMHandle, ctx.recvConnId,
-        //     ctx.opts.recv_channel, ctx.opts.send_channel, ctx.opts.send_role,
-        //     linkAddress, replyPackageId, {std::move(dialMessage)});
+        // Pair this hello with the specific connSM/connId it arrived on
+        // (not just the parent's first-ever init connection) - required so
+        // a merged single-bidi init link routes each client's hello response
+        // over its OWN connection instead of one shared/already-closed one.
+        RaceHandle helloConnSMHandle = ctx.initRecvConnSMHandle;
+        auto handleIt = ctx.initRecvConnIdToHandle.find(helloConnId);
+        if (handleIt != ctx.initRecvConnIdToHandle.end()) {
+          helloConnSMHandle = handleIt->second;
+        }
+
         helper::logInfo(logPrefix +
                          " startBootstrapPreConduitStateMachine being called");
         RaceHandle preBootstrapConnSMHandle = ctx.manager.startBootstrapPreConduitStateMachine(
             ctx.handle,
             ctx,
+            helloConnSMHandle,
+            helloConnId,
             replyPackageId, {std::move(dialMessage)});
 
 
@@ -372,18 +460,32 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
 
         ctx.preBootstrapConduitSM.push(preBootstrapConnSMHandle);
 
-        break;
+        // Continue processing remaining hello messages - a single fetch from
+        // a shared/indirect init-recv channel can deliver multiple clients'
+        // hellos in one batch (only one EVENT_RECEIVE_PACKAGE may follow),
+        // so don't stop after the first (mirrors ListenStateMachine).
       } catch (std::exception &e) {
         helper::logError(logPrefix +
                          "Failed to process received message: " + e.what());
       }
     }
 
-    while (!ctx.acceptCb.empty() && !ctx.preBootstrapConduitSM.empty()) {
-      auto cb = std::move(ctx.acceptCb.front());
-      ctx.acceptCb.pop_front();
-      RaceHandle preBootstrapConnSMHandle = std::move(ctx.preBootstrapConduitSM.front());
+    // Pair hello-derived pre-conduit state machines with the accept()
+    // callback whose init-recv connection is meant to service it, so
+    // multiple concurrent clients each get routed to their own accept().
+    while (!ctx.pendingConnSMHandles.empty() && !ctx.preBootstrapConduitSM.empty()) {
+      RaceHandle connSMHandle = ctx.pendingConnSMHandles.front();
+      ctx.pendingConnSMHandles.pop();
+      RaceHandle preBootstrapConnSMHandle = ctx.preBootstrapConduitSM.front();
       ctx.preBootstrapConduitSM.pop();
+
+      auto it = ctx.connSMToAcceptCallback.find(connSMHandle);
+      if (it == ctx.connSMToAcceptCallback.end()) {
+        helper::logError(logPrefix + "No accept callback found for connection SM");
+        continue;
+      }
+      auto cb = std::move(it->second);
+      ctx.connSMToAcceptCallback.erase(it);
       if (!ctx.manager.onBootstrapListenAccept(preBootstrapConnSMHandle, cb)) {
         helper::logError(logPrefix + "bootstrap listen accept failed");
         cb(ApiStatus::INTERNAL_ERROR, {}, {});

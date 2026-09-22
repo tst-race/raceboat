@@ -18,6 +18,7 @@ SCENARIOS_DIR = INTEGRATION_DIR / "scenarios"
 
 sys.path.insert(0, str(INTEGRATION_DIR))
 from generate_scenario import generate  # noqa: E402
+from link_topology import check_final_link_topology, print_link_topology_summary  # noqa: E402
 
 
 def main() -> int:
@@ -48,7 +49,20 @@ def main() -> int:
         "--client-container", connector_nodes[0],
         "--additional-clients", *connector_nodes[1:],
     ]
-    return subprocess.run(cmd).returncode
+    returncode = subprocess.run(cmd).returncode
+
+    logs_dir = compose_path.parent / "logs"
+    print_link_topology_summary(scenario, logs_dir)
+    topology_ok, topology_lines = check_final_link_topology(scenario, logs_dir)
+    if topology_lines:
+        print("\nFinal-link creator/loader check (bootstrap-connect only):")
+        for line in topology_lines:
+            print(line)
+        print(f"Final-link topology: {'PASSED' if topology_ok else 'FAILED'}")
+
+    if not topology_ok and returncode == 0:
+        return 1
+    return returncode
 
 
 if __name__ == "__main__":

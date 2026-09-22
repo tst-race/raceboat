@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -251,16 +252,30 @@ def main():
         )
         time.sleep(2)
 
-        # Run client stubs on all clients
+        # Run client stubs on all clients concurrently, so a slow-starting
+        # client isn't forced to wait out an earlier client's full retry
+        # budget before it even begins trying to connect. This matters for
+        # scenarios that assert genuinely simultaneous client connections.
         print(f"Starting {num_clients} client stub(s)...")
-        client_results = []
-        for idx, client in enumerate(all_clients):
-            result = subprocess.run(
+        client_results = [None] * num_clients
+
+        def run_client_stub(idx, client):
+            client_results[idx] = (client, subprocess.run(
                 ['docker', 'exec', client, 'python3', '/tmp/stub-client.py', client],
                 capture_output=True,
                 text=True
-            )
-            client_results.append((client, result))
+            ))
+
+        client_threads = [
+            threading.Thread(target=run_client_stub, args=(idx, client))
+            for idx, client in enumerate(all_clients)
+        ]
+        for thread in client_threads:
+            thread.start()
+        for thread in client_threads:
+            thread.join()
+
+        for client, result in client_results:
             print(f"  {client} exited with code: {result.returncode}")
 
         # Write client outputs to temp files

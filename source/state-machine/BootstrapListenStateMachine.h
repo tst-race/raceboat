@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <unordered_map>
+#include <unordered_set>
 #include "ApiContext.h"
 
 namespace Raceboat {
@@ -54,7 +56,10 @@ public:
 
 public:
   BootstrapConnectionOptions opts;
-  std::queue<std::shared_ptr<std::vector<uint8_t>>> data;
+  // Each queued hello is paired with the connId it arrived on, so it can be
+  // matched back to the specific per-client connSM that received it (see
+  // initRecvConnIdToHandle) instead of always using the first client's.
+  std::queue<std::pair<ConnectionID, std::shared_ptr<std::vector<uint8_t>>>> data;
   std::function<void(ApiStatus, LinkAddress, RaceHandle)> listenCb;
   std::deque<std::function<void(ApiStatus, RaceHandle, ConduitProperties)>> acceptCb;
   std::function<void(ApiStatus)> closeCb;
@@ -79,6 +84,21 @@ public:
   
   bool initUsingSingleBidiConnection = false;  // true if init uses one bidi connection
   bool finalUsingSingleBidiConnection = false;  // true if final uses one bidi connection
+
+  // Support for multiple concurrent bootstrapping clients sharing the same
+  // init-recv link: the first connection's LinkID is reused to open an
+  // additional connection per extra accept(), mirroring ApiListenContext.
+  LinkID firstInitRecvLinkId;
+  bool initialInitRecvConnSMUsed = false;
+  std::unordered_set<RaceHandle> initRecvConnSMHandles;
+  std::queue<RaceHandle> pendingConnSMHandles;
+  std::unordered_map<RaceHandle, std::function<void(ApiStatus, RaceHandle, ConduitProperties)>>
+      connSMToAcceptCallback;
+  // Maps each init-recv connId to the specific connSM handle that owns it,
+  // so a per-client hello can be paired with its own connection (needed for
+  // a merged single-bidi init link, where each client's connSM is also used
+  // to send that client's hello response - see startBootstrapPreConduitStateMachine).
+  std::unordered_map<ConnectionID, RaceHandle> initRecvConnIdToHandle;
 };
 
 class BootstrapListenStateEngine : public StateEngine {

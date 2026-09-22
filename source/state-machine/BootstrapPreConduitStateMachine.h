@@ -34,10 +34,8 @@ public:
   virtual void updateBootstrapPreConduitStateMachineStart(
       RaceHandle contextHandle,
       const ApiBootstrapListenContext &parentContext,
-      // RaceHandle recvHandle,
-      // const ConnectionID &_recvConnId, const ChannelId &_recvChannel,
-      // const ChannelId &_sendChannel, const std::string &_sendRole,
-      // const std::string &_sendLinkAddress,
+      RaceHandle helloConnSMHandle,
+      const ConnectionID &helloConnId,
       const std::string &_packageId,
       std::vector<std::vector<uint8_t>> recvMessages) override;
   virtual void
@@ -75,6 +73,12 @@ public:
   RaceHandle finalRecvConnSMHandle;
   LinkAddress finalRecvLinkAddress;
   ConnectionID finalRecvConnId;
+
+  // true when finalSendConnSMHandle/finalRecvConnSMHandle are aliased to the
+  // same merged bidirectional connection; a link we create for this case is
+  // a listening socket, so readiness for sending the hello response only
+  // requires the link's address, not an established peer connection.
+  bool finalUsingSingleBidiConnection = false;
 
   std::string packageId;
   RaceHandle apiHandle;
