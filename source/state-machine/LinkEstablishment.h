@@ -70,4 +70,22 @@ struct ConnEstablishment {
   }
 };
 
+// Which side of a conversation a state machine represents when it needs to
+// resolve the LinkRole for a merged/Bidi link. LD_BIDI channels have no
+// manifest-derivable creator/loader answer - shouldCreateSender()/
+// shouldCreateReceiver() return the same value regardless of caller - so
+// every merged-link call site across channel and bootstrap mode hardcoded
+// the same convention independently. This centralizes that one convention.
+enum class ModeRole {
+  Listener,
+  Dialer,
+};
+
+// The listener always creates a merged/Bidi link; the dialer always loads
+// it (and, for bootstrap's initial/final slots, learns its address via the
+// hello/response exchange rather than the manifest).
+inline LinkRole resolveBidiRole(ModeRole modeRole) {
+  return modeRole == ModeRole::Listener ? LinkRole::Creator : LinkRole::Loader;
+}
+
 } // namespace Raceboat

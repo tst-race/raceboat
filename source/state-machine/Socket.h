@@ -17,6 +17,7 @@
 
 #include "LinkEstablishment.h"
 #include "api-managers/ApiManager.h"
+#include "helper.h"
 
 namespace Raceboat {
 
@@ -39,9 +40,19 @@ public:
   // Starts the connection state machine appropriate for `req.establishment`
   // (genuinely bidirectional via startConnStateMachineBidi when merged,
   // directional via startConnStateMachine otherwise) and returns its handle.
+  // `slot` ("channel"/"initial"/"final") is logged only - it lets test
+  // tooling (link_topology.py) attribute create/load events to a slot even
+  // when "initial" and "final" share the same channel gid, instead of
+  // guessing from log position.
   static RaceHandle establish(ApiManagerInternal &manager,
                              RaceHandle contextHandle,
-                             const SocketRequest &req) {
+                             const SocketRequest &req,
+                             const std::string &slot = "channel") {
+    helper::logInfo("Socket::establish: slot=" + slot +
+                    " channel=" + req.channelId +
+                    " role=" + (req.establishment.isCreator() ? "creator" : "loader") +
+                    " directionality=" + (req.establishment.isBidi() ? "bidi" :
+                                          req.establishment.isSend() ? "send" : "recv"));
     if (req.establishment.isBidi()) {
       return manager.startConnStateMachineBidi(
           contextHandle, req.channelId, req.role, req.linkAddress,

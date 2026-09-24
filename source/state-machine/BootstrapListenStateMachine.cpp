@@ -149,17 +149,16 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
             ctx.manager, ctx.handle,
             SocketRequest{ctx.opts.init_send_channel, ctx.opts.init_send_role,
                          ctx.opts.init_send_address,
-                         ConnEstablishment{LinkRole::Creator, LinkDirectionality::Bidi}});
+                         ConnEstablishment{resolveBidiRole(ModeRole::Listener), LinkDirectionality::Bidi}},
+            "initial");
       } else {
         bool sending = true;
-        ctx.initSendConnSMHandle = ctx.manager.
-          startConnStateMachine(ctx.handle,
-                                ctx.opts.init_send_channel,
-                                ctx.opts.init_send_role,
-                                ctx.opts.init_send_address,
-                                create, // is true
-                                sending // is true
-                                );
+        ctx.initSendConnSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{ctx.opts.init_send_channel, ctx.opts.init_send_role,
+                         ctx.opts.init_send_address,
+                         ConnEstablishment::fromLegacy(create, sending, false)},
+            "initial");
       }
     if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -169,14 +168,12 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
     } else if (!ctx.opts.init_send_address.empty()) {
       helper::logInfo(logPrefix + "Loading init-send link on " + ctx.opts.init_send_channel + " with address: " + ctx.opts.init_send_address);
       bool sending = true;
-      ctx.initSendConnSMHandle = ctx.manager.
-        startConnStateMachine(ctx.handle,
-                              ctx.opts.init_send_channel,
-                              ctx.opts.init_send_role,
-                              ctx.opts.init_send_address,
-                              create, // is false
-                              sending // is true
-                              );
+      ctx.initSendConnSMHandle = Socket::establish(
+          ctx.manager, ctx.handle,
+          SocketRequest{ctx.opts.init_send_channel, ctx.opts.init_send_role,
+                       ctx.opts.init_send_address,
+                       ConnEstablishment::fromLegacy(create, sending, false)},
+          "initial");
     if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
       return EventResult::NOT_SUPPORTED;
@@ -201,14 +198,12 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
       if (create) {
         helper::logInfo(logPrefix + "Creating init-recv link on " + ctx.opts.init_recv_channel + " with address: " + ctx.opts.init_recv_address);
       bool sending = false;
-      ctx.initRecvConnSMHandle = ctx.manager.
-        startConnStateMachine(ctx.handle,
-                              ctx.opts.init_recv_channel,
-                              ctx.opts.init_recv_role,
-                              ctx.opts.init_recv_address,
-                              create, // is true
-                              sending // is false
-                              );
+      ctx.initRecvConnSMHandle = Socket::establish(
+          ctx.manager, ctx.handle,
+          SocketRequest{ctx.opts.init_recv_channel, ctx.opts.init_recv_role,
+                       ctx.opts.init_recv_address,
+                       ConnEstablishment::fromLegacy(create, sending, false)},
+          "initial");
       }
       else if (ctx.opts.init_recv_address.empty()) {
         // Need an address to load
@@ -221,14 +216,12 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
         helper::logInfo(logPrefix + "Loading init-recv link on " + ctx.opts.init_recv_channel + " with address: " + ctx.opts.init_recv_address);
       // If we are loading we should have a recv_address, if we are creating we will send the address in the hello message
       bool sending = false;
-      ctx.initRecvConnSMHandle = ctx.manager.
-        startConnStateMachine(ctx.handle,
-                              ctx.opts.init_recv_channel,
-                              ctx.opts.init_recv_role,
-                              ctx.opts.init_recv_address,
-                              create, // is false
-                              sending // is false
-                              );
+      ctx.initRecvConnSMHandle = Socket::establish(
+          ctx.manager, ctx.handle,
+          SocketRequest{ctx.opts.init_recv_channel, ctx.opts.init_recv_role,
+                       ctx.opts.init_recv_address,
+                       ConnEstablishment::fromLegacy(create, sending, false)},
+          "initial");
 
       }
       if (ctx.initRecvConnSMHandle == NULL_RACE_HANDLE) {
@@ -374,11 +367,12 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
         std::string role = ctx.initUsingSingleBidiConnection
                                 ? ctx.opts.init_send_role
                                 : ctx.opts.init_recv_role;
-        connSMHandle = ctx.manager.startConnStateMachine(
-            ctx.handle, channelId, role, ctx.initRecvLinkAddress,
-            false /* creating: reuse existing link */,
-            false /* sending: this is a receive-side connection */,
-            ctx.firstInitRecvLinkId);
+        connSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{channelId, role, ctx.initRecvLinkAddress,
+                         ConnEstablishment{LinkRole::Loader, LinkDirectionality::Recv},  // reuse existing link, receive-side
+                         ctx.firstInitRecvLinkId},
+            "initial");
         if (connSMHandle == NULL_RACE_HANDLE) {
           helper::logError(logPrefix + "Failed to start additional init-recv connection state machine");
           cb(ApiStatus::INTERNAL_ERROR, {}, {});

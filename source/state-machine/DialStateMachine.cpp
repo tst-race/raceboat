@@ -126,7 +126,7 @@ struct StateDialInitial : public DialState {
       ctx.recvConnSMHandle = Socket::establish(
           ctx.manager, ctx.handle,
           SocketRequest{recvChannelId, recvRole, ctx.opts.send_address,
-                       ConnEstablishment{LinkRole::Loader, LinkDirectionality::Bidi}});
+                       ConnEstablishment{resolveBidiRole(ModeRole::Dialer), LinkDirectionality::Bidi}});
       
       if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting bidirectional connection state machine failed");

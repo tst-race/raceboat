@@ -35,6 +35,15 @@ LINK_EVENT_RE = re.compile(
     r".*?channelGid=([^,\s]+)"
 )
 
+# Slot-tagged establishment events emitted by Socket::establish() (see
+# source/state-machine/Socket.h) - unlike LINK_EVENT_RE these are attributed
+# to a slot ("channel"/"initial"/"final") at the source, so they can
+# distinguish initial-slot from final-slot events even when both slots
+# share the same channel gid (which LINK_EVENT_RE alone cannot).
+SOCKET_ESTABLISH_RE = re.compile(
+    r"Socket::establish: slot=(\w+) channel=([^\s]+) role=(creator|loader)"
+)
+
 CREATE_METHODS = {"createLink", "createLinkFromAddress"}
 
 # plugin_name -> slot -> channel gid, filled in lazily by asking the plugin's
@@ -71,6 +80,21 @@ def count_link_events(log_path: Path) -> Dict[str, Dict[str, int]]:
     for method, channel_gid in LINK_EVENT_RE.findall(text):
         key = "create" if method in CREATE_METHODS else "load"
         counts[channel_gid][key] += 1
+    return counts
+
+
+def count_socket_establish_events(log_path: Path) -> Dict[str, Dict[str, int]]:
+    """Returns {slot: {"create": N, "load": M}} using the SDK's own
+    slot-tagged Socket::establish log lines, which - unlike
+    count_link_events()'s channelGid-keyed counts - stay distinguishable
+    even when the "initial" and "final" slots share a channel gid."""
+    counts: Dict[str, Dict[str, int]] = defaultdict(lambda: {"create": 0, "load": 0})
+    if not log_path.exists():
+        return counts
+    text = log_path.read_text(errors="replace")
+    for slot, _channel_gid, role in SOCKET_ESTABLISH_RE.findall(text):
+        key = "create" if role == "creator" else "load"
+        counts[slot][key] += 1
     return counts
 
 
@@ -126,25 +150,17 @@ def check_final_link_topology(scenario: dict, logs_dir: Path) -> Tuple[bool, Lis
 
         # When the same plugin (and therefore the same channelGid, e.g.
         # decomposed-exemplars' twoSixIndirectComposition used for both
-        # "initial" and "final") backs both slots, the initial slot's own
-        # link-reuse events (the listener creates its shared init link once
-        # then loads it again for each additional accepted client; each
-        # connector loads the listener's init address and creates its own
-        # return link) land in the exact same log lines/channelGid bucket as
-        # the final slot's - there's no reliable way to tell them apart by
-        # grepping createLink/loadLinkAddress calls alone. Skip the strict
-        # count assertion in that case rather than report a false mismatch.
+        # "initial" and "final") backs both slots, count_link_events()'s
+        # channelGid-keyed counts can't tell initial-slot link reuse apart
+        # from final-slot events. Prefer the slot-tagged Socket::establish
+        # counts (count_socket_establish_events) in that case, which can;
+        # only fall back to skipping the assertion if a log predates that
+        # instrumentation (no Socket::establish lines found at all).
         initial_plugin = listener.get("slots", {}).get("initial")
+        same_gid_as_initial = False
         if initial_plugin is not None:
             initial_channel_gid = resolve_channel_gid(initial_plugin, "initial", registry)
-            if initial_channel_gid == channel_gid:
-                lines.append(
-                    f"  [SKIPPED] {listener['id']} (final channel={channel_gid}): "
-                    f"initial slot uses the same channel gid - create/load counts "
-                    f"include initial-slot link reuse and can't be reliably "
-                    f"separated by log-grepping alone"
-                )
-                continue
+            same_gid_as_initial = initial_channel_gid == channel_gid
 
         # A merged single-bidi channel (e.g. racebird's obfs4) gets one
         # physical link per connector; a non-merged channel (e.g.
@@ -154,7 +170,19 @@ def check_final_link_topology(scenario: dict, logs_dir: Path) -> Tuple[bool, Lis
         expected_creates = len(connectors) * links_per_connector
 
         log_path = logs_dir / listener["id"] / "raceboat_listener.log"
-        counts = count_link_events(log_path)[channel_gid]
+        slot_counts = count_socket_establish_events(log_path)
+        has_slot_data = bool(slot_counts)
+
+        if same_gid_as_initial and not has_slot_data:
+            lines.append(
+                f"  [SKIPPED] {listener['id']} (final channel={channel_gid}): "
+                f"initial slot uses the same channel gid and this log predates "
+                f"slot-tagged Socket::establish instrumentation - create/load "
+                f"counts can't be reliably separated by log-grepping alone"
+            )
+            continue
+
+        counts = slot_counts["final"] if has_slot_data else count_link_events(log_path)[channel_gid]
         node_ok = counts["create"] == expected_creates and counts["load"] == 0
         ok = ok and node_ok
         lines.append(
@@ -168,7 +196,8 @@ def check_final_link_topology(scenario: dict, logs_dir: Path) -> Tuple[bool, Lis
             if connector.get("slots", {}).get("final") != final_plugin:
                 continue
             c_log_path = logs_dir / connector["id"] / "raceboat_connector.log"
-            c_counts = count_link_events(c_log_path)[channel_gid]
+            c_slot_counts = count_socket_establish_events(c_log_path)
+            c_counts = c_slot_counts["final"] if c_slot_counts else count_link_events(c_log_path)[channel_gid]
             c_ok = c_counts["load"] == links_per_connector and c_counts["create"] == 0
             ok = ok and c_ok
             lines.append(

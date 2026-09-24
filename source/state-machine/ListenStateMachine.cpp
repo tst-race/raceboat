@@ -141,7 +141,7 @@ struct StateListenInitial : public ListenState {
     ctx.recvConnSMHandle = Socket::establish(
         ctx.manager, ctx.handle,
         SocketRequest{channelId, role, linkAddress,
-                     ConnEstablishment{LinkRole::Creator, LinkDirectionality::Bidi}});
+                     ConnEstablishment{resolveBidiRole(ModeRole::Listener), LinkDirectionality::Bidi}});
 
     if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
