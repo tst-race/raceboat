@@ -18,6 +18,7 @@
 
 #include "Core.h"
 #include "Events.h"
+#include "LinkEstablishment.h"
 #include "PluginWrapper.h"
 #include "States.h"
 #include "base64.h"
@@ -147,15 +148,27 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
         ctx.dialCallback = {};
         return EventResult::NOT_SUPPORTED;
       }
-      bool sending = true;
-      ctx.initSendConnSMHandle = ctx.manager.
-        startConnStateMachine(ctx.handle,
-                              ctx.opts.init_send_channel,
-                              ctx.opts.init_send_role,
-                              ctx.opts.init_send_address,
-                              create, // is false
-                              sending // is true
-                              );
+      if (initUsesSingleBidiLink) {
+        // Genuinely bidirectional connSM instead of a directional one
+        // aliased to look bidi - the merge mechanism this step migrates.
+        ConnEstablishment initEstablishment{LinkRole::Loader, LinkDirectionality::Bidi};
+        ctx.initSendConnSMHandle = ctx.manager.startConnStateMachineBidi(
+            ctx.handle,
+            ctx.opts.init_send_channel,
+            ctx.opts.init_send_role,
+            ctx.opts.init_send_address,
+            initEstablishment.isCreator());
+      } else {
+        bool sending = true;
+        ctx.initSendConnSMHandle = ctx.manager.
+          startConnStateMachine(ctx.handle,
+                                ctx.opts.init_send_channel,
+                                ctx.opts.init_send_role,
+                                ctx.opts.init_send_address,
+                                create, // is false
+                                sending // is true
+                                );
+      }
     }
     if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -466,11 +479,12 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
             continue;
           }
 
-          bool sending = true;
-          bool create = false;
-          ctx.finalSendConnSMHandle = ctx.manager.startConnStateMachine(
+          // Genuinely bidirectional connSM instead of a directional one
+          // aliased to look bidi - the merge mechanism this step migrates.
+          ConnEstablishment finalEstablishment{LinkRole::Loader, LinkDirectionality::Bidi};
+          ctx.finalSendConnSMHandle = ctx.manager.startConnStateMachineBidi(
               ctx.handle, ctx.opts.final_send_channel, ctx.opts.final_send_role,
-              finalAddr, create, sending);
+              finalAddr, finalEstablishment.isCreator());
 
           if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
             helper::logError(logPrefix + " starting connection state machine failed");

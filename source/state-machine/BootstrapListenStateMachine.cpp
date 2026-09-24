@@ -19,6 +19,7 @@
 #include "../../include/race/Race.h"
 #include "Core.h"
 #include "Events.h"
+#include "LinkEstablishment.h"
 #include "PluginContainer.h"
 #include "PluginWrapper.h"
 #include "States.h"
@@ -139,15 +140,27 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
     // We are going to need to create this link and then transmit the address out-of-band to the dialer before they run dial
     if (create) {
       helper::logInfo(logPrefix + "Creating init-send link on " + ctx.opts.init_send_channel + (ctx.opts.init_recv_address.empty() ? "" : " from address: " + ctx.opts.init_recv_address));
-      bool sending = true;
-      ctx.initSendConnSMHandle = ctx.manager.
-        startConnStateMachine(ctx.handle,
-                              ctx.opts.init_send_channel,
-                              ctx.opts.init_send_role,
-                              ctx.opts.init_send_address,
-                              create, // is true
-                              sending // is true
-                              );
+      if (initUsesSingleBidiLink) {
+        // Genuinely bidirectional connSM instead of a directional one
+        // aliased to look bidi - the merge mechanism this step migrates.
+        ConnEstablishment initEstablishment{LinkRole::Creator, LinkDirectionality::Bidi};
+        ctx.initSendConnSMHandle = ctx.manager.startConnStateMachineBidi(
+            ctx.handle,
+            ctx.opts.init_send_channel,
+            ctx.opts.init_send_role,
+            ctx.opts.init_send_address,
+            initEstablishment.isCreator());
+      } else {
+        bool sending = true;
+        ctx.initSendConnSMHandle = ctx.manager.
+          startConnStateMachine(ctx.handle,
+                                ctx.opts.init_send_channel,
+                                ctx.opts.init_send_role,
+                                ctx.opts.init_send_address,
+                                create, // is true
+                                sending // is true
+                                );
+      }
     if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
       return EventResult::NOT_SUPPORTED;

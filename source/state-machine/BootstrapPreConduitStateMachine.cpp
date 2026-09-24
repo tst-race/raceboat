@@ -26,6 +26,7 @@
 #include "base64.h"
 #include "helper.h"
 #include "BootstrapListenStateMachine.h"
+#include "LinkEstablishment.h"
 
 namespace Raceboat {
 
@@ -213,22 +214,14 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
       // the shared final link here and reports its address back to the
       // dialer in the hello response (StateBootstrapPreConduitSendResponse);
       // the dialer always loads it (StateBootstrapDialRecvResponse).
-      const bool create = true;
-      const bool sending = true;
+      ConnEstablishment finalEstablishment{LinkRole::Creator, LinkDirectionality::Bidi};
       helper::logInfo(logPrefix + "Using a single bidirectional final link for channel '" +
                       ctx.opts.final_send_channel + "'");
-      if (create) {
-        ctx.finalSendConnSMHandle = ctx.manager.startConnStateMachine(
-            ctx.handle, ctx.opts.final_send_channel, ctx.opts.final_send_role,
-            "", create, sending);
-      } else if (ctx.finalSendLinkAddress.empty()) {
-        helper::logError(logPrefix + " finalSend address is missing (was it sent in the hello?)");
-        return EventResult::NOT_SUPPORTED;
-      } else {
-        ctx.finalSendConnSMHandle = ctx.manager.startConnStateMachine(
-            ctx.handle, ctx.opts.final_send_channel, ctx.opts.final_send_role,
-            ctx.finalSendLinkAddress, create, sending);
-      }
+      // Genuinely bidirectional connSM instead of a directional one aliased
+      // to look bidi - the merge mechanism this step migrates.
+      ctx.finalSendConnSMHandle = ctx.manager.startConnStateMachineBidi(
+          ctx.handle, ctx.opts.final_send_channel, ctx.opts.final_send_role,
+          "", finalEstablishment.isCreator());
       if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting connection state machine failed");
         return EventResult::NOT_SUPPORTED;
@@ -524,6 +517,10 @@ BootstrapPreConduitStateEngine::BootstrapPreConduitStateEngine() {
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_INITIAL,   EVENT_LISTEN_ACCEPTED,              STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED);
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_ACCEPTED,  EVENT_ALWAYS,                       STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_CONN_STATE_MACHINE_CONNECTED,              STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS);
+    // A genuinely bidirectional final link (see StateBootstrapPreConduitAccepted)
+    // is a listening socket whose address readiness is signaled via
+    // LINK_ESTABLISHED, not CONNECTED - re-enter to re-evaluate readiness.
+    declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED,              STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_NEEDS_SEND,              STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE);
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS,      EVENT_SATISFIED,              STATE_BOOTSTRAP_PRE_CONN_OBJ_FINISHED);
     declareStateTransition(STATE_BOOTSTRAP_PRE_CONN_OBJ_SEND_RESPONSE,      EVENT_PACKAGE_SENT,              STATE_BOOTSTRAP_PRE_CONN_OBJ_WAITING_FOR_CONNECTIONS);
