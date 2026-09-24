@@ -22,6 +22,8 @@
 #include "LinkEstablishment.h"
 #include "PluginContainer.h"
 #include "PluginWrapper.h"
+#include "RoundTrip.h"
+#include "Socket.h"
 #include "States.h"
 #include "api-managers/ApiManager.h"
 #include "base64.h"
@@ -142,14 +144,12 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
       helper::logInfo(logPrefix + "Creating init-send link on " + ctx.opts.init_send_channel + (ctx.opts.init_recv_address.empty() ? "" : " from address: " + ctx.opts.init_recv_address));
       if (initUsesSingleBidiLink) {
         // Genuinely bidirectional connSM instead of a directional one
-        // aliased to look bidi - the merge mechanism this step migrates.
-        ConnEstablishment initEstablishment{LinkRole::Creator, LinkDirectionality::Bidi};
-        ctx.initSendConnSMHandle = ctx.manager.startConnStateMachineBidi(
-            ctx.handle,
-            ctx.opts.init_send_channel,
-            ctx.opts.init_send_role,
-            ctx.opts.init_send_address,
-            initEstablishment.isCreator());
+        // aliased to look bidi - the merge mechanism Step 3 migrated.
+        ctx.initSendConnSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{ctx.opts.init_send_channel, ctx.opts.init_send_role,
+                         ctx.opts.init_send_address,
+                         ConnEstablishment{LinkRole::Creator, LinkDirectionality::Bidi}});
       } else {
         bool sending = true;
         ctx.initSendConnSMHandle = ctx.manager.
@@ -402,8 +402,11 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
       ctx.data.pop();
 
       try {
-        std::string str{data->begin(), data->end()};
-        nlohmann::json json = nlohmann::json::parse(str);
+        nlohmann::json json;
+        if (!RoundTrip::parseMessage(*data, json)) {
+          helper::logError(logPrefix + "Failed to parse hello message");
+          continue;
+        }
 
         ChannelId initSendChannel = "";
         // LinkAddress initSendLinkAddress = "";
@@ -430,20 +433,13 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
 
         // TODO: validate the channel statements align with the args of the listen run unless we intend to do it dynamically based on client request
 
-        std::string packageId = json.at("packageId");
-        std::string messageB64 = json.at("message");
-        std::vector<uint8_t> packageIdBytes = base64::decode(packageId);
-
-        if (packageIdBytes.size() != packageIdLen) {
-          helper::logError(logPrefix + "Invalid package id len: " +
-                           std::to_string(packageIdBytes.size()));
+        std::string replyPackageId;
+        if (!RoundTrip::decodePackageIdField(json, packageIdLen, replyPackageId)) {
+          helper::logError(logPrefix + "Invalid or missing package id in hello message");
           continue;
         }
 
-        std::string replyPackageId =
-            std::string(packageIdBytes.begin(), packageIdBytes.end());
-
-        std::vector<uint8_t> dialMessage = base64::decode(messageB64);
+        std::vector<uint8_t> dialMessage = RoundTrip::extractPayload(json);
 
         // Pair this hello with the specific connSM/connId it arrived on
         // (not just the parent's first-ever init connection) - required so

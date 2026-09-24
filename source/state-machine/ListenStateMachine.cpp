@@ -23,6 +23,7 @@
 #include "LinkEstablishment.h"
 #include "PluginContainer.h"
 #include "PluginWrapper.h"
+#include "Socket.h"
 #include "States.h"
 #include "api-managers/ApiManager.h"
 #include "base64.h"
@@ -137,9 +138,10 @@ struct StateListenInitial : public ListenState {
     
     // Create the FIRST connection state machine for the initial listener
     // This creates LinkID_0 and waits for the first client to connect
-    ConnEstablishment initialEstablishment{LinkRole::Creator, LinkDirectionality::Bidi};
-    ctx.recvConnSMHandle = ctx.manager.startConnStateMachineBidi(
-        ctx.handle, channelId, role, linkAddress, initialEstablishment.isCreator());
+    ctx.recvConnSMHandle = Socket::establish(
+        ctx.manager, ctx.handle,
+        SocketRequest{channelId, role, linkAddress,
+                     ConnEstablishment{LinkRole::Creator, LinkDirectionality::Bidi}});
 
     if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -230,15 +232,12 @@ struct StateListenWaiting : public ListenState {
         // Pass the existing LinkID from the first connection - all accepts share the same link
         // Each openConnection() on that link will get a new ConnectionID
         // Use the ACTUAL link address from the first connection (not the initial empty/placeholder)
-        ConnEstablishment reuseEstablishment{LinkRole::Loader, LinkDirectionality::Bidi};
-        connSMHandle = ctx.manager.startConnStateMachineBidi(
-            ctx.handle, 
-            ctx.recvChannelId, 
-            ctx.recvRole, 
-            ctx.recvLinkAddress,  // Use the actual link address from first connection
-            reuseEstablishment.isCreator(),  // NOT creating - reusing existing link
-            ctx.firstLinkId  // Reuse the existing LinkID_0
-        );
+        connSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{ctx.recvChannelId, ctx.recvRole,
+                         ctx.recvLinkAddress,  // Use the actual link address from first connection
+                         ConnEstablishment{LinkRole::Loader, LinkDirectionality::Bidi},  // NOT creating - reusing existing link
+                         ctx.firstLinkId});  // Reuse the existing LinkID_0
         
         if (connSMHandle == NULL_RACE_HANDLE) {
           helper::logError(logPrefix + "Failed to start connection state machine for accept()");

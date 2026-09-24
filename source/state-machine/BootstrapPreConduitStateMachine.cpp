@@ -27,6 +27,8 @@
 #include "helper.h"
 #include "BootstrapListenStateMachine.h"
 #include "LinkEstablishment.h"
+#include "RoundTrip.h"
+#include "Socket.h"
 
 namespace Raceboat {
 
@@ -218,10 +220,11 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
       helper::logInfo(logPrefix + "Using a single bidirectional final link for channel '" +
                       ctx.opts.final_send_channel + "'");
       // Genuinely bidirectional connSM instead of a directional one aliased
-      // to look bidi - the merge mechanism this step migrates.
-      ctx.finalSendConnSMHandle = ctx.manager.startConnStateMachineBidi(
-          ctx.handle, ctx.opts.final_send_channel, ctx.opts.final_send_role,
-          "", finalEstablishment.isCreator());
+      // to look bidi - the merge mechanism Step 3 migrated.
+      ctx.finalSendConnSMHandle = Socket::establish(
+          ctx.manager, ctx.handle,
+          SocketRequest{ctx.opts.final_send_channel, ctx.opts.final_send_role,
+                       "", finalEstablishment});
       if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting connection state machine failed");
         return EventResult::NOT_SUPPORTED;
@@ -412,13 +415,9 @@ struct StateBootstrapPreConduitSendResponse : public BootstrapPreConduitState {
     json["finalSendLinkAddress"] = ctx.finalRecvLinkAddress;
     json["finalSendChannel"] = ctx.opts.final_recv_channel;
 
-    std::string message = json.dump();
-    std::vector<uint8_t> bytes(message.begin(), message.end());
-    std::vector<uint8_t> prefixedBytes;
-    prefixedBytes.reserve(bytes.size() + packageIdLen);
-    prefixedBytes.insert(prefixedBytes.end(), ctx.packageId.begin(),
-                         ctx.packageId.end());
-    prefixedBytes.insert(prefixedBytes.end(), bytes.begin(), bytes.end());
+    // Routing prefix is this client's own real packageId, so the dialer's
+    // waiting handle (registered in StateBootstrapDialHelloSent) gets it.
+    std::vector<uint8_t> prefixedBytes = RoundTrip::buildMessage(ctx.packageId, json);
     EncPkg pkg(0, 0, prefixedBytes);
     RaceHandle pkgHandle = ctx.manager.getCore().generateHandle();
     SdkResponse response =

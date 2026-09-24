@@ -20,6 +20,8 @@
 #include "Events.h"
 #include "LinkEstablishment.h"
 #include "PluginWrapper.h"
+#include "RoundTrip.h"
+#include "Socket.h"
 #include "States.h"
 #include "base64.h"
 #include "race/common/EncPkg.h"
@@ -150,14 +152,12 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
       }
       if (initUsesSingleBidiLink) {
         // Genuinely bidirectional connSM instead of a directional one
-        // aliased to look bidi - the merge mechanism this step migrates.
-        ConnEstablishment initEstablishment{LinkRole::Loader, LinkDirectionality::Bidi};
-        ctx.initSendConnSMHandle = ctx.manager.startConnStateMachineBidi(
-            ctx.handle,
-            ctx.opts.init_send_channel,
-            ctx.opts.init_send_role,
-            ctx.opts.init_send_address,
-            initEstablishment.isCreator());
+        // aliased to look bidi - the merge mechanism Step 3 migrated.
+        ctx.initSendConnSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{ctx.opts.init_send_channel, ctx.opts.init_send_role,
+                         ctx.opts.init_send_address,
+                         ConnEstablishment{LinkRole::Loader, LinkDirectionality::Bidi}});
       } else {
         bool sending = true;
         ctx.initSendConnSMHandle = ctx.manager.
@@ -368,8 +368,7 @@ struct StateBootstrapDialSendHello : public BootstrapDialState {
     // TODO: There's better ways to encode than base64 inside json
     helper::logDebug(logPrefix + "encoding packageId");
     nlohmann::json json = {
-        {"packageId", base64::encode(std::vector<uint8_t>(
-                          ctx.packageId.begin(), ctx.packageId.end()))},
+        {"packageId", RoundTrip::encodePackageIdField(ctx.packageId)},
     };
     helper::logDebug(logPrefix + "Creating links");
 
@@ -393,14 +392,11 @@ struct StateBootstrapDialSendHello : public BootstrapDialState {
     }
 
     helper::logDebug(logPrefix + "encoding hello");
-    std::string dataB64 = base64::encode(std::move(ctx.helloData));
-    json["message"] = dataB64;
+    // Well-known all-zero routing prefix - the listener registers this same
+    // tag for its generic "any hello" handler (see ApiBootstrapListenContext).
+    std::vector<uint8_t> bytes = RoundTrip::buildMessage(
+        std::string(packageIdLen, '\0'), json, ctx.helloData);
     ctx.helloData.clear();
-    helper::logDebug(logPrefix + "converting packageId to bytes");
-
-    helper::logDebug(logPrefix + " json.dump");
-    std::string message = std::string(packageIdLen, '\0') + json.dump();
-    std::vector<uint8_t> bytes(message.begin(), message.end());
 
     EncPkg pkg(0, 0, bytes);
     RaceHandle pkgHandle = ctx.manager.getCore().generateHandle();
@@ -457,8 +453,11 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
       ctx.responseData.pop();
 
       try {
-        std::string str{data->begin(), data->end()};
-        nlohmann::json json = nlohmann::json::parse(str);
+        nlohmann::json json;
+        if (!RoundTrip::parseMessage(*data, json)) {
+          helper::logError(logPrefix + "Failed to parse response message");
+          continue;
+        }
         const bool finalUsesSingleBidiLink =
             !ctx.opts.final_recv_channel.empty() &&
             ctx.shouldUseSingleBidiLink(ctx.opts.final_send_channel,
@@ -480,11 +479,12 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
           }
 
           // Genuinely bidirectional connSM instead of a directional one
-          // aliased to look bidi - the merge mechanism this step migrates.
-          ConnEstablishment finalEstablishment{LinkRole::Loader, LinkDirectionality::Bidi};
-          ctx.finalSendConnSMHandle = ctx.manager.startConnStateMachineBidi(
-              ctx.handle, ctx.opts.final_send_channel, ctx.opts.final_send_role,
-              finalAddr, finalEstablishment.isCreator());
+          // aliased to look bidi - the merge mechanism Step 3 migrated.
+          ctx.finalSendConnSMHandle = Socket::establish(
+              ctx.manager, ctx.handle,
+              SocketRequest{ctx.opts.final_send_channel, ctx.opts.final_send_role,
+                           finalAddr,
+                           ConnEstablishment{LinkRole::Loader, LinkDirectionality::Bidi}});
 
           if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
             helper::logError(logPrefix + " starting connection state machine failed");
@@ -507,14 +507,11 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
 
             bool sending = true;
             bool create = false;
-            ctx.finalSendConnSMHandle = ctx.manager.
-              startConnStateMachine(ctx.handle,
-                                    ctx.opts.final_send_channel,
-                                    ctx.opts.final_send_role,
-                                    finalSendLinkAddress,
-                                    create, // is false
-                                    sending // is true
-                                    );
+            ctx.finalSendConnSMHandle = Socket::establish(
+                ctx.manager, ctx.handle,
+                SocketRequest{ctx.opts.final_send_channel, ctx.opts.final_send_role,
+                             finalSendLinkAddress,
+                             ConnEstablishment::fromLegacy(create, sending, false)});
             
             if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
               helper::logError(logPrefix + " starting connection state machine failed");
@@ -534,14 +531,11 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
 
             bool sending = false;
             bool create = false;
-            ctx.finalRecvConnSMHandle = ctx.manager.
-              startConnStateMachine(ctx.handle,
-                                    ctx.opts.final_recv_channel,
-                                    ctx.opts.final_recv_role,
-                                    finalRecvLinkAddress,
-                                    create, // is false
-                                    sending // is false
-                                    );
+            ctx.finalRecvConnSMHandle = Socket::establish(
+                ctx.manager, ctx.handle,
+                SocketRequest{ctx.opts.final_recv_channel, ctx.opts.final_recv_role,
+                             finalRecvLinkAddress,
+                             ConnEstablishment::fromLegacy(create, sending, false)});
             
             if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
               helper::logError(logPrefix + " starting connection state machine failed");
