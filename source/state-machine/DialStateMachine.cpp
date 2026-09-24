@@ -18,6 +18,7 @@
 
 #include "Core.h"
 #include "Events.h"
+#include "LinkEstablishment.h"
 #include "PluginWrapper.h"
 #include "States.h"
 #include "base64.h"
@@ -121,8 +122,9 @@ struct StateDialInitial : public DialState {
       // Create a single bidirectional connection state machine
       // For LD_BIDI channels, dialer should load (creating=false) not create
       // Only create if recvChannel is LD_LOADER_TO_CREATOR or sendChannel is LD_CREATOR_TO_LOADER
+      ConnEstablishment mergedEstablishment{LinkRole::Loader, LinkDirectionality::Bidi};
       ctx.recvConnSMHandle = ctx.manager.startConnStateMachineBidi(
-          ctx.handle, recvChannelId, recvRole, ctx.opts.send_address, false);
+          ctx.handle, recvChannelId, recvRole, ctx.opts.send_address, mergedEstablishment.isCreator());
       
       if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting bidirectional connection state machine failed");
@@ -134,8 +136,10 @@ struct StateDialInitial : public DialState {
       ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
     } else {
       // Original behavior: separate receive connection
+      ConnEstablishment recvEstablishment{LinkRole::Creator, LinkDirectionality::Recv};
       ctx.recvConnSMHandle = ctx.manager.startConnStateMachine(
-          ctx.handle, recvChannelId, recvRole, "", true, false);
+          ctx.handle, recvChannelId, recvRole, "",
+          recvEstablishment.isCreator(), recvEstablishment.isSend());
 
       if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting connection state machine failed");
@@ -216,8 +220,10 @@ struct StateDialWaitingForSendConnection : public DialState {
       return EventResult::NOT_SUPPORTED;
     }
 
+    ConnEstablishment sendEstablishment{LinkRole::Loader, LinkDirectionality::Send};
     ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
-                                                             ctx.handle, sendChannelId, sendRole, sendLinkAddress, false, true);
+                                                             ctx.handle, sendChannelId, sendRole, sendLinkAddress,
+                                                             sendEstablishment.isCreator(), sendEstablishment.isSend());
     if (ctx.sendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
       return EventResult::NOT_SUPPORTED;
