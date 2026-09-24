@@ -1,11 +1,61 @@
 # State Machine Refactor: Branch Summary (`refactoring-state-machines`)
 
-This summarizes the 4-step migration performed on this branch (commits
-`1cad2f9`..`9c0bf4c`, on top of `integration-testing`), the resulting
-architecture, what's now fixed, what's still rough, and suggested next
-steps. Read alongside `link-management.md` (the original architectural
-analysis that motivated this branch) and `Step1.md`-`Step4.md` (per-step
-detail, build/test evidence).
+This summarizes the 4-step migration performed on this branch plus a
+follow-up pass applying the suggested next steps (commits `1cad2f9`..`152b169`,
+on top of `integration-testing`), the resulting architecture, what's now
+fixed, what's still rough, and suggested next steps. Read alongside
+`link-management.md` (the original architectural analysis that motivated
+this branch) and `Step1.md`-`Step4.md` (per-step detail, build/test
+evidence).
+
+## Follow-up: suggested next steps applied (commit `152b169`)
+
+After the initial 4-step migration, the following next steps (below) were
+applied and verified against the full regression suite:
+
+1. **Closed the dialer-side transition gap.** Added the symmetric
+   `EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED` self-loop to
+   `BootstrapDialStateEngine`'s `STATE_BOOTSTRAP_DIAL_WAITING_FOR_CONNECTIONS`
+   and `STATE_BOOTSTRAP_DIAL_WAITING_FOR_FINAL_CONNECTIONS`, matching the fix
+   already applied to the listener side in Step 3.
+2. **Centralized role resolution.** Added `resolveBidiRole(ModeRole)` to
+   `LinkEstablishment.h` (`ModeRole::Listener` -> `LinkRole::Creator`,
+   `ModeRole::Dialer` -> `LinkRole::Loader`) and replaced the 6 call sites
+   that were hardcoding this LD_BIDI tie-break convention with calls into it.
+   The one `LinkRole::Loader` literal that was NOT a tie-break case (the
+   "reuse an existing link" call in `ListenStateMachine.cpp`'s multi-accept
+   path) was deliberately left as a literal - it isn't resolving creator vs.
+   loader for an ambiguous channel, it's inherently a loader regardless of
+   channel type.
+3. **Finished routing every remaining directional call site through
+   `Socket::establish`.** All ~21 previously-direct
+   `ctx.manager.startConnStateMachine(...)` calls across
+   `BootstrapListenStateMachine.cpp`/`BootstrapDialStateMachine.cpp`/
+   `BootstrapPreConduitStateMachine.cpp` (including dead-code branches, for
+   consistency) now go through `Socket::establish`, tagged with an explicit
+   `slot` ("initial"/"final") argument.
+4. **Fixed `link_topology.py`'s same-channel-gid blind spot.**
+   `Socket::establish` now logs a structured, slot-tagged line
+   (`Socket::establish: slot=... channel=... role=... directionality=...`);
+   `link_topology.py` gained `count_socket_establish_events()` to parse it,
+   and `check_final_link_topology` now uses this slot-tagged count as its
+   primary source (falling back to the old channelGid-keyed heuristic, with
+   `[SKIPPED]`, only for logs that predate this instrumentation). **Result:
+   the two previously-`[SKIPPED]` scenarios
+   (`bootstrap-decomposed-decomposed(-multi-client)`,
+   `bootstrap-racebird-racebird(-multi-client)`) now get real `[OK]`
+   assertions instead.**
+6. **Soak-tested combo 1.** Re-ran `bootstrap-racebird-racebird-multi-client`
+   3 additional times this session (on top of the runs from Step 3/4); all
+   passed consistently (~46s each).
+
+**Deliberately not applied**: next step #5 (the literal state-machine-class
+collapse) remains unimplemented, per its own explicit "optional/lower
+priority" framing - it was not requested and the concrete problems it would
+solve (combo 1, code duplication) are already resolved.
+
+All 10 integration scenarios were re-verified fresh after this follow-up
+pass and now **all show `[OK]`** (zero remaining `[SKIPPED]` verdicts).
 
 ## Why this branch exists
 
@@ -115,62 +165,54 @@ flowchart TB
 - `shouldCreateSender`/`shouldCreateReceiver`/`shouldUseSingleBidiLink`
   (`ApiContext.cpp`) are **unchanged** - still role-blind for `LD_BIDI`
   channels, still valid/correct for genuinely asymmetric
-  `LD_CREATOR_TO_LOADER`/`LD_LOADER_TO_CREATOR` channels. Every place that
-  needed to resolve the `LD_BIDI` tie-break already had a hardcoded
-  role-based constant (`LinkRole::Creator` for listener, `LinkRole::Loader`
-  for dialer) predating this branch; that hardcoding is now expressed via
-  `ConnEstablishment` literals instead of bare `true`/`false`, but the
-  *decision logic itself* was not centralized into a single `resolveRole()`
-  function this round (see "Next steps" below).
+  `LD_CREATOR_TO_LOADER`/`LD_LOADER_TO_CREATOR` channels. The `LD_BIDI`
+  tie-break itself is now resolved by the new, centralized
+  `resolveBidiRole(ModeRole)` function (`LinkEstablishment.h`) rather than a
+  literal `LinkRole::Creator`/`Loader` hardcoded independently at each of
+  the 6 merged-link call sites.
+- **Every** connection-establishment call site across channel mode and
+  bootstrap mode (merged and non-merged, ~28 call sites total) now goes
+  through `Socket::establish`, tagged with an explicit `slot`
+  ("channel"/"initial"/"final") argument used for test-log attribution.
 
 ## Validated test coverage
 
 All 10 integration scenarios under `test/integration/scenarios/` pass as of
-`9c0bf4c` (each re-run fresh, not assumed from a prior step):
+`152b169` (each re-run fresh, not assumed from a prior step), and **all now
+show real `[OK]` topology assertions - zero `[SKIPPED]` verdicts remain**:
 
 | Scenario | Initial/final channels | Status |
 |---|---|---|
 | `racebird-client-connect` | channel mode, racebird | PASS |
 | `decomposed-client-connect(-multi-client)` | channel mode, decomposed | PASS |
-| `bootstrap-decomposed-racebird` | decomposed / racebird | PASS |
-| `bootstrap-racebird-multi-client` | decomposed / racebird, multi-client | PASS |
-| `bootstrap-racebird-decomposed(-multi-client)` | racebird / decomposed | PASS |
-| `bootstrap-decomposed-decomposed(-multi-client)` | decomposed / decomposed | PASS (topology check SKIPPED, see below) |
-| `bootstrap-racebird-racebird(-multi-client)` | racebird / racebird ("combo 1") | **PASS - previously broken across multiple sessions** |
+| `bootstrap-decomposed-racebird` | decomposed / racebird | PASS (topology: OK) |
+| `bootstrap-racebird-multi-client` | decomposed / racebird, multi-client | PASS (topology: OK) |
+| `bootstrap-racebird-decomposed(-multi-client)` | racebird / decomposed | PASS (topology: OK) |
+| `bootstrap-decomposed-decomposed(-multi-client)` | decomposed / decomposed | PASS (topology: OK - previously SKIPPED) |
+| `bootstrap-racebird-racebird(-multi-client)` | racebird / racebird ("combo 1") | **PASS (topology: OK) - previously broken across multiple sessions, soak-tested 5x this session** |
 
 ## Remaining problem areas
 
-1. **Dialer-side latent transition gap.** `BootstrapDialStateEngine`'s
-   `STATE_BOOTSTRAP_DIAL_WAITING_FOR_CONNECTIONS`/
-   `STATE_BOOTSTRAP_DIAL_WAITING_FOR_FINAL_CONNECTIONS` states have the same
-   missing-`LINK_ESTABLISHED`-transition pattern that was fixed on the
-   listener side in Step 3. It hasn't caused a failure in any of the 10
-   scenarios because the dialer's own `CONNECTED` event already satisfies
-   its wait gates first, but it's a latent gap, not a proven-safe absence.
-2. **`link_topology.py` can't verify same-channel-gid scenarios.** When
-   initial and final slots use the same channel (the `bootstrap-*-decomposed-
-   decomposed*` and `bootstrap-racebird-racebird*` scenarios), the checker
-   emits `[SKIPPED]` rather than asserting exact create/load counts, because
-   initial-slot link-reuse events and final-slot events land in the same
-   log bucket. This is a test-tooling gap, not known to hide a product bug,
-   but it does mean these scenarios have weaker verification than the
-   others.
-3. **Role decision is still hardcoded per call site, not centralized.**
-   Every `LD_BIDI` tie-break (`ConnEstablishment{LinkRole::Creator, ...}` on
-   the listener, `{LinkRole::Loader, ...}` on the dialer) is still a literal
-   written at each of ~9 call sites rather than derived from one
-   `resolveRole(role_in_mode, channel_properties)`-style function. This
-   matches `link-management.md` §5.1's original recommendation, which this
-   branch did not implement - see "Next steps."
-4. **Non-merged directional call sites are inconsistent in style.** Some
-   (`BootstrapDialStateMachine.cpp`'s `StateBootstrapDialRecvResponse`) were
-   incidentally routed through `Socket::establish` while doing other work in
-   the same function; most others (`init_recv`, non-merged `final_send`/
-   `final_recv` create-or-load pairs) were deliberately left as direct
-   `ctx.manager.startConnStateMachine(...)` calls (Step 4 scope decision).
-   This is a stylistic inconsistency, not a bug, but a future pass could
-   finish routing every call site through `Socket::establish` for
-   uniformity.
+1. ~~Dialer-side latent transition gap.~~ **Resolved.** Symmetric
+   `EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED` self-loops added to
+   `BootstrapDialStateEngine`'s two waiting states.
+2. ~~`link_topology.py` can't verify same-channel-gid scenarios.~~
+   **Resolved.** `Socket::establish` now emits a slot-tagged structured log
+   line; `check_final_link_topology` uses it as the primary count source,
+   eliminating the `[SKIPPED]` verdict for same-gid scenarios (falls back to
+   the old heuristic only for logs predating this instrumentation).
+3. ~~Role decision is still hardcoded per call site, not centralized.~~
+   **Resolved for the `LD_BIDI` tie-break** via `resolveBidiRole(ModeRole)`.
+   Note this is narrower than `link-management.md` §5.1's full proposal
+   (a `resolveRole(ChannelProperties, ModeRole)` that also subsumes the
+   already-correct `LD_CREATOR_TO_LOADER`/`LD_LOADER_TO_CREATOR` resolution
+   via `shouldCreateSender`/`shouldCreateReceiver`) - those two paths remain
+   separate call sites rather than one unified function. Low priority to
+   unify further since both paths are independently correct today.
+4. ~~Non-merged directional call sites are inconsistent in style.~~
+   **Resolved.** Every remaining direct `ctx.manager.startConnStateMachine(...)`
+   call site (including dead-code branches) now goes through
+   `Socket::establish`.
 5. **`Socket`/`RoundTrip` are helper functions, not state-machine instances.**
    Per Step4.md, a literal replacement of the three bootstrap `StateEngine`/
    `Context` class hierarchies with instances of new, generic `Socket`/
@@ -181,40 +223,28 @@ All 10 integration scenarios under `test/integration/scenarios/` pass as of
    opposed to logic duplication, which *is* resolved) still exists in
    `BootstrapListenStateMachine.cpp`/`BootstrapDialStateMachine.cpp`/
    `BootstrapPreConduitStateMachine.cpp`'s state tables themselves.
-6. **Combo 1's fix was validated functionally, not stress-tested.** Both
-   single- and multi-client `bootstrap-racebird-racebird` variants pass
-   reliably across multiple runs this session, but only this session -
-   no long-running/soak testing or larger client counts (3+) have been
-   tried against the new Bidi-merged final-link path.
+6. **Combo 1's fix is now soak-tested within this session, not across
+   sessions or with larger client counts.** Both single- and multi-client
+   `bootstrap-racebird-racebird` variants have now passed reliably across 5
+   repeated runs total this session, but no long-running/overnight soak
+   testing or larger client counts (3+) have been tried against the new
+   Bidi-merged final-link path.
 
-## Suggested next steps (in rough priority order)
+## Suggested next steps (remaining, in rough priority order)
 
-1. **Close the dialer-side transition gap** (problem #1) - add the
-   symmetric `EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED` self-loop to
-   `BootstrapDialStateEngine`'s two waiting states, gated behind the full
-   regression suite, to remove the latent risk proactively rather than
-   waiting for a scenario to surface it.
-2. **Centralize role resolution** (problem #3): introduce a
-   `resolveRole(ChannelProperties, ModeRole)`-style function per
-   `link-management.md` §5.1, replacing the ~9 literal
-   `ConnEstablishment{LinkRole::Creator/Loader, ...}` call sites with calls
-   into it. Lower risk than Steps 1-4 since it's a pure refactor of already-
-   correct hardcoded values into one function, verifiable the same way.
-3. **Fix `link_topology.py`'s same-gid blind spot** (problem #2), per
-   `link-management.md` §5.3 (thread a slot name into the create/load debug
-   lines, or emit one structured summary line per link from a central
-   place) - this is test-infrastructure work, independent of SDK behavior
-   changes, and would let same-channel-gid scenarios get real assertions
-   instead of `[SKIPPED]`.
-4. **Finish routing non-merged call sites through `Socket::establish`**
-   (problem #4) for uniformity - cosmetic, no urgency.
-5. **Consider the literal state-machine collapse** (problem #5) only as a
+1. **Consider the literal state-machine collapse** (problem #5) only as a
    deliberate, separately-scoped follow-up, per Step4.md's guidance: extend
    `ApiManager`'s dispatch core to support generic `Socket`/`RoundTrip`
    context/engine types first, then migrate one bootstrap file at a time,
    each gated by the full suite. Given this area's demonstrated fragility
    (Step 3's revert history), treat as optional/lower priority now that the
    concrete bug (combo 1) and the duplication concern are both resolved.
-6. **Soak/stress-test combo 1** (problem #6) - run `bootstrap-racebird-
-   racebird-multi-client` repeatedly and with more simulated clients before
-   treating it as production-hardened, not just "passes once."
+2. **Extend soak-testing of combo 1** (problem #6) across sessions and with
+   3+ simulated clients, and consider adding a dedicated 3-client scenario
+   file to the permanent suite rather than only ad hoc repeated runs.
+3. **Optionally unify the `LD_BIDI` tie-break and the
+   `LD_CREATOR_TO_LOADER`/`LD_LOADER_TO_CREATOR` resolution paths** (problem
+   #3's residual note) into a single `resolveRole(ChannelProperties,
+   ModeRole)` function per `link-management.md` §5.1's full proposal - purely
+   cosmetic/organizational at this point, since both paths are already
+   independently correct.
