@@ -94,6 +94,11 @@ class Node:
         self.ip = spec["ip"]
         self.slots: Dict[str, str] = spec["slots"]  # slot -> plugin name
         self.composition_name = spec.get("composition_name")
+        # Optional per-slot override, e.g. {"final": "twoSixIndirectCompositionReactive"}
+        # - lets a scenario use a distinct channel gid for one slot so its
+        # manifest entry (and any linkDirectionOverrides targeting it) stays
+        # isolated from other slots sharing the same plugin.
+        self.composition_names: Dict[str, str] = spec.get("composition_names", {})
         self.contributions: Dict[str, NodeContribution] = {}  # slot -> contribution
 
 
@@ -107,7 +112,7 @@ def _process_node(node: Node, registry: Dict[str, Path], adapters: dict, context
             ip=node.ip,
             slot=slot,
             peer_context=context.get((plugin_name, slot), {}),
-            composition_name=node.composition_name,
+            composition_name=node.composition_names.get(slot, node.composition_name),
         )
         node.contributions[slot] = adapter.generate_node_contribution(request)
         if node.role == "listener" and node.contributions[slot].address_output is not None:
