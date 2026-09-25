@@ -17,7 +17,7 @@ import json
 import shutil
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple, Union
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from adapter_types import NodeContribution, NodeRequest  # noqa: E402
@@ -87,38 +87,60 @@ def _yaml_flow(value) -> str:
     return json.dumps(str(value))
 
 
+# A scenario slot's plugin can be a plain string (one plugin fills both the
+# recv and send direction, the long-standing/common case) or a dict
+# {"recv": plugin, "send": plugin} when the two directions of one logical
+# phase (e.g. bootstrap's initial upstream vs downstream) should use
+# genuinely different plugins.
+SlotSpec = Union[str, Dict[str, str]]
+
+
 class Node:
     def __init__(self, spec: dict):
         self.role = spec["role"]
         self.id = spec["id"]
         self.ip = spec["ip"]
-        self.slots: Dict[str, str] = spec["slots"]  # slot -> plugin name
+        self.slots: Dict[str, SlotSpec] = spec["slots"]  # slot -> plugin name(s)
         self.composition_name = spec.get("composition_name")
         # Optional per-slot override, e.g. {"final": "twoSixIndirectCompositionReactive"}
         # - lets a scenario use a distinct channel gid for one slot so its
         # manifest entry (and any linkDirectionOverrides targeting it) stays
         # isolated from other slots sharing the same plugin.
         self.composition_names: Dict[str, str] = spec.get("composition_names", {})
-        self.contributions: Dict[str, NodeContribution] = {}  # slot -> contribution
+        # (slot, "recv"|"send") -> contribution. For a plain-string slot both
+        # directions share the SAME contribution instance (one adapter call).
+        self.contributions: Dict[Tuple[str, str], NodeContribution] = {}
+        self.contribution_plugins: Dict[Tuple[str, str], str] = {}
 
 
 def _process_node(node: Node, registry: Dict[str, Path], adapters: dict, context: dict):
-    for slot, plugin_name in node.slots.items():
-        plugin_dir = registry[plugin_name]
-        adapter = adapters.setdefault(plugin_name, load_adapter(plugin_dir))
-        request = NodeRequest(
-            role=node.role,
-            node_id=node.id,
-            ip=node.ip,
-            slot=slot,
-            peer_context=context.get((plugin_name, slot), {}),
-            composition_name=node.composition_names.get(slot, node.composition_name),
+    for slot, plugin_spec in node.slots.items():
+        directions = (
+            plugin_spec if isinstance(plugin_spec, dict)
+            else {"recv": plugin_spec, "send": plugin_spec}
         )
-        node.contributions[slot] = adapter.generate_node_contribution(request)
-        if node.role == "listener" and node.contributions[slot].address_output is not None:
-            context.setdefault((plugin_name, slot), {})[node.id] = node.contributions[
-                slot
-            ].address_output
+        contribution_by_plugin: Dict[str, NodeContribution] = {}
+        for direction, plugin_name in directions.items():
+            contribution = contribution_by_plugin.get(plugin_name)
+            if contribution is None:
+                plugin_dir = registry[plugin_name]
+                adapter = adapters.setdefault(plugin_name, load_adapter(plugin_dir))
+                request = NodeRequest(
+                    role=node.role,
+                    node_id=node.id,
+                    ip=node.ip,
+                    slot=slot,
+                    peer_context=context.get((plugin_name, slot), {}),
+                    composition_name=node.composition_names.get(slot, node.composition_name),
+                )
+                contribution = adapter.generate_node_contribution(request)
+                contribution_by_plugin[plugin_name] = contribution
+                if node.role == "listener" and contribution.address_output is not None:
+                    context.setdefault((plugin_name, slot), {})[node.id] = (
+                        contribution.address_output
+                    )
+            node.contributions[(slot, direction)] = contribution
+            node.contribution_plugins[(slot, direction)] = plugin_name
 
 
 def _build_command(scenario: dict, node: Node) -> str:
@@ -128,18 +150,31 @@ def _build_command(scenario: dict, node: Node) -> str:
         "--logto", "/tmp/raceboat_%s.log" % node.role,
         "--dir", "/kits",
     ]
-    for slot, contribution in node.contributions.items():
+    for slot in node.slots:
         recv_flag, send_flag = SLOT_CHANNEL_FLAGS[slot]
-        parts.append(f"--{recv_flag}={contribution.channel_name}")
-        parts.append(f"--{send_flag}={contribution.channel_name}")
+        parts.append(f"--{recv_flag}={node.contributions[(slot, 'recv')].channel_name}")
+        parts.append(f"--{send_flag}={node.contributions[(slot, 'send')].channel_name}")
     if "timeout" in scenario:
         parts.append(f"--timeout={scenario['timeout']}")
-    for slot, contribution in node.contributions.items():
+    seen_contributions: set = set()
+    for (slot, direction), contribution in node.contributions.items():
+        if id(contribution) in seen_contributions:
+            continue
+        seen_contributions.add(id(contribution))
+        is_mixed_slot = isinstance(node.slots[slot], dict)
         for key, value in contribution.params.items():
             parts.append(f"--param {key}={_quote_shell_arg(str(value))}")
         for flag, value in contribution.cli_flags.items():
             if slot == "final" and flag in ADDRESS_FLAGS:
                 continue
+            if is_mixed_slot and flag in ADDRESS_FLAGS:
+                # This plugin fills only ONE direction of a mixed slot - its
+                # adapter names the address flag from the NODE's role
+                # (listener always calls it "recv-address", connector
+                # "send-address") regardless of which direction it actually
+                # serves here, so attribute it to the flag matching the
+                # direction it's actually assigned to in this slot.
+                flag = "recv-address" if direction == "recv" else "send-address"
             parts.append(f"--{flag}={_quote_shell_arg(value)}")
     # YAML folded scalars (">") join lines with a single space on their own -
     # no shell-style "\" continuations, which would end up as literal
@@ -158,7 +193,11 @@ def _merge_sidecar_services(nodes: List[Node]) -> Dict[str, dict]:
 def _merge_kits(node: Node, output_dir: Path) -> None:
     kits_dir = output_dir / "kits" / node.id
     kits_dir.mkdir(parents=True, exist_ok=True)
+    seen_contributions: set = set()
     for contribution in node.contributions.values():
+        if id(contribution) in seen_contributions:
+            continue
+        seen_contributions.add(id(contribution))
         dest = kits_dir / contribution.kit_dir.name
         if dest.exists():
             shutil.rmtree(dest)
@@ -205,8 +244,12 @@ def _apply_link_direction_overrides(scenario: dict, nodes: List[Node], output_di
 
     patched: set = set()
     for node in nodes:
-        for slot, contribution in node.contributions.items():
-            plugin_name = node.slots[slot]
+        seen_contributions: set = set()
+        for (slot, _direction), contribution in node.contributions.items():
+            if id(contribution) in seen_contributions:
+                continue
+            seen_contributions.add(id(contribution))
+            plugin_name = node.contribution_plugins[(slot, _direction)]
             slot_overrides = overrides.get(plugin_name, {})
             if slot not in slot_overrides:
                 continue

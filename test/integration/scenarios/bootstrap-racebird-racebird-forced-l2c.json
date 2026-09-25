@@ -1,0 +1,24 @@
+{
+  "id": "bootstrap-racebird-racebird-forced-l2c",
+  "mode": "bootstrap-connect",
+  "wait_time": 20,
+  "timeout": 60,
+  "network": {"name": "brr-forced-l2c-network", "subnet": "10.35.1.0/24"},
+  "linkDirectionOverrides": {
+    "racebird": { "initial": "LD_LOADER_TO_CREATOR", "final": "LD_LOADER_TO_CREATOR" }
+  },
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "rrl2cserver",
+      "ip": "10.35.1.3",
+      "slots": {"initial": "racebird", "final": "racebird"}
+    },
+    {
+      "role": "connector",
+      "id": "rrl2cclient",
+      "ip": "10.35.1.2",
+      "slots": {"initial": "racebird", "final": "racebird"}
+    }
+  ]
+}

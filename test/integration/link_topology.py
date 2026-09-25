@@ -146,6 +146,13 @@ def check_final_link_topology(scenario: dict, logs_dir: Path) -> Tuple[bool, Lis
         final_plugin = listener.get("slots", {}).get("final")
         if final_plugin is None:
             continue
+        if isinstance(final_plugin, dict):
+            lines.append(
+                f"  [SKIPPED] {listener['id']} (final slot): uses a per-direction "
+                f"mixed plugin spec ({final_plugin}) - this checker only supports "
+                f"one plugin per slot"
+            )
+            continue
         channel_gid = resolve_channel_gid(final_plugin, "final", registry)
 
         # When the same plugin (and therefore the same channelGid, e.g.
@@ -158,6 +165,8 @@ def check_final_link_topology(scenario: dict, logs_dir: Path) -> Tuple[bool, Lis
         # instrumentation (no Socket::establish lines found at all).
         initial_plugin = listener.get("slots", {}).get("initial")
         same_gid_as_initial = False
+        if isinstance(initial_plugin, dict):
+            initial_plugin = None
         if initial_plugin is not None:
             initial_channel_gid = resolve_channel_gid(initial_plugin, "initial", registry)
             same_gid_as_initial = initial_channel_gid == channel_gid

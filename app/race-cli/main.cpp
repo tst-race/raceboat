@@ -1092,6 +1092,7 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
       opts.init_send_address; // generated in handle_server_connect
   conn_opt.init_recv_channel = opts.init_recv_channel;
   conn_opt.init_recv_role = opts.init_recv_role;
+  conn_opt.init_recv_address = opts.init_recv_address;
   conn_opt.final_send_channel = opts.final_send_channel;
   conn_opt.final_send_role = opts.final_send_role;
   conn_opt.final_recv_channel = opts.final_recv_channel;
