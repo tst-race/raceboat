@@ -269,16 +269,21 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
       ctx.finalRecvConnId = ctx.finalSendConnId;
       ctx.finalRecvLinkAddress = ctx.finalSendLinkAddress;
     } else {
-      // shouldCreateSender()/shouldCreateReceiver() only consult the
-      // channel's static LD_BIDI manifest property, so they return the same
-      // answer regardless of role - the dialer must always wait for the
-      // listener to create and publish both final links via the hello
-      // response (see StateBootstrapPreConduitSendResponse/StateBootstrapDialRecvResponse).
-      create = false;
+      // shouldCreateSender()/shouldCreateReceiver() are role-blind (hence
+      // unreliable) only for LD_BIDI channels, where the pre-existing
+      // "dialer always loads, waits for the listener's response" convention
+      // is preserved exactly below. For a genuinely asymmetric channel
+      // they ARE reliable, and creating+embedding the address in the hello
+      // (StateBootstrapDialSendHello already does this conditionally) lets
+      // the listener load it instead (StateBootstrapPreConduitAccepted).
+      create = ctx.isBidiChannel(ctx.opts.final_send_channel)
+                  ? false
+                  : ctx.shouldCreateSender(ctx.opts.final_send_channel);
+      ctx.createdFinalSend = create;
 
       // If we are NOT creating then we have to wait for the server to create and send us the address as a hello-response
       if (create) {
-        helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_send_channel + (ctx.opts.init_recv_address.empty() ? "" : " from address: " + ctx.opts.init_recv_address));
+        helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_send_channel);
         bool sending = true;
         ctx.finalSendConnSMHandle = Socket::establish(
             ctx.manager, ctx.handle,
@@ -297,7 +302,10 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
       }
     
       // Handle finalial server->client aka final_recv
-      create = false;
+      create = ctx.isBidiChannel(ctx.opts.final_recv_channel)
+                  ? false
+                  : ctx.shouldCreateReceiver(ctx.opts.final_recv_channel);
+      ctx.createdFinalRecv = create;
 
       // If we are NOT creating then we are waiting for the server to create and send the address as a hello-response
       if (create) {
@@ -500,7 +508,17 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
           ctx.finalRecvLinkAddress = ctx.finalSendLinkAddress;
           ctx.finalUsingSingleBidiConnection = true;
         } else {
-          if (ctx.finalSendConnId.empty()) {
+          // finalSendConnSMHandle (not finalSendConnId) is the right gate
+          // here - if WE already created this link (createdFinalSend), a
+          // fresh listening socket won't have a real peer connection yet
+          // either, but we must not try to create/load a second one; only
+          // load from the response if we haven't started anything for this
+          // direction ourselves.
+          if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
+            if (!json.contains("finalSendLinkAddress")) {
+              helper::logError(logPrefix + "finalSendLinkAddress missing from response and we didn't create final-send ourselves");
+              continue;
+            }
             LinkAddress finalSendLinkAddress = json.at("finalSendLinkAddress");
             std::string finalSendChannel = json.at("finalSendChannel");
             helper::logInfo(logPrefix + "Loading final-send link: " + ctx.opts.final_send_channel + " " + finalSendLinkAddress);
@@ -525,7 +543,11 @@ struct StateBootstrapDialRecvResponse : public BootstrapDialState {
             ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
             
           }
-          if (ctx.finalRecvConnId.empty()) {
+          if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
+            if (!json.contains("finalRecvLinkAddress")) {
+              helper::logError(logPrefix + "finalRecvLinkAddress missing from response and we didn't create final-recv ourselves");
+              continue;
+            }
             LinkAddress finalRecvLinkAddress = json.at("finalRecvLinkAddress");
             std::string finalRecvChannel = json.at("finalRecvChannel");
             helper::logInfo(logPrefix + "Loading final-recv-link: " + ctx.opts.final_recv_channel + " " + finalRecvLinkAddress);

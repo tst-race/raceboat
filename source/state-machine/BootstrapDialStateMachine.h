@@ -69,6 +69,14 @@ public:
   
   bool initUsingSingleBidiConnection = false;  // true if init uses one bidi connection
   bool finalUsingSingleBidiConnection = false;  // true if final uses one bidi connection
+
+  // Whether THIS side (the dialer) created (vs loaded) each final link -
+  // only a created link's address needs embedding in the hello (a loaded
+  // link's address comes from the listener's response), and only a created
+  // link needs its address (not a real peer connection) awaited before the
+  // hello can be sent - see StateBootstrapDialWaitingForConnections.
+  bool createdFinalSend = false;
+  bool createdFinalRecv = false;
 };
 
 class BootstrapDialStateEngine : public StateEngine {

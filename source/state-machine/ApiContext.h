@@ -56,6 +56,14 @@ public:
   // address, so LD_CREATOR_TO_LOADER (which would require the dialer/sender
   // to create it instead) is never valid here, regardless of merge status.
   bool isValidInitSendChannelDirection(const ChannelId &channelId);
+
+  // True only for a channel whose manifest-declared linkDirection is
+  // exactly LD_BIDI, for which shouldCreateSender/shouldCreateReceiver are
+  // role-blind (same answer regardless of which side asks) and therefore
+  // unreliable - callers should fall back to a hardcoded role-based
+  // convention in that case, and only trust shouldCreateSender/Receiver for
+  // genuinely asymmetric (LD_CREATOR_TO_LOADER/LD_LOADER_TO_CREATOR) channels.
+  bool isBidiChannel(const ChannelId &channelId);
   
   // Detects if a single bidirectional link should be used for both send and receive
   bool shouldUseSingleBidiLink(const ChannelId &sendChannel, 
