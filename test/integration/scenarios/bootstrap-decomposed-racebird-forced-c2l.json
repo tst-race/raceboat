@@ -1,0 +1,30 @@
+{
+  "id": "bootstrap-decomposed-racebird-forced-c2l",
+  "mode": "bootstrap-connect",
+  "wait_time": 20,
+  "timeout": 30,
+  "network": {"name": "bdr-forced-c2l-network", "subnet": "10.30.1.0/24"},
+  "linkDirectionOverrides": {
+    "racebird": "LD_CREATOR_TO_LOADER"
+  },
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "fc2lserver",
+      "ip": "10.30.1.3",
+      "slots": {
+        "initial": "decomposed-exemplars",
+        "final": "racebird"
+      }
+    },
+    {
+      "role": "connector",
+      "id": "fc2lclient",
+      "ip": "10.30.1.2",
+      "slots": {
+        "initial": "decomposed-exemplars",
+        "final": "racebird"
+      }
+    }
+  ]
+}

@@ -27,6 +27,11 @@ SCENARIOS_DIR = INTEGRATION_DIR / "scenarios"
 GENERATED_DIR = INTEGRATION_DIR / "generated"
 REGISTRY_PATH = INTEGRATION_DIR / "plugin_registry.json"
 
+# Valid raceboat LinkDirection values (source/common/ChannelProperties.cpp
+# linkDirectionFromString) - the only manifest field
+# linkDirectionOverrides is allowed to set.
+LINK_DIRECTIONS = {"LD_BIDI", "LD_CREATOR_TO_LOADER", "LD_LOADER_TO_CREATOR"}
+
 # race-cli mode flag per (scenario mode, node role).
 MODE_ROLE_FLAGS = {
     "client-connect": {"listener": "server-connect", "connector": "client-connect"},
@@ -155,6 +160,49 @@ def _merge_kits(node: Node, output_dir: Path) -> None:
         shutil.copytree(contribution.kit_dir, dest)
 
 
+def _apply_link_direction_overrides(scenario: dict, nodes: List[Node], output_dir: Path) -> None:
+    """Test-only hook: lets a scenario "pretend" a channel's manifest-declared
+    linkDirection is something other than its real value, so integration
+    tests can exercise the SDK's LD_CREATOR_TO_LOADER/LD_LOADER_TO_CREATOR
+    code paths (ApiContext::shouldCreateSender/shouldCreateReceiver) even
+    though every plugin currently available for testing (racebird,
+    decomposed-exemplars) is natively LD_BIDI. Patches only the manifest.json
+    already copied into this scenario's generated/<id>/kits/<node>/ - never
+    the plugin's own source/kit tree, so other scenarios/runs are unaffected.
+    """
+    overrides = scenario.get("linkDirectionOverrides", {})
+    if not overrides:
+        return
+    for plugin_name, link_direction in overrides.items():
+        if link_direction not in LINK_DIRECTIONS:
+            raise ValueError(
+                f"linkDirectionOverrides: unknown linkDirection '{link_direction}' "
+                f"for plugin '{plugin_name}' (expected one of {sorted(LINK_DIRECTIONS)})"
+            )
+
+    patched: set = set()
+    for node in nodes:
+        for slot, contribution in node.contributions.items():
+            plugin_name = node.slots[slot]
+            if plugin_name not in overrides:
+                continue
+            manifest_path = output_dir / "kits" / node.id / contribution.kit_dir.name / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            channel_gid = contribution.channel_name
+            props = manifest.get("channel_properties", {}).get(channel_gid)
+            if props is None:
+                raise ValueError(
+                    f"linkDirectionOverrides: channel '{channel_gid}' not found in "
+                    f"channel_properties of {manifest_path} (plugin '{plugin_name}')"
+                )
+            props["linkDirection"] = overrides[plugin_name]
+            manifest_path.write_text(json.dumps(manifest, indent=4))
+            patched.add((node.id, plugin_name, channel_gid))
+    for node_id, plugin_name, channel_gid in sorted(patched):
+        print(f"  [linkDirectionOverrides] {node_id}: {plugin_name} ({channel_gid}) "
+              f"-> {overrides[plugin_name]}")
+
+
 def _render_compose(scenario: dict, nodes: List[Node], output_dir: Path, image_tag: str) -> str:
     network = scenario.get("network", {"name": "race-network", "subnet": "10.18.1.0/24"})
     lines = ["services:"]
@@ -226,6 +274,7 @@ def generate(scenario_id: str, image_tag: str) -> Path:
     for node in nodes:
         _merge_kits(node, output_dir)
         (output_dir / "logs" / node.id).mkdir(parents=True, exist_ok=True)
+    _apply_link_direction_overrides(scenario, nodes, output_dir)
 
     compose_text = _render_compose(scenario, nodes, output_dir, image_tag)
     compose_path = output_dir / "docker-compose.yml"
