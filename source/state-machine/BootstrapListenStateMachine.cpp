@@ -121,6 +121,19 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
+    // init_recv_channel carries the same upstream (dialer -> listener)
+    // traffic the dialer calls its own init_send_channel - validate from
+    // this (listener) side too, since either side could be misconfigured.
+    if (!ctx.isValidInitSendChannelDirection(ctx.opts.init_recv_channel)) {
+      helper::logError(logPrefix + "init_recv_channel '" + ctx.opts.init_recv_channel +
+                       "' is declared LD_CREATOR_TO_LOADER, which is never valid for the "
+                       "bootstrap first-contact (upstream) channel (the listener must be "
+                       "able to create/publish this address, not the dialer)");
+      ctx.listenCb(ApiStatus::CHANNEL_INVALID, "", {});
+      ctx.listenCb = {};
+      return EventResult::NOT_SUPPORTED;
+    }
+
     // *** INIT SEND ***
     // Handle initial server->client aka init_send
     // shouldCreateSender()/shouldCreateReceiver() only consult the channel's

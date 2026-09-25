@@ -49,6 +49,13 @@ public:
                     bool useForRecv);
   bool shouldCreateSender(const ChannelId &channelId);
   bool shouldCreateReceiver(const ChannelId &channelId);
+
+  // The bootstrap "init send" (upstream) channel is how the dialer makes
+  // first contact with a listener address it already knows out-of-band -
+  // the listener must always be the one able to create/publish that
+  // address, so LD_CREATOR_TO_LOADER (which would require the dialer/sender
+  // to create it instead) is never valid here, regardless of merge status.
+  bool isValidInitSendChannelDirection(const ChannelId &channelId);
   
   // Detects if a single bidirectional link should be used for both send and receive
   bool shouldUseSingleBidiLink(const ChannelId &sendChannel, 

@@ -108,6 +108,16 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
+    if (!ctx.isValidInitSendChannelDirection(ctx.opts.init_send_channel)) {
+      helper::logError(logPrefix + "init_send_channel '" + ctx.opts.init_send_channel +
+                       "' is declared LD_CREATOR_TO_LOADER, which is never valid for the "
+                       "bootstrap first-contact channel (the listener must be able to "
+                       "create/publish this address, not the dialer)");
+      ctx.dialCallback(ApiStatus::CHANNEL_INVALID, {}, {});
+      ctx.dialCallback = {};
+      return EventResult::NOT_SUPPORTED;
+    }
+
     // Generate and set packageId
     if (ctx.packageId.empty()) {
       std::vector<uint8_t> packageIdBytes =

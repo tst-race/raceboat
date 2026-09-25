@@ -169,22 +169,41 @@ def _apply_link_direction_overrides(scenario: dict, nodes: List[Node], output_di
     decomposed-exemplars) is natively LD_BIDI. Patches only the manifest.json
     already copied into this scenario's generated/<id>/kits/<node>/ - never
     the plugin's own source/kit tree, so other scenarios/runs are unaffected.
+
+    Keyed per (plugin, slot) - {"<plugin>": {"<slot>": "<linkDirection>"}} -
+    rather than just per-plugin, since the same plugin can be used for both
+    the "initial" and "final" slots (e.g. bootstrap-decomposed-decomposed)
+    and only one of those slots may be a sensible one to force: in
+    particular, init_send_channel (the dialer's first-contact channel to an
+    out-of-band-known address) can never realistically be
+    LD_CREATOR_TO_LOADER, since that would require the dialer to publish a
+    fresh address for a listener that doesn't yet know this dialer exists.
+    Also note plugins whose sendType is ST_EPHEM_SYNC (a live, synchronous
+    socket - e.g. racebird's obfs4) can't meaningfully be forced into
+    LD_CREATOR_TO_LOADER/LD_LOADER_TO_CREATOR either, regardless of slot:
+    both peers still need to be simultaneously present to rendezvous, which
+    is only representative of real asymmetric-role channels when paired
+    with an ST_STORED_ASYNC-like (store-and-forward, e.g. whiteboard-based)
+    transport such as decomposed-exemplars' twoSixIndirect.
     """
     overrides = scenario.get("linkDirectionOverrides", {})
     if not overrides:
         return
-    for plugin_name, link_direction in overrides.items():
-        if link_direction not in LINK_DIRECTIONS:
-            raise ValueError(
-                f"linkDirectionOverrides: unknown linkDirection '{link_direction}' "
-                f"for plugin '{plugin_name}' (expected one of {sorted(LINK_DIRECTIONS)})"
-            )
+    for plugin_name, slot_overrides in overrides.items():
+        for slot, link_direction in slot_overrides.items():
+            if link_direction not in LINK_DIRECTIONS:
+                raise ValueError(
+                    f"linkDirectionOverrides: unknown linkDirection '{link_direction}' "
+                    f"for plugin '{plugin_name}' slot '{slot}' "
+                    f"(expected one of {sorted(LINK_DIRECTIONS)})"
+                )
 
     patched: set = set()
     for node in nodes:
         for slot, contribution in node.contributions.items():
             plugin_name = node.slots[slot]
-            if plugin_name not in overrides:
+            slot_overrides = overrides.get(plugin_name, {})
+            if slot not in slot_overrides:
                 continue
             manifest_path = output_dir / "kits" / node.id / contribution.kit_dir.name / "manifest.json"
             manifest = json.loads(manifest_path.read_text())
@@ -195,12 +214,12 @@ def _apply_link_direction_overrides(scenario: dict, nodes: List[Node], output_di
                     f"linkDirectionOverrides: channel '{channel_gid}' not found in "
                     f"channel_properties of {manifest_path} (plugin '{plugin_name}')"
                 )
-            props["linkDirection"] = overrides[plugin_name]
+            props["linkDirection"] = slot_overrides[slot]
             manifest_path.write_text(json.dumps(manifest, indent=4))
-            patched.add((node.id, plugin_name, channel_gid))
-    for node_id, plugin_name, channel_gid in sorted(patched):
-        print(f"  [linkDirectionOverrides] {node_id}: {plugin_name} ({channel_gid}) "
-              f"-> {overrides[plugin_name]}")
+            patched.add((node.id, plugin_name, slot, channel_gid, slot_overrides[slot]))
+    for node_id, plugin_name, slot, channel_gid, link_direction in sorted(patched):
+        print(f"  [linkDirectionOverrides] {node_id}: {plugin_name} ({channel_gid}, "
+              f"slot={slot}) -> {link_direction}")
 
 
 def _render_compose(scenario: dict, nodes: List[Node], output_dir: Path, image_tag: str) -> str:
