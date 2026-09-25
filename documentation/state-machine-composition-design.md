@@ -218,6 +218,41 @@ analogous to Steps 1-4:
    manifest field per `link-management.md` §5.5? (Recommend: new declared
    field - inferring it has no reliable signal today, which is exactly why
    the current code hardcodes per-channel-family behavior.)
+4. **Which `LinkRole` values are even semantically valid per channel, not
+   just per merge-status.** `init_send_channel`/`init_recv_channel`/
+   `final_send_channel`/`final_recv_channel` are four *independent* channel
+   IDs (not necessarily the same plugin, and not necessarily paired) - each
+   has its own manifest-declared `linkDirection`, resolved role-blind by
+   `shouldCreateSender`/`shouldCreateReceiver`. Not every combination of
+   slot x direction x `LinkRole` is sensible:
+   - **`init_send_channel` (the "upstream" bootstrap rendezvous channel the
+     dialer uses to make first contact with an address it already knows
+     out-of-band) can never be `LD_CREATOR_TO_LOADER`.** That would require
+     the *dialer* (the channel's sender) to be the creator - i.e. the
+     dialer publishes a fresh address that the listener would then have to
+     discover and dial into, despite the listener not yet knowing this
+     specific dialer exists. Only `LD_BIDI` (resolved via the existing
+     listener-creates convention) or `LD_LOADER_TO_CREATOR` (listener/
+     receiver creates, dialer loads the out-of-band address) make sense.
+   - **Every other channel/direction - `init_recv_channel` ("initial
+     downstream"), and both `final_send_channel`/`final_recv_channel`
+     ("final" upstream and downstream) - can validly be any of `LD_BIDI`,
+     `LD_LOADER_TO_CREATOR`, or `LD_CREATOR_TO_LOADER`.** By the time these
+     links are established, contact has already been made once (either via
+     the initial upstream channel, or - for `init_recv` specifically -
+     because its address can be bundled into the same out-of-band
+     distribution as `init_send`'s), so either side is free to create and
+     communicate its address through whatever channel is already live
+     (the hello payload, or the hello response).
+   - This is a genuinely different axis from the `ModeRole`/
+     `resolveBidiRole` tie-break (which only matters *when* `LD_BIDI` makes
+     the role ambiguous) - it's a validity constraint on `LD_CREATOR_TO_LOADER`
+     specifically for one channel slot, regardless of ambiguity. It should
+     inform both (a) the eventual `resolveRole` centralization (§5.1) as an
+     explicit precondition/assertion, and (b) test-scenario construction -
+     a scenario that forces `init_send_channel` to `LD_CREATOR_TO_LOADER` is
+     testing a nonsensical configuration, not a real gap, and should either
+     be rejected early with a clear error or simply never constructed.
 
 ## Recommendation
 
