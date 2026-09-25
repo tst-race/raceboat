@@ -82,7 +82,20 @@ void ApiBootstrapDialContext::updateConnStateMachineConnected(RaceHandle context
 
 void ApiBootstrapDialContext::updateConnStateMachineLinkEstablished(
   RaceHandle contextHandle, LinkID /* linkId */, std::string linkAddress) {
-  if (this->finalSendConnSMHandle == contextHandle) {
+  if (this->initSendConnSMHandle == contextHandle) {
+    this->initSendLinkReady = true;
+    this->initSendLinkAddress = linkAddress;
+    // For a single bidirectional init link, initRecvConnSMHandle is
+    // aliased to the same handle - update both sides so neither is left
+    // permanently blocked (see StateBootstrapDialWaitingForConnections).
+    if (this->initRecvConnSMHandle == contextHandle) {
+      this->initRecvLinkReady = true;
+      this->initRecvLinkAddress = linkAddress;
+    }
+  } else if (this->initRecvConnSMHandle == contextHandle) {
+    this->initRecvLinkReady = true;
+    this->initRecvLinkAddress = linkAddress;
+  } else if (this->finalSendConnSMHandle == contextHandle) {
     this->finalSendLinkReady = true;
     this->finalSendLinkAddress = linkAddress;
     // For a single bidirectional final link, finalRecvConnSMHandle is
@@ -342,10 +355,19 @@ struct StateBootstrapDialWaitingForConnections : public BootstrapDialState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
     // For each potential awaited connection, check if the handle is non-null (meaning we ARE expecting it) AND the connection ID is not set (meaning it has not finished opening yet)
-    if (ctx.initRecvConnSMHandle != NULL_RACE_HANDLE and ctx.initRecvConnId.empty()) {
+    // init-recv is a link WE created/loaded whose address alone is enough -
+    // it only gets embedded in the hello JSON below, nothing is actually
+    // sent over it yet - so waiting for a real peer connection here is a
+    // chicken-and-egg deadlock for a link nobody else knows about until the
+    // hello (built from this same address) is sent. init-send, by contrast,
+    // is what the hello is physically transmitted over via sendPackage() a
+    // few lines down, so it genuinely needs a real ConnId, not just a
+    // known address - no LinkReady bypass for it.
+    if (ctx.initRecvConnSMHandle != NULL_RACE_HANDLE &&
+        !ctx.initRecvLinkReady && ctx.initRecvConnId.empty()) {
       return EventResult::SUCCESS;
     }
-    if (ctx.initSendConnSMHandle != NULL_RACE_HANDLE and ctx.initSendConnId.empty()) {
+    if (ctx.initSendConnSMHandle != NULL_RACE_HANDLE && ctx.initSendConnId.empty()) {
       return EventResult::SUCCESS;
     }
     if (ctx.finalRecvConnSMHandle != NULL_RACE_HANDLE &&
@@ -434,6 +456,15 @@ struct StateBootstrapDialHelloSent : public BootstrapDialState {
 
     // If any final links are missing, we must be waiting for the server to send us addresses in a response
     if (ctx.finalSendConnId.empty() or ctx.finalRecvConnId.empty()) {
+      // registerPackageId needs a REAL connId to correctly route the
+      // response - unlike the hello's address embedding (SendHello), which
+      // only needed the address known. If we created init-recv ourselves,
+      // the server may not have dialed in yet; wait here (re-entered via
+      // the CONNECTED self-loop below) instead of registering against an
+      // empty connId and losing the response.
+      if (ctx.initRecvConnId.empty()) {
+        return EventResult::SUCCESS;
+      }
       // Register to listen for the response from the server
       ctx.manager.registerPackageId(ctx, ctx.initRecvConnId, ctx.packageId);
     
@@ -688,6 +719,10 @@ BootstrapDialStateEngine::BootstrapDialStateEngine() {
     declareStateTransition(STATE_BOOTSTRAP_DIAL_WAITING_FOR_CONNECTIONS, EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED, STATE_BOOTSTRAP_DIAL_WAITING_FOR_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_WAITING_FOR_CONNECTIONS, EVENT_SATISFIED,                    STATE_BOOTSTRAP_DIAL_SEND_HELLO);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_SEND_HELLO,              EVENT_PACKAGE_SENT,                 STATE_BOOTSTRAP_DIAL_HELLO_SENT);
+    // Self-loop: if we created init-recv ourselves, the server may not have
+    // dialed in yet when hello-sending completes - re-enter once the real
+    // connection lands (see StateBootstrapDialHelloSent::enter's connId guard).
+    declareStateTransition(STATE_BOOTSTRAP_DIAL_HELLO_SENT,              EVENT_CONN_STATE_MACHINE_CONNECTED,                STATE_BOOTSTRAP_DIAL_HELLO_SENT);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_HELLO_SENT,              EVENT_NEEDS_RECV,                STATE_BOOTSTRAP_DIAL_AWAIT_RESPONSE);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_AWAIT_RESPONSE,          EVENT_RECEIVE_PACKAGE,                STATE_BOOTSTRAP_DIAL_RECV_RESPONSE);
     declareStateTransition(STATE_BOOTSTRAP_DIAL_RECV_RESPONSE,           EVENT_SATISFIED,              STATE_BOOTSTRAP_DIAL_WAITING_FOR_FINAL_CONNECTIONS);

@@ -96,7 +96,20 @@ void ApiBootstrapListenContext::updateConnStateMachineConnected(
 
 void ApiBootstrapListenContext::updateConnStateMachineLinkEstablished(
   RaceHandle contextHandle, LinkID /* linkId */, std::string linkAddress) {
-  if (this->finalRecvConnSMHandle == contextHandle) {
+  if (this->initRecvConnSMHandle == contextHandle) {
+    this->initRecvLinkReady = true;
+    this->initRecvLinkAddress = linkAddress;
+    // For a single bidirectional init link, initSendConnSMHandle is aliased
+    // to the same handle - update both sides so neither is left
+    // permanently blocked (see StateBootstrapListenWaitingForConnections).
+    if (this->initSendConnSMHandle == contextHandle) {
+      this->initSendLinkReady = true;
+      this->initSendLinkAddress = linkAddress;
+    }
+  } else if (this->initSendConnSMHandle == contextHandle) {
+    this->initSendLinkReady = true;
+    this->initSendLinkAddress = linkAddress;
+  } else if (this->finalRecvConnSMHandle == contextHandle) {
     this->finalRecvLinkReady = true;
     this->finalRecvLinkAddress = linkAddress;
   } else if (this->finalSendConnSMHandle == contextHandle) {
@@ -309,10 +322,20 @@ struct StateBootstrapListenWaitingForConnections : public BootstrapListenState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
     // For each potential awaited connection, check if the handle is non-null (meaning we ARE expecting it) AND the connection ID is not set (meaning it has not finished opening yet)
-    if (ctx.initRecvConnSMHandle != NULL_RACE_HANDLE and ctx.initRecvConnId.empty()) {
+    // init-send is a link WE created/loaded whose address alone is enough -
+    // it only gets embedded in the listenCb address JSON below for
+    // out-of-band publishing, nothing is actually sent over it yet - so
+    // waiting for a real peer connection here is a chicken-and-egg deadlock
+    // for a link the peer can't reach until that same address is
+    // published. init-recv, by contrast, has its ConnId registered as a
+    // real package route a few lines down (registerPackageId), so it
+    // genuinely needs a real ConnId, not just a known address - no
+    // LinkReady bypass for it.
+    if (ctx.initRecvConnSMHandle != NULL_RACE_HANDLE && ctx.initRecvConnId.empty()) {
       return EventResult::SUCCESS;
     }
-    if (ctx.initSendConnSMHandle != NULL_RACE_HANDLE and ctx.initSendConnId.empty()) {
+    if (ctx.initSendConnSMHandle != NULL_RACE_HANDLE &&
+        !ctx.initSendLinkReady && ctx.initSendConnId.empty()) {
       return EventResult::SUCCESS;
     }
     if (ctx.finalRecvConnSMHandle != NULL_RACE_HANDLE &&

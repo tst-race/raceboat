@@ -52,9 +52,11 @@ public:
   RaceHandle initSendConnSMHandle;
   ConnectionID initSendConnId;
   std::string initSendLinkAddress;
+  bool initSendLinkReady = false;
   RaceHandle initRecvConnSMHandle;
   ConnectionID initRecvConnId;
   std::string initRecvLinkAddress;
+  bool initRecvLinkReady = false;
 
   RaceHandle finalSendConnSMHandle;
   ConnectionID finalSendConnId;
