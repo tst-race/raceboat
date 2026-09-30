@@ -1,0 +1,13 @@
+# Best-effort default-convention spec (2 connectors, no linkDirectionOverrides).
+# Both slots use racebird's obfs4 (merges -> 1 link/connector). `listener`
+# aggregates counts across both connectors (dialer/dialer2), `connector`
+# (role keyword) auto-expands to each independently.
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 2}
+  2:
+    - {node: connector, action: LOAD, channel: obfs4, slot: initial, count: 1}
+  3:
+    - {node: listener, action: CREATE, channel: obfs4, slot: final, count: 2}
+  4:
+    - {node: connector, action: LOAD, channel: obfs4, slot: final, count: 1}

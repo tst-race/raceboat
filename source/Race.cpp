@@ -35,6 +35,7 @@ std::string recvOptionsToString(const ReceiveOptions &recvOptions) {
   ss << "alt_channel: '" << recvOptions.alt_channel << "', ";
   ss << "send_role: '" << recvOptions.send_role << "', ";
   ss << "recv_role: '" << recvOptions.recv_role << "', ";
+  ss << "send_address: '" << recvOptions.send_address << "', ";
   ss << "timeout_ms: '" << recvOptions.timeout_ms << "'}";
   return ss.str();
 }
@@ -47,6 +48,7 @@ std::string sendOptionsToString(const SendOptions &sendOptions) {
   ss << "send_channel: '" << sendOptions.send_channel << "', ";
   ss << "alt_channel: '" << sendOptions.alt_channel << "', ";
   ss << "send_address: '" << sendOptions.send_address << "', ";
+  ss << "recv_address: '" << sendOptions.recv_address << "', ";
   ss << "send_role: '" << sendOptions.send_role << "', ";
   ss << "recv_role: '" << sendOptions.recv_role << "', ";
   ss << "timeout_ms: '" << sendOptions.timeout_ms << "'}";

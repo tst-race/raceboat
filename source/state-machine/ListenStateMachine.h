@@ -42,7 +42,12 @@ public:
 
 public:
   ReceiveOptions opts;
-  std::queue<std::shared_ptr<std::vector<uint8_t>>> data;
+  // Each queued dial message is tagged with the connId it actually arrived
+  // on, so it can be routed with the correct connId even if other clients'
+  // connSMs connect in between (recvConnId below is a single shared field
+  // overwritten by every connSM's connect event - not safe for per-message
+  // routing when multiple clients share one link).
+  std::queue<std::pair<ConnectionID, std::shared_ptr<std::vector<uint8_t>>>> data;
   std::function<void(ApiStatus, LinkAddress, RaceHandle)> listenCb;
   std::deque<std::function<void(ApiStatus, RaceHandle, ConduitProperties)>> acceptCb;
   std::function<void(ApiStatus)> closeCb;
@@ -67,6 +72,13 @@ public:
   
   // Track whether the initial connection SM (recvConnSMHandle) has been used for an accept
   bool initialConnSMUsed = false;
+
+  // Pre-established send link for replying (see ReceiveOptions::send_address),
+  // reused by every accepted conduit instead of each creating its own
+  // redundant duplicate link from the address its dial handshake supplies.
+  RaceHandle presetSendConnSMHandle = NULL_RACE_HANDLE;
+  ConnectionID presetSendConnId;
+  bool presetSendLinkReady = false;
 
   std::queue<RaceHandle> preConduitSM;
 };

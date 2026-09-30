@@ -1,0 +1,30 @@
+# NEEDS AUDIT (highest uncertainty of any spec in this directory): BOTH slots
+# are genuinely mixed (different plugin per direction: listener
+# initial-recv=racebird/initial-send=decomposed-exemplars,
+# final-recv=decomposed-exemplars/final-send=racebird; connector is the
+# mirror image), AND "initial" additionally has linkDirectionOverrides on
+# both racebird (LD_LOADER_TO_CREATOR) and decomposed-exemplars
+# (LD_CREATOR_TO_LOADER).
+#
+# This assumes those "initial" overrides end up being no-ops in practice: in
+# a mixed slot each node's recv/send assignment per channel is already fixed
+# by the scenario config (unlike a plain bidi slot, where a single channel's
+# creator/loader role is what linkDirectionOverrides actually flips), so the
+# same "whoever RECEIVES creates, whoever SENDs loads" convention used in
+# bootstrap-mixed-initial-downstream-c2l.yaml is applied uniformly to both
+# slots here too. This has NOT been confirmed against a real run - if this
+# scenario's actual logs don't match, the "initial" overrides are the most
+# likely explanation and should be investigated first.
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}
+    - {node: connector, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
+  2:
+    - {node: connector, action: LOAD, channel: obfs4, slot: initial, count: 1}
+    - {node: listener, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
+  3:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
+    - {node: connector, action: CREATE, channel: obfs4, slot: final, count: 1}
+  4:
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}
+    - {node: listener, action: LOAD, channel: obfs4, slot: final, count: 1}

@@ -1,7 +1,7 @@
 {
   "id": "bootstrap-decomposed-decomposed-forced-final-c2l",
   "mode": "bootstrap-connect",
-  "wait_time": 20,
+  "wait_time": 45,
   "timeout": 120,
   "network": {"name": "bdd-forced-final-c2l-network", "subnet": "10.31.1.0/24"},
   "linkDirectionOverrides": {
@@ -12,21 +12,23 @@
   "nodes": [
     {
       "role": "listener",
-      "id": "ffc2lserver",
+      "id": "listener",
       "ip": "10.31.1.3",
       "slots": {
         "initial": "decomposed-exemplars",
         "final": "decomposed-exemplars"
-      }
+      },
+      "composition_names": {"initial": "twoSixIndirectCompositionFile"}
     },
     {
       "role": "connector",
-      "id": "ffc2lclient",
+      "id": "dialer",
       "ip": "10.31.1.2",
       "slots": {
         "initial": "decomposed-exemplars",
         "final": "decomposed-exemplars"
-      }
+      },
+      "composition_names": {"initial": "twoSixIndirectCompositionFile"}
     }
   ]
 }

@@ -52,18 +52,24 @@ void ApiListenContext::updateClose(RaceHandle /* handle */,
 
 void ApiListenContext::updateReceiveEncPkg(
     ConnectionID connId, std::shared_ptr<std::vector<uint8_t>> _data) {
-  // Legacy queue for backwards compatibility (dial messages as JSON)
-  this->data.push(_data);
+  // Tag with the connId this message actually arrived on so it's routed
+  // correctly regardless of which connSM connects/disconnects afterward.
+  this->data.push({connId, _data});
   
-  // For new accept() model: track which connection each message came from
-  // This allows us to match hello messages to specific accept() calls
   helper::logDebug("ApiListenContext::updateReceiveEncPkg: received message from connection " + connId);
 };
 void ApiListenContext::updateConnStateMachineConnected(
-    RaceHandle /* connSMHandle */, ConnectionID connId,
+    RaceHandle connSMHandle, ConnectionID connId,
     std::string linkAddress, LinkID linkId) {
   const std::string logPrefix = "ApiListenContext::updateConnStateMachineConnected: ";
-  
+
+  if (connSMHandle == presetSendConnSMHandle) {
+    presetSendConnId = connId;
+    presetSendLinkReady = true;
+    helper::logDebug(logPrefix + "Preset send link ready: connId=" + connId);
+    return;
+  }
+
   // Store the LinkID from the first connection - all subsequent accepts will reuse this
   if (firstLinkId.empty() && !linkId.empty()) {
     firstLinkId = linkId;
@@ -149,6 +155,24 @@ struct StateListenInitial : public ListenState {
     }
 
     ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
+
+    // Pre-establish the reply send link once, up front, when the caller
+    // knows it out of band (ReceiveOptions::send_address) - so every
+    // accepted conduit reuses ONE link instead of each creating its own
+    // duplicate from whatever address its dial handshake happens to carry.
+    if (!ctx.opts.send_address.empty()) {
+      ctx.presetSendConnSMHandle = Socket::establish(
+          ctx.manager, ctx.handle,
+          SocketRequest{ctx.opts.send_channel, ctx.opts.send_role, ctx.opts.send_address,
+                       ConnEstablishment{LinkRole::Loader, LinkDirectionality::Send}});
+
+      if (ctx.presetSendConnSMHandle == NULL_RACE_HANDLE) {
+        helper::logError(logPrefix + " starting preset send connection state machine failed");
+        return EventResult::NOT_SUPPORTED;
+      }
+
+      ctx.manager.registerHandle(ctx, ctx.presetSendConnSMHandle);
+    }
 
     return EventResult::SUCCESS;
   }
@@ -257,7 +281,7 @@ struct StateListenWaiting : public ListenState {
     // Process dial messages from clients
     // ALL clients send dial messages specifying packageId, replyChannel, and linkAddress
     while (!ctx.data.empty()) {
-      auto data = std::move(ctx.data.front());
+      auto [dialConnId, data] = std::move(ctx.data.front());
       ctx.data.pop();
 
       try {
@@ -291,11 +315,21 @@ struct StateListenWaiting : public ListenState {
 
         // Note: If linkAddress is empty in dial message, PreConduitSM will reuse the existing connection
         // If linkAddress is specified, PreConduitSM will create a new link/connection
-        
+
+        // Use the connId this specific dial message actually arrived on
+        // (not ctx.recvConnId, which is shared/overwritten across all
+        // accepted connSMs and can be stale by the time this message is
+        // processed if another client has connected in the meantime).
+        // When a preset send link is configured (ReceiveOptions::
+        // send_address), ignore the address the client's own handshake
+        // supplies and reuse that one link for every conduit instead.
         RaceHandle preConnSMHandle = ctx.manager.startPreConduitStateMachine(
-            ctx.handle, ctx.recvConnSMHandle, ctx.recvConnId,
+            ctx.handle, ctx.recvConnSMHandle, dialConnId,
             ctx.opts.recv_channel, ctx.opts.send_channel, ctx.opts.send_role,
-            linkAddress, replyPackageId, {std::move(dialMessage)});
+            ctx.presetSendLinkReady ? "" : linkAddress, replyPackageId,
+            {std::move(dialMessage)},
+            ctx.presetSendLinkReady ? ctx.presetSendConnSMHandle : NULL_RACE_HANDLE,
+            ctx.presetSendLinkReady ? ctx.presetSendConnId : ConnectionID{});
 
         if (preConnSMHandle == NULL_RACE_HANDLE) {
           helper::logError(logPrefix +

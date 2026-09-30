@@ -137,11 +137,15 @@ struct StateDialInitial : public DialState {
       ctx.sendConnSMHandle = ctx.recvConnSMHandle;
       ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
     } else {
-      // Original behavior: separate receive connection
+      // Original behavior: separate receive connection. If the caller
+      // pre-specified a recv_address (e.g. so multiple dialers can share one
+      // known reply address), load it instead of creating a fresh one.
+      bool loadingRecvAddress = not ctx.opts.recv_address.empty();
       ctx.recvConnSMHandle = Socket::establish(
           ctx.manager, ctx.handle,
-          SocketRequest{recvChannelId, recvRole, "",
-                       ConnEstablishment{LinkRole::Creator, LinkDirectionality::Recv}});
+          SocketRequest{recvChannelId, recvRole, ctx.opts.recv_address,
+                       ConnEstablishment{loadingRecvAddress ? LinkRole::Loader : LinkRole::Creator,
+                                         LinkDirectionality::Recv}});
 
       if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting connection state machine failed");

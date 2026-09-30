@@ -32,7 +32,9 @@ public:
       const ConnectionID &_recvConnId, const ChannelId &_recvChannel,
       const ChannelId &_sendChannel, const std::string &_sendRole,
       const std::string &_sendLinkAddress, const std::string &_packageId,
-      std::vector<std::vector<uint8_t>> recvMessages) override;
+      std::vector<std::vector<uint8_t>> recvMessages,
+      RaceHandle _existingSendConnSMHandle = NULL_RACE_HANDLE,
+      const ConnectionID &_existingSendConnId = "") override;
   virtual void
   updateReceiveEncPkg(ConnectionID connId,
                       std::shared_ptr<std::vector<uint8_t>> data) override;
@@ -53,6 +55,12 @@ public:
   std::string sendRole;
   LinkAddress sendLinkAddress;
   ConnectionID sendConnId;
+
+  // Pre-established send link to reuse (see ReceiveOptions::send_address),
+  // instead of creating a new one from sendLinkAddress. Non-empty connId
+  // means "already connected, skip straight to reuse".
+  RaceHandle existingSendConnSMHandle = NULL_RACE_HANDLE;
+  ConnectionID existingSendConnId;
 
   RaceHandle recvConnSMHandle;
   ConnectionID recvConnId;
