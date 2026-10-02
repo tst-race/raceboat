@@ -245,6 +245,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
+          build-contexts: ghcr.io/tst-race/raceboat/raceboat-plugin-builder=docker-image://ghcr.io/tst-race/raceboat/raceboat-plugin-builder:${{ steps.meta.outputs.version }}
 
   # Builds the racebird/decomposed-exemplars plugin kits needed by
   # test/integration's scenario suite (test/integration/plugin_registry.json
@@ -362,4 +363,3 @@ jobs:
           name: integration-test-logs
           path: raceboat/test/integration/generated
           retention-days: 5
-          build-contexts: ghcr.io/tst-race/raceboat/raceboat-plugin-builder=docker-image://ghcr.io/tst-race/raceboat/raceboat-plugin-builder:${{ steps.meta.outputs.version }}

@@ -37,7 +37,7 @@ DECOMPOSED_TEST_DIR = INTEGRATION_DIR.parents[2] / "decomposed-exemplars" / "tes
 sys.path.insert(0, str(INTEGRATION_DIR))
 sys.path.insert(0, str(DECOMPOSED_TEST_DIR))
 from adapter_types import NodeRequest  # noqa: E402
-from generate_scenario import _quote_shell_arg, _yaml_flow  # noqa: E402
+from generate_scenario import _host_user_directive, _quote_shell_arg, _yaml_flow  # noqa: E402
 import adapter as decomposed_adapter  # noqa: E402
 
 GENERATED_DIR = INTEGRATION_DIR / "generated" / "shared-upstream-downstream-hashtags"
@@ -122,6 +122,7 @@ def generate(image_tag: str) -> Path:
         lines.append(f"  {node_id}:")
         lines.append(f"    image: ghcr.io/tst-race/raceboat/raceboat-runtime:{image_tag}")
         lines.append(f"    container_name: {node_id}")
+        lines.append(f'    user: "{_host_user_directive()}"')
         lines.append("    depends_on:")
         if role == "connector":
             lines.append(f"      {SERVER_ID}:")

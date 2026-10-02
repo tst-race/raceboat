@@ -14,6 +14,7 @@ lives here - that's entirely owned by each plugin's adapter.py.
 import argparse
 import importlib.util
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -70,6 +71,15 @@ def _quote_shell_arg(value: str) -> str:
     """Wrap in double quotes, escaping embedded double quotes (matches the
     hand-authored racebird compose file's convention for JSON-valued flags)."""
     return '"' + value.replace('"', '\\"') + '"'
+
+
+def _host_user_directive() -> str:
+    """Node containers default to root (no USER in raceboat-runtime-image), so
+    anything they write into bind-mounted ./kits/./logs under generated/<id>/
+    ends up root-owned on the host. Running as the invoking host user/group
+    instead makes those files owned by the user, matching the rest of
+    generated/ and avoiding a `sudo rm -rf` to clean up."""
+    return f"{os.getuid()}:{os.getgid()}"
 
 
 def _yaml_flow(value) -> str:
@@ -277,6 +287,7 @@ def _render_compose(scenario: dict, nodes: List[Node], output_dir: Path, image_t
         lines.append(f"  {node.id}:")
         lines.append(f"    image: ghcr.io/tst-race/raceboat/raceboat-runtime:{image_tag}")
         lines.append(f"    container_name: {node.id}")
+        lines.append(f'    user: "{_host_user_directive()}"')
         listener_ids = [n.id for n in nodes if n.role == "listener"]
         sidecars = _merge_sidecar_services(nodes)
         has_dependencies = (node.role == "connector" and listener_ids) or sidecars
