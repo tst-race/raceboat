@@ -208,7 +208,12 @@ public:
       const ConnectionID &recvConnId, const ChannelId &recvChannel,
       const ChannelId &sendChannel, const std::string &sendRole,
       const std::string &sendLinkAddress, const std::string &packageId,
-      std::vector<std::vector<uint8_t>> recvMessages);
+      std::vector<std::vector<uint8_t>> recvMessages,
+      // Non-null when the listener has a pre-established send link (see
+      // ReceiveOptions::send_address) to reuse instead of creating a new
+      // one from sendLinkAddress - avoids one duplicate link per client.
+      RaceHandle existingSendConnSMHandle = NULL_RACE_HANDLE,
+      const ConnectionID &existingSendConnId = "");
   virtual RaceHandle startBootstrapPreConduitStateMachine(
       RaceHandle contextHandle, 
       const ApiBootstrapListenContext &listenContext,

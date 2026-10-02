@@ -1,0 +1,9 @@
+# Best-effort default convention for client-connect mode: the listener
+# (server) creates its listen link(s), the connector (client) loads them.
+# decomposed-exemplars (LD_BIDI+TT_MULTICAST) never merges send/recv into one
+# physical link, so there are 2 links for the single "channel" slot.
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, count: 2}
+  2:
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, count: 2}

@@ -246,3 +246,120 @@ jobs:
           cache-from: ${{ steps.cache.outputs.cache-from }}
           cache-to: ${{ steps.cache.outputs.cache-to }}
           build-contexts: ghcr.io/tst-race/raceboat/raceboat-plugin-builder=docker-image://ghcr.io/tst-race/raceboat/raceboat-plugin-builder:${{ steps.meta.outputs.version }}
+
+  # Builds the racebird/decomposed-exemplars plugin kits needed by
+  # test/integration's scenario suite (test/integration/plugin_registry.json
+  # expects them checked out as siblings of raceboat) - built once here,
+  # inside the plugin-builder image (same toolchain each plugin's own CI
+  # uses), and handed off as artifacts so integration-tests doesn't need a
+  # container job itself (it needs a real docker daemon for docker compose).
+  plugin-artifacts:
+    needs: [plugin-builder-image]
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/tst-race/raceboat/raceboat-plugin-builder:${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
+    strategy:
+      matrix:
+        plugin: [racebird, decomposed-exemplars]
+    steps:
+      - name: Checkout ${{ matrix.plugin }}
+        uses: actions/checkout@v3
+        with:
+          repository: tst-race/${{ matrix.plugin }}
+          path: ${{ matrix.plugin }}
+
+      - name: Build ${{ matrix.plugin }} artifacts
+        working-directory: ${{ matrix.plugin }}
+        env:
+          GOFLAGS: "-buildvcs=false"
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/${{ matrix.plugin }}"
+          ./build_artifacts.sh
+
+      - name: Create Build Artifact
+        working-directory: ${{ matrix.plugin }}
+        run: tar czf "${{ matrix.plugin }}-kit.tar.gz" ./kit
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: "${{ matrix.plugin }}-kit"
+          path: "${{ matrix.plugin }}/${{ matrix.plugin }}-kit.tar.gz"
+          retention-days: 1
+
+  integration-tests:
+    needs: [runtime-image, plugin-artifacts]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout raceboat
+        uses: actions/checkout@v3
+        with:
+          path: raceboat
+
+      - name: Checkout racebird
+        uses: actions/checkout@v3
+        with:
+          repository: tst-race/racebird
+          path: racebird
+
+      - name: Checkout decomposed-exemplars
+        uses: actions/checkout@v3
+        with:
+          repository: tst-race/decomposed-exemplars
+          path: decomposed-exemplars
+
+      - name: Download racebird build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: racebird-kit
+          path: racebird
+
+      - name: Download decomposed-exemplars build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: decomposed-exemplars-kit
+          path: decomposed-exemplars
+
+      - name: Extract plugin kits
+        run: |
+          tar xzf racebird/racebird-kit.tar.gz -C racebird
+          tar xzf decomposed-exemplars/decomposed-exemplars-kit.tar.gz -C decomposed-exemplars
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Python test dependencies
+        run: pip install --quiet pyyaml
+
+      - name: Run scenario integration test suite
+        working-directory: raceboat/test/integration
+        run: |
+          python3 run_all_scenarios.py \
+            --image-tag "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}" \
+            --fail-fast \
+            --skip bootstrap-decomposed-decomposed-forced-final-c2l
+
+      - name: Run standalone shared-address/timeout-zero tests
+        working-directory: raceboat/test/integration
+        run: |
+          IMAGE_TAG="${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}"
+          python3 test-shared-upstream-downstream-hashtags.py --image-tag "$IMAGE_TAG"
+          python3 test-timeout-zero-teardown.py --image-tag "$IMAGE_TAG"
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-logs
+          path: raceboat/test/integration/generated
+          retention-days: 5

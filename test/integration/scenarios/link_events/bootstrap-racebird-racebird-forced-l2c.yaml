@@ -1,0 +1,25 @@
+# Based on real log evidence (see raceboat_connector.log for this scenario's
+# dialer node) - structurally identical to the confirmed
+# bootstrap-decomposed-decomposed-final-l2c.yaml example (same
+# LD_LOADER_TO_CREATOR override on both slots), just with racebird's obfs4
+# channel instead of decomposed-exemplars's twoSixIndirectComposition, and a
+# single connector instead of two. The connector-side sequence below (LOAD
+# initial -> CREATE initial -> CREATE final -> ... -> LOAD final) matches the
+# attached log's Socket::establish lines exactly; the listener-side ordering
+# is inferred by analogy (no listener log was available to confirm) - audit
+# against listener's log if in doubt.
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}
+  2:
+    - {node: connector, action: LOAD, channel: obfs4, slot: initial, count: 1}
+    - {node: connector, action: CREATE, channel: obfs4, slot: initial, count: 1}
+    - {node: connector, action: CREATE, channel: obfs4, slot: final, count: 1}
+  3:
+    - {node: listener, action: LOAD, channel: obfs4, slot: initial, count: 1}
+    - {node: listener, action: LOAD, channel: obfs4, slot: final, count: 1}
+    - {node: listener, action: CREATE, channel: obfs4, slot: final, count: 1}
+  4:
+    - {node: listener, action: LOAD, channel: obfs4, slot: initial, count: 1}
+  5:
+    - {node: connector, action: LOAD, channel: obfs4, slot: final, count: 1}

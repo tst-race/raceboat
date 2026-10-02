@@ -1,0 +1,9 @@
+# Best-effort default convention for client-connect mode (2 connectors). See
+# decomposed-client-connect.yaml for the per-channel reasoning; `listener`
+# aggregates 2 links/connector * 2 connectors = 4, `connector` (role keyword)
+# auto-expands to each of dialer/dialer2 independently expecting 2 loads.
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, count: 4}
+  2:
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, count: 2}

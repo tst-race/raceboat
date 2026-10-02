@@ -14,10 +14,11 @@ lives here - that's entirely owned by each plugin's adapter.py.
 import argparse
 import importlib.util
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple, Union
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from adapter_types import NodeContribution, NodeRequest  # noqa: E402
@@ -26,6 +27,11 @@ INTEGRATION_DIR = Path(__file__).resolve().parent
 SCENARIOS_DIR = INTEGRATION_DIR / "scenarios"
 GENERATED_DIR = INTEGRATION_DIR / "generated"
 REGISTRY_PATH = INTEGRATION_DIR / "plugin_registry.json"
+
+# Valid raceboat LinkDirection values (source/common/ChannelProperties.cpp
+# linkDirectionFromString) - the only manifest field
+# linkDirectionOverrides is allowed to set.
+LINK_DIRECTIONS = {"LD_BIDI", "LD_CREATOR_TO_LOADER", "LD_LOADER_TO_CREATOR"}
 
 # race-cli mode flag per (scenario mode, node role).
 MODE_ROLE_FLAGS = {
@@ -67,6 +73,15 @@ def _quote_shell_arg(value: str) -> str:
     return '"' + value.replace('"', '\\"') + '"'
 
 
+def _host_user_directive() -> str:
+    """Node containers default to root (no USER in raceboat-runtime-image), so
+    anything they write into bind-mounted ./kits/./logs under generated/<id>/
+    ends up root-owned on the host. Running as the invoking host user/group
+    instead makes those files owned by the user, matching the rest of
+    generated/ and avoiding a `sudo rm -rf` to clean up."""
+    return f"{os.getuid()}:{os.getgid()}"
+
+
 def _yaml_flow(value) -> str:
     """Render a Python value as a YAML flow-style scalar/collection, for
     embedding adapter-supplied sidecar service fields (e.g. environment maps,
@@ -82,33 +97,60 @@ def _yaml_flow(value) -> str:
     return json.dumps(str(value))
 
 
+# A scenario slot's plugin can be a plain string (one plugin fills both the
+# recv and send direction, the long-standing/common case) or a dict
+# {"recv": plugin, "send": plugin} when the two directions of one logical
+# phase (e.g. bootstrap's initial upstream vs downstream) should use
+# genuinely different plugins.
+SlotSpec = Union[str, Dict[str, str]]
+
+
 class Node:
     def __init__(self, spec: dict):
         self.role = spec["role"]
         self.id = spec["id"]
         self.ip = spec["ip"]
-        self.slots: Dict[str, str] = spec["slots"]  # slot -> plugin name
+        self.slots: Dict[str, SlotSpec] = spec["slots"]  # slot -> plugin name(s)
         self.composition_name = spec.get("composition_name")
-        self.contributions: Dict[str, NodeContribution] = {}  # slot -> contribution
+        # Optional per-slot override, e.g. {"final": "twoSixIndirectCompositionReactive"}
+        # - lets a scenario use a distinct channel gid for one slot so its
+        # manifest entry (and any linkDirectionOverrides targeting it) stays
+        # isolated from other slots sharing the same plugin.
+        self.composition_names: Dict[str, str] = spec.get("composition_names", {})
+        # (slot, "recv"|"send") -> contribution. For a plain-string slot both
+        # directions share the SAME contribution instance (one adapter call).
+        self.contributions: Dict[Tuple[str, str], NodeContribution] = {}
+        self.contribution_plugins: Dict[Tuple[str, str], str] = {}
 
 
 def _process_node(node: Node, registry: Dict[str, Path], adapters: dict, context: dict):
-    for slot, plugin_name in node.slots.items():
-        plugin_dir = registry[plugin_name]
-        adapter = adapters.setdefault(plugin_name, load_adapter(plugin_dir))
-        request = NodeRequest(
-            role=node.role,
-            node_id=node.id,
-            ip=node.ip,
-            slot=slot,
-            peer_context=context.get((plugin_name, slot), {}),
-            composition_name=node.composition_name,
+    for slot, plugin_spec in node.slots.items():
+        directions = (
+            plugin_spec if isinstance(plugin_spec, dict)
+            else {"recv": plugin_spec, "send": plugin_spec}
         )
-        node.contributions[slot] = adapter.generate_node_contribution(request)
-        if node.role == "listener" and node.contributions[slot].address_output is not None:
-            context.setdefault((plugin_name, slot), {})[node.id] = node.contributions[
-                slot
-            ].address_output
+        contribution_by_plugin: Dict[str, NodeContribution] = {}
+        for direction, plugin_name in directions.items():
+            contribution = contribution_by_plugin.get(plugin_name)
+            if contribution is None:
+                plugin_dir = registry[plugin_name]
+                adapter = adapters.setdefault(plugin_name, load_adapter(plugin_dir))
+                request = NodeRequest(
+                    role=node.role,
+                    node_id=node.id,
+                    ip=node.ip,
+                    slot=slot,
+                    peer_context=context.get((plugin_name, slot), {}),
+                    composition_name=node.composition_names.get(slot, node.composition_name),
+                )
+                contribution = adapter.generate_node_contribution(request)
+                contribution_by_plugin[plugin_name] = contribution
+                if node.role == "listener" and contribution.address_output is not None:
+                    context.setdefault((plugin_name, slot), {})[node.id] = (
+                        contribution.address_output
+                    )
+            node.contributions[(slot, direction)] = contribution
+            node.contribution_plugins[(slot, direction)] = plugin_name
 
 
 def _build_command(scenario: dict, node: Node) -> str:
@@ -118,18 +160,31 @@ def _build_command(scenario: dict, node: Node) -> str:
         "--logto", "/tmp/raceboat_%s.log" % node.role,
         "--dir", "/kits",
     ]
-    for slot, contribution in node.contributions.items():
+    for slot in node.slots:
         recv_flag, send_flag = SLOT_CHANNEL_FLAGS[slot]
-        parts.append(f"--{recv_flag}={contribution.channel_name}")
-        parts.append(f"--{send_flag}={contribution.channel_name}")
+        parts.append(f"--{recv_flag}={node.contributions[(slot, 'recv')].channel_name}")
+        parts.append(f"--{send_flag}={node.contributions[(slot, 'send')].channel_name}")
     if "timeout" in scenario:
         parts.append(f"--timeout={scenario['timeout']}")
-    for slot, contribution in node.contributions.items():
+    seen_contributions: set = set()
+    for (slot, direction), contribution in node.contributions.items():
+        if id(contribution) in seen_contributions:
+            continue
+        seen_contributions.add(id(contribution))
+        is_mixed_slot = isinstance(node.slots[slot], dict)
         for key, value in contribution.params.items():
             parts.append(f"--param {key}={_quote_shell_arg(str(value))}")
         for flag, value in contribution.cli_flags.items():
             if slot == "final" and flag in ADDRESS_FLAGS:
                 continue
+            if is_mixed_slot and flag in ADDRESS_FLAGS:
+                # This plugin fills only ONE direction of a mixed slot - its
+                # adapter names the address flag from the NODE's role
+                # (listener always calls it "recv-address", connector
+                # "send-address") regardless of which direction it actually
+                # serves here, so attribute it to the flag matching the
+                # direction it's actually assigned to in this slot.
+                flag = "recv-address" if direction == "recv" else "send-address"
             parts.append(f"--{flag}={_quote_shell_arg(value)}")
     # YAML folded scalars (">") join lines with a single space on their own -
     # no shell-style "\" continuations, which would end up as literal
@@ -148,11 +203,81 @@ def _merge_sidecar_services(nodes: List[Node]) -> Dict[str, dict]:
 def _merge_kits(node: Node, output_dir: Path) -> None:
     kits_dir = output_dir / "kits" / node.id
     kits_dir.mkdir(parents=True, exist_ok=True)
+    seen_contributions: set = set()
     for contribution in node.contributions.values():
+        if id(contribution) in seen_contributions:
+            continue
+        seen_contributions.add(id(contribution))
         dest = kits_dir / contribution.kit_dir.name
         if dest.exists():
             shutil.rmtree(dest)
         shutil.copytree(contribution.kit_dir, dest)
+
+
+def _apply_link_direction_overrides(scenario: dict, nodes: List[Node], output_dir: Path) -> None:
+    """Test-only hook: lets a scenario "pretend" a channel's manifest-declared
+    linkDirection is something other than its real value, so integration
+    tests can exercise the SDK's LD_CREATOR_TO_LOADER/LD_LOADER_TO_CREATOR
+    code paths (ApiContext::shouldCreateSender/shouldCreateReceiver) even
+    though every plugin currently available for testing (racebird,
+    decomposed-exemplars) is natively LD_BIDI. Patches only the manifest.json
+    already copied into this scenario's generated/<id>/kits/<node>/ - never
+    the plugin's own source/kit tree, so other scenarios/runs are unaffected.
+
+    Keyed per (plugin, slot) - {"<plugin>": {"<slot>": "<linkDirection>"}} -
+    rather than just per-plugin, since the same plugin can be used for both
+    the "initial" and "final" slots (e.g. bootstrap-decomposed-decomposed)
+    and only one of those slots may be a sensible one to force: in
+    particular, init_send_channel (the dialer's first-contact channel to an
+    out-of-band-known address) can never realistically be
+    LD_CREATOR_TO_LOADER, since that would require the dialer to publish a
+    fresh address for a listener that doesn't yet know this dialer exists.
+    Also note plugins whose sendType is ST_EPHEM_SYNC (a live, synchronous
+    socket - e.g. racebird's obfs4) can't meaningfully be forced into
+    LD_CREATOR_TO_LOADER/LD_LOADER_TO_CREATOR either, regardless of slot:
+    both peers still need to be simultaneously present to rendezvous, which
+    is only representative of real asymmetric-role channels when paired
+    with an ST_STORED_ASYNC-like (store-and-forward, e.g. whiteboard-based)
+    transport such as decomposed-exemplars' twoSixIndirect.
+    """
+    overrides = scenario.get("linkDirectionOverrides", {})
+    if not overrides:
+        return
+    for plugin_name, slot_overrides in overrides.items():
+        for slot, link_direction in slot_overrides.items():
+            if link_direction not in LINK_DIRECTIONS:
+                raise ValueError(
+                    f"linkDirectionOverrides: unknown linkDirection '{link_direction}' "
+                    f"for plugin '{plugin_name}' slot '{slot}' "
+                    f"(expected one of {sorted(LINK_DIRECTIONS)})"
+                )
+
+    patched: set = set()
+    for node in nodes:
+        seen_contributions: set = set()
+        for (slot, _direction), contribution in node.contributions.items():
+            if id(contribution) in seen_contributions:
+                continue
+            seen_contributions.add(id(contribution))
+            plugin_name = node.contribution_plugins[(slot, _direction)]
+            slot_overrides = overrides.get(plugin_name, {})
+            if slot not in slot_overrides:
+                continue
+            manifest_path = output_dir / "kits" / node.id / contribution.kit_dir.name / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            channel_gid = contribution.channel_name
+            props = manifest.get("channel_properties", {}).get(channel_gid)
+            if props is None:
+                raise ValueError(
+                    f"linkDirectionOverrides: channel '{channel_gid}' not found in "
+                    f"channel_properties of {manifest_path} (plugin '{plugin_name}')"
+                )
+            props["linkDirection"] = slot_overrides[slot]
+            manifest_path.write_text(json.dumps(manifest, indent=4))
+            patched.add((node.id, plugin_name, slot, channel_gid, slot_overrides[slot]))
+    for node_id, plugin_name, slot, channel_gid, link_direction in sorted(patched):
+        print(f"  [linkDirectionOverrides] {node_id}: {plugin_name} ({channel_gid}, "
+              f"slot={slot}) -> {link_direction}")
 
 
 def _render_compose(scenario: dict, nodes: List[Node], output_dir: Path, image_tag: str) -> str:
@@ -162,6 +287,7 @@ def _render_compose(scenario: dict, nodes: List[Node], output_dir: Path, image_t
         lines.append(f"  {node.id}:")
         lines.append(f"    image: ghcr.io/tst-race/raceboat/raceboat-runtime:{image_tag}")
         lines.append(f"    container_name: {node.id}")
+        lines.append(f'    user: "{_host_user_directive()}"')
         listener_ids = [n.id for n in nodes if n.role == "listener"]
         sidecars = _merge_sidecar_services(nodes)
         has_dependencies = (node.role == "connector" and listener_ids) or sidecars
@@ -226,6 +352,7 @@ def generate(scenario_id: str, image_tag: str) -> Path:
     for node in nodes:
         _merge_kits(node, output_dir)
         (output_dir / "logs" / node.id).mkdir(parents=True, exist_ok=True)
+    _apply_link_direction_overrides(scenario, nodes, output_dir)
 
     compose_text = _render_compose(scenario, nodes, output_dir, image_tag)
     compose_path = output_dir / "docker-compose.yml"

@@ -1,0 +1,12 @@
+# Best-effort default-convention spec (single connector, no linkDirectionOverrides).
+# initial=racebird's obfs4 (LD_BIDI+TT_UNICAST, merges -> 1 link);
+# final=decomposed-exemplars (LD_BIDI+TT_MULTICAST, never merges -> 2 links).
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}
+  2:
+    - {node: connector, action: LOAD, channel: obfs4, slot: initial, count: 1}
+  3:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 2}
+  4:
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 2}
