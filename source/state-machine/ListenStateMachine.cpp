@@ -88,6 +88,13 @@ void ApiListenContext::updateConnStateMachineConnected(
   helper::logDebug(logPrefix + "Registered packageId for " + connId + " to route dial messages");
 };
 
+void ApiListenContext::updateConnStateMachineLinkEstablished(
+    RaceHandle connSMHandle, LinkID /* linkId */, std::string /* linkAddress */) {
+  if (connSMHandle == recvConnSMHandle) {
+    recvLinkEstablished = true;
+  }
+};
+
 //-----------------------------------------------------------------------------------------------
 // States
 //-----------------------------------------------------------------------------------------------
@@ -168,25 +175,55 @@ struct StateListenInitial : public ListenState {
 
     ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
 
+    // The preset send link (below) is deliberately NOT established here.
+    // Establishing both connections in the same enter() would register both
+    // under the same channel-activation wait, whose fan-out order depends
+    // on unordered_set<ApiContext*> iteration (pointer-hash order) rather
+    // than call order - making LinkID_0 vs LinkID_1 assignment
+    // nondeterministic. See StateListenWaitingForSendConnection, which
+    // defers that establish until recv's own link is confirmed, mirroring
+    // the dialer's StateDialWaitingForSendConnection pattern.
+    return EventResult::SUCCESS;
+  }
+};
+
+struct StateListenWaitingForSendConnection : public ListenState {
+  explicit StateListenWaitingForSendConnection(
+      StateType id = STATE_LISTEN_WAITING_FOR_SEND_CONNECTION)
+      : ListenState(id, "STATE_LISTEN_WAITING_FOR_SEND_CONNECTION") {}
+  virtual EventResult enter(Context &context) {
+    TRACE_METHOD();
+    auto &ctx = getContext(context);
+
     // Pre-establish the reply send link once, up front, when the caller
     // knows it out of band (ReceiveOptions::send_address) - so every
     // accepted conduit reuses ONE link instead of each creating its own
     // duplicate from whatever address its dial handshake happens to carry.
     // Skipped when using a single bidi connection, since that one
     // connection already carries both directions.
-    if (!ctx.usingSingleBidiConnection && !ctx.opts.send_address.empty()) {
-      ctx.presetSendConnSMHandle = Socket::establish(
-          ctx.manager, ctx.handle,
-          SocketRequest{ctx.opts.send_channel, ctx.opts.send_role, ctx.opts.send_address,
-                       ConnEstablishment{LinkRole::Loader, LinkDirectionality::Send}});
-
-      if (ctx.presetSendConnSMHandle == NULL_RACE_HANDLE) {
-        helper::logError(logPrefix + " starting preset send connection state machine failed");
-        return EventResult::NOT_SUPPORTED;
-      }
-
-      ctx.manager.registerHandle(ctx, ctx.presetSendConnSMHandle);
+    if (ctx.usingSingleBidiConnection || ctx.opts.send_address.empty() ||
+        ctx.presetSendConnSMHandle != NULL_RACE_HANDLE) {
+      return EventResult::SUCCESS;
     }
+
+    // Recv's own link isn't established yet; wait for its
+    // EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED to re-enter this state (its
+    // LinkID is guaranteed assigned by then, so it always wins LinkID_0).
+    if (!ctx.recvLinkEstablished) {
+      return EventResult::SUCCESS;
+    }
+
+    ctx.presetSendConnSMHandle = Socket::establish(
+        ctx.manager, ctx.handle,
+        SocketRequest{ctx.opts.send_channel, ctx.opts.send_role, ctx.opts.send_address,
+                     ConnEstablishment{LinkRole::Loader, LinkDirectionality::Send}});
+
+    if (ctx.presetSendConnSMHandle == NULL_RACE_HANDLE) {
+      helper::logError(logPrefix + " starting preset send connection state machine failed");
+      return EventResult::NOT_SUPPORTED;
+    }
+
+    ctx.manager.registerHandle(ctx, ctx.presetSendConnSMHandle);
 
     return EventResult::SUCCESS;
   }
@@ -270,11 +307,18 @@ struct StateListenWaiting : public ListenState {
         // Pass the existing LinkID from the first connection - all accepts share the same link
         // Each openConnection() on that link will get a new ConnectionID
         // Use the ACTUAL link address from the first connection (not the initial empty/placeholder)
+        // Match StateListenInitial's directionality choice: only Bidi for a
+        // genuinely merged single-bidi link, otherwise Recv so this pairs
+        // with the separate preset LT_SEND connection instead of attempting
+        // LT_BIDI on a link the transport never treats as bidi.
         connSMHandle = Socket::establish(
             ctx.manager, ctx.handle,
             SocketRequest{ctx.recvChannelId, ctx.recvRole,
                          ctx.recvLinkAddress,  // Use the actual link address from first connection
-                         ConnEstablishment{LinkRole::Loader, LinkDirectionality::Bidi},  // NOT creating - reusing existing link
+                         ConnEstablishment{LinkRole::Loader,
+                                           ctx.usingSingleBidiConnection
+                                               ? LinkDirectionality::Bidi
+                                               : LinkDirectionality::Recv},  // NOT creating - reusing existing link
                          ctx.firstLinkId});  // Reuse the existing LinkID_0
         
         if (connSMHandle == NULL_RACE_HANDLE) {
@@ -442,6 +486,9 @@ ListenStateEngine::ListenStateEngine() {
   // calls startConnectionStateMachine on manager, waits for
   // connStateMachineConnected
   addInitialState<StateListenInitial>(STATE_LISTEN_INITIAL);
+  // waits for recv's own link to establish, then starts the preset send
+  // link (if any) - deferred so it can't race recv for LinkID_0
+  addState<StateListenWaitingForSendConnection>(STATE_LISTEN_WAITING_FOR_SEND_CONNECTION);
   // calls user supplied callback to return the receiver object, always
   // transitions to next state
   addState<StateListenConnectionOpen>(STATE_LISTEN_CONNECTION_OPEN);
@@ -453,7 +500,8 @@ ListenStateEngine::ListenStateEngine() {
   addFailedState<StateListenFailed>(STATE_LISTEN_FAILED);
 
   // clang-format off
-    declareStateTransition(STATE_LISTEN_INITIAL,                       EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_LISTEN_CONNECTION_OPEN);
+    declareStateTransition(STATE_LISTEN_INITIAL,                       EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED, STATE_LISTEN_WAITING_FOR_SEND_CONNECTION);
+    declareStateTransition(STATE_LISTEN_WAITING_FOR_SEND_CONNECTION,   EVENT_CONN_STATE_MACHINE_CONNECTED,        STATE_LISTEN_CONNECTION_OPEN);
     declareStateTransition(STATE_LISTEN_CONNECTION_OPEN,               EVENT_ALWAYS,                       STATE_LISTEN_WAITING);
     declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_RECEIVE_PACKAGE,              STATE_LISTEN_WAITING);
     declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_ACCEPT,                       STATE_LISTEN_WAITING);

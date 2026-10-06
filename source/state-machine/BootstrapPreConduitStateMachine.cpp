@@ -236,7 +236,15 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
       ctx.finalRecvLinkAddress = ctx.finalSendLinkAddress;
       ctx.finalUsingSingleBidiConnection = true;
     } else {
-      // Handle final server->client aka final_send
+      // Establish final-recv FIRST and defer final-send to
+      // StateBootstrapPreConduitWaitingForConnections (gated on
+      // ctx.finalRecvLinkAddress being set) so the two connSMs don't race
+      // through the same channel-activation event and get their LinkIDs
+      // assigned in a nondeterministic order - mirrors the dialer's
+      // StateDialWaitingForSendConnection pattern and the equivalent fixes
+      // applied to the non-bootstrap ListenStateMachine and
+      // StateBootstrapListenInitial. final-recv is thus guaranteed to
+      // always win the lower LinkID.
       // shouldCreateSender()/shouldCreateReceiver() are role-blind (hence
       // unreliable) only for LD_BIDI channels, where the pre-existing
       // "listener always creates" convention is preserved exactly below.
@@ -245,48 +253,7 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
       // address in the hello (see StateBootstrapDialInitial) - which
       // StateBootstrapListenWaitingForHellos already parses into
       // ctx.finalSendLinkAddress/finalRecvLinkAddress before this state runs.
-      bool create = ctx.isBidiChannel(ctx.opts.final_send_channel)
-                        ? true
-                        : ctx.shouldCreateSender(ctx.opts.final_send_channel);
-      ctx.createdFinalSend = create;
-
-      // We are creating, we will create and then send this address in a hello response
-      if (create) {
-        bool sending = true;
-        helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_send_channel);
-        ctx.finalSendConnSMHandle = Socket::establish(
-            ctx.manager, ctx.handle,
-            SocketRequest{ctx.opts.final_send_channel, ctx.opts.final_send_role,
-                         "", ConnEstablishment::fromLegacy(create, sending, false)},
-            "final");
-        if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
-          helper::logError(logPrefix + " starting connection state machine failed");
-          return EventResult::NOT_SUPPORTED;
-        }
-        ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
-        // We are loading, we should have an address to load from the hello
-      } else if (ctx.finalSendLinkAddress.empty()) {
-        helper::logError(logPrefix + " finalSend address is missing (was it sent in the hello?)");
-        return EventResult::NOT_SUPPORTED;
-      } else {
-      bool sending = true;
-      helper::logInfo(logPrefix + "Loading final-send link on " + ctx.opts.final_send_channel + " with address: " + ctx.finalSendLinkAddress);
-      ctx.finalSendConnSMHandle = Socket::establish(
-          ctx.manager, ctx.handle,
-          SocketRequest{ctx.opts.final_send_channel, ctx.opts.final_send_role,
-                       ctx.finalSendLinkAddress,
-                       ConnEstablishment::fromLegacy(create, sending, false)},
-          "final");
-      if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
-        helper::logError(logPrefix + " starting connection state machine failed");
-        return EventResult::NOT_SUPPORTED;
-      }
-      ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
-      } 
-      
-
-      // *** FINAL RECV ***
-      create = ctx.isBidiChannel(ctx.opts.final_recv_channel)
+      bool create = ctx.isBidiChannel(ctx.opts.final_recv_channel)
                   ? true
                   : ctx.shouldCreateReceiver(ctx.opts.final_recv_channel);
       ctx.createdFinalRecv = create;
@@ -306,24 +273,29 @@ struct StateBootstrapPreConduitAccepted : public BootstrapPreConduitState {
         }
         ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
       // We are loading, we should have an address to load from the hello
-    } else if (ctx.finalRecvLinkAddress.empty()) {
-      helper::logError(logPrefix + " finalRecv address is missing (was it sent in the hello?)");
-      return EventResult::NOT_SUPPORTED;
-    } else {
-      bool sending = false;
-      helper::logInfo(logPrefix + "Loading final-recv link on " + ctx.opts.final_recv_channel + " with address: " + ctx.finalRecvLinkAddress);
-      ctx.finalRecvConnSMHandle = Socket::establish(
-          ctx.manager, ctx.handle,
-          SocketRequest{ctx.opts.final_recv_channel, ctx.opts.final_recv_role,
-                       ctx.finalRecvLinkAddress,
-                       ConnEstablishment::fromLegacy(create, sending, false)},
-          "final");
-      if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
-        helper::logError(logPrefix + " starting connection state machine failed");
+      } else if (ctx.finalRecvLinkAddress.empty()) {
+        helper::logError(logPrefix + " finalRecv address is missing (was it sent in the hello?)");
         return EventResult::NOT_SUPPORTED;
+      } else {
+        bool sending = false;
+        helper::logInfo(logPrefix + "Loading final-recv link on " + ctx.opts.final_recv_channel + " with address: " + ctx.finalRecvLinkAddress);
+        ctx.finalRecvConnSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{ctx.opts.final_recv_channel, ctx.opts.final_recv_role,
+                         ctx.finalRecvLinkAddress,
+                         ConnEstablishment::fromLegacy(create, sending, false)},
+            "final");
+        if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
+          helper::logError(logPrefix + " starting connection state machine failed");
+          return EventResult::NOT_SUPPORTED;
+        }
+        ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
       }
-      ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
-    }
+
+      // *** FINAL SEND *** (deferred - see StateBootstrapPreConduitWaitingForConnections)
+      ctx.createdFinalSend = ctx.isBidiChannel(ctx.opts.final_send_channel)
+                        ? true
+                        : ctx.shouldCreateSender(ctx.opts.final_send_channel);
     }
      
     ctx.manager.registerHandle(ctx, ctx.initSendConnSMHandle);
@@ -339,6 +311,52 @@ struct StateBootstrapPreConduitWaitingForConnections : public BootstrapPreCondui
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
+
+    // Establish final-send only after final-recv's own link is ready (see
+    // StateBootstrapPreConduitAccepted, which deferred this establish to
+    // avoid racing final-recv for the lower LinkID). Skipped for a merged
+    // single-bidi final link, which already has its one connSM established.
+    if (!ctx.finalUsingSingleBidiConnection &&
+        ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
+      if (ctx.finalRecvLinkAddress.empty()) {
+        // final-recv isn't established yet; nothing to do until its
+        // EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED re-enters this state.
+        return EventResult::SUCCESS;
+      }
+      bool create = ctx.createdFinalSend;
+      if (create) {
+        bool sending = true;
+        helper::logInfo(logPrefix + "Creating final-send link on " + ctx.opts.final_send_channel);
+        ctx.finalSendConnSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{ctx.opts.final_send_channel, ctx.opts.final_send_role,
+                         "", ConnEstablishment::fromLegacy(create, sending, false)},
+            "final");
+        if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
+          helper::logError(logPrefix + " starting connection state machine failed");
+          return EventResult::NOT_SUPPORTED;
+        }
+        ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
+      } else if (ctx.finalSendLinkAddress.empty()) {
+        helper::logError(logPrefix + " finalSend address is missing (was it sent in the hello?)");
+        return EventResult::NOT_SUPPORTED;
+      } else {
+        bool sending = true;
+        helper::logInfo(logPrefix + "Loading final-send link on " + ctx.opts.final_send_channel + " with address: " + ctx.finalSendLinkAddress);
+        ctx.finalSendConnSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{ctx.opts.final_send_channel, ctx.opts.final_send_role,
+                         ctx.finalSendLinkAddress,
+                         ConnEstablishment::fromLegacy(create, sending, false)},
+            "final");
+        if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
+          helper::logError(logPrefix + " starting connection state machine failed");
+          return EventResult::NOT_SUPPORTED;
+        }
+        ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
+      }
+    }
+
     // For each potential awaited connection, check if the handle is non-null (meaning we ARE expecting it) AND the connection ID is not set (meaning it has not finished opening yet)
     if (ctx.initRecvConnSMHandle != NULL_RACE_HANDLE and ctx.initRecvConnId.empty()) {
       return EventResult::SUCCESS;

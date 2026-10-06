@@ -39,6 +39,9 @@ public:
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
                                   std::string linkAddress, LinkID linkId) override;
+  virtual void
+  updateConnStateMachineLinkEstablished(RaceHandle contextHandle, LinkID linkId,
+                                        std::string linkAddress) override;
 
 public:
   ReceiveOptions opts;
@@ -60,6 +63,11 @@ public:
   // true if recv_address's channel is LD_BIDI+TT_UNICAST, so recvConnSMHandle
   // alone carries both directions instead of pairing with presetSendConnSMHandle
   bool usingSingleBidiConnection = false;
+
+  // Set once recvConnSMHandle's own link is established - gates
+  // StateListenWaitingForSendConnection so the preset send link is only
+  // established afterward, guaranteeing recv always wins LinkID_0.
+  bool recvLinkEstablished = false;
 
   // Support for multiple accept() calls - each creates a connection SM
   std::queue<RaceHandle> pendingConnSMHandles;
