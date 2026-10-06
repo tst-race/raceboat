@@ -141,13 +141,25 @@ struct StateListenInitial : public ListenState {
     ctx.recvChannelId = channelId;
     ctx.recvRole = role;
     ctx.recvLinkAddressStored = linkAddress;
-    
+
+    // Only merge recv_address into a single LT_BIDI connection when the
+    // channel is actually LD_BIDI/TT_UNICAST (same check the dial side uses
+    // via shouldUseSingleBidiLink); otherwise this must stay LT_RECV so it
+    // pairs with the separate LT_SEND preset-send connection below, matching
+    // how the dialer always splits non-unicast-bidi channels into two
+    // unidirectional links.
+    ctx.usingSingleBidiConnection =
+        ctx.shouldUseSingleBidiLink(ctx.opts.send_channel, channelId);
+    LinkDirectionality recvDirectionality = ctx.usingSingleBidiConnection
+        ? LinkDirectionality::Bidi
+        : LinkDirectionality::Recv;
+
     // Create the FIRST connection state machine for the initial listener
     // This creates LinkID_0 and waits for the first client to connect
     ctx.recvConnSMHandle = Socket::establish(
         ctx.manager, ctx.handle,
         SocketRequest{channelId, role, linkAddress,
-                     ConnEstablishment{resolveBidiRole(ModeRole::Listener), LinkDirectionality::Bidi}});
+                     ConnEstablishment{resolveBidiRole(ModeRole::Listener), recvDirectionality}});
 
     if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -160,7 +172,9 @@ struct StateListenInitial : public ListenState {
     // knows it out of band (ReceiveOptions::send_address) - so every
     // accepted conduit reuses ONE link instead of each creating its own
     // duplicate from whatever address its dial handshake happens to carry.
-    if (!ctx.opts.send_address.empty()) {
+    // Skipped when using a single bidi connection, since that one
+    // connection already carries both directions.
+    if (!ctx.usingSingleBidiConnection && !ctx.opts.send_address.empty()) {
       ctx.presetSendConnSMHandle = Socket::establish(
           ctx.manager, ctx.handle,
           SocketRequest{ctx.opts.send_channel, ctx.opts.send_role, ctx.opts.send_address,

@@ -57,6 +57,10 @@ public:
   ConnectionID recvConnId;
   std::string recvLinkAddress;
 
+  // true if recv_address's channel is LD_BIDI+TT_UNICAST, so recvConnSMHandle
+  // alone carries both directions instead of pairing with presetSendConnSMHandle
+  bool usingSingleBidiConnection = false;
+
   // Support for multiple accept() calls - each creates a connection SM
   std::queue<RaceHandle> pendingConnSMHandles;
   std::unordered_map<RaceHandle, std::function<void(ApiStatus, RaceHandle, ConduitProperties)>> 
