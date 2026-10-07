@@ -33,6 +33,10 @@ COPY racesdk/package/LINUX_arm64-v8a/app/bridge-distro /usr/local/bin/bridge-dis
 # Installing PluginCommsTwoSixStubDecomposed and Destini dependencies at system level
 # TODO: refactor those plugins to bring their own dependencies with them
 FROM ${TARGETARCH}-linux
+# race-cli/bridge-distro are built on the host (possibly as root with a
+# restrictive umask) - force executable/readable for all regardless, since
+# integration-test containers run as an arbitrary non-root --user.
+RUN chmod a+rX /usr/local/bin/race-cli /usr/local/bin/bridge-distro
 RUN apt-get update && yes | apt-get install -y \
     libboost-system1.74.0 \
     libboost-filesystem1.74.0 \
