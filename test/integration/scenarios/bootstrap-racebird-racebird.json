@@ -3,15 +3,18 @@
   "mode": "bootstrap-connect",
   "wait_time": 20,
   "timeout": 60,
-  "network": {"name": "bootstrap-racebird-racebird-network", "subnet": "10.25.1.0/24"},
+  "network": {
+    "name": "bootstrap-racebird-racebird-network",
+    "subnet": "10.25.1.0/24"
+  },
   "nodes": [
     {
       "role": "listener",
       "id": "listener",
       "ip": "10.25.1.3",
       "slots": {
-        "initial": "racebird",
-        "final": "racebird"
+        "initial": "obfs4",
+        "final": "obfs4"
       }
     },
     {
@@ -19,8 +22,8 @@
       "id": "dialer",
       "ip": "10.25.1.2",
       "slots": {
-        "initial": "racebird",
-        "final": "racebird"
+        "initial": "obfs4",
+        "final": "obfs4"
       }
     }
   ]

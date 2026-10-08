@@ -10,12 +10,13 @@
 # assignment), but that has NOT been confirmed against a real run of this
 # specific (C2L) scenario - verify against listener/dialer logs.
 # "initial" uses a distinct composition (twoSixIndirectCompositionReactive,
-# via composition_names) so its manifest channel_properties entry stays
-# isolated from "final"'s LD_CREATOR_TO_LOADER override - both slots use the
-# same plugin, and a shared channel gid would otherwise leak the override
-# into "initial" too (see generate_scenario.py's _apply_link_direction_overrides
-# docstring). "initial" itself is unforced, so it follows the default
-# convention (see bootstrap-decomposed-decomposed.yaml).
+# set directly as the "initial" slot's value in the scenario json) so its
+# manifest channel_properties entry stays isolated from "final"'s
+# LD_CREATOR_TO_LOADER override - both slots resolve to the same plugin, and
+# a shared channel gid would otherwise leak the override into "initial" too
+# (see generate_scenario.py's _apply_link_direction_overrides docstring).
+# "initial" itself is unforced, so it follows the default convention (see
+# bootstrap-decomposed-decomposed.yaml).
 steps:
   1:
     - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}

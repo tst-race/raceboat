@@ -1,4 +1,5 @@
 {
   "racebird": "../../../racebird",
-  "decomposed-exemplars": "../../../decomposed-exemplars"
+  "decomposed-exemplars": "../../../decomposed-exemplars",
+  "skyhook": "../../../skyhook"
 }

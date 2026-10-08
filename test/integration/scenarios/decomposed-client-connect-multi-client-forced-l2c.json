@@ -6,12 +6,38 @@
   "stub_client": "tcp-stub-client-multimsg.py",
   "stub_server": "tcp-stub-server-multimsg.py",
   "linkDirectionOverrides": {
-    "decomposed-exemplars": { "channel": "LD_LOADER_TO_CREATOR" }
+    "twoSixIndirectComposition": {
+      "channel": "LD_LOADER_TO_CREATOR"
+    }
   },
-  "network": {"name": "decomposed-forced-l2c-network", "subnet": "10.30.1.0/24"},
+  "network": {
+    "name": "decomposed-forced-l2c-network",
+    "subnet": "10.30.1.0/24"
+  },
   "nodes": [
-    {"role": "listener", "id": "listener", "ip": "10.30.1.3", "slots": {"channel": "decomposed-exemplars"}},
-    {"role": "connector", "id": "dialer", "ip": "10.30.1.2", "slots": {"channel": "decomposed-exemplars"}},
-    {"role": "connector", "id": "dialer2", "ip": "10.30.1.4", "slots": {"channel": "decomposed-exemplars"}}
+    {
+      "role": "listener",
+      "id": "listener",
+      "ip": "10.30.1.3",
+      "slots": {
+        "channel": "twoSixIndirectComposition"
+      }
+    },
+    {
+      "role": "connector",
+      "id": "dialer",
+      "ip": "10.30.1.2",
+      "slots": {
+        "channel": "twoSixIndirectComposition"
+      }
+    },
+    {
+      "role": "connector",
+      "id": "dialer2",
+      "ip": "10.30.1.4",
+      "slots": {
+        "channel": "twoSixIndirectComposition"
+      }
+    }
   ]
 }

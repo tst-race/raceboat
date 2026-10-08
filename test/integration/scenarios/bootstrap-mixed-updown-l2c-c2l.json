@@ -3,10 +3,17 @@
   "mode": "bootstrap-connect",
   "wait_time": 20,
   "timeout": 60,
-  "network": {"name": "bmu-l2c-c2l-network", "subnet": "10.36.1.0/24"},
+  "network": {
+    "name": "bmu-l2c-c2l-network",
+    "subnet": "10.36.1.0/24"
+  },
   "linkDirectionOverrides": {
-    "racebird": { "initial": "LD_LOADER_TO_CREATOR" },
-    "decomposed-exemplars": { "initial": "LD_CREATOR_TO_LOADER" }
+    "obfs4": {
+      "initial": "LD_LOADER_TO_CREATOR"
+    },
+    "twoSixIndirectComposition": {
+      "initial": "LD_CREATOR_TO_LOADER"
+    }
   },
   "nodes": [
     {
@@ -14,8 +21,14 @@
       "id": "listener",
       "ip": "10.36.1.3",
       "slots": {
-        "initial": {"recv": "racebird", "send": "decomposed-exemplars"},
-        "final": {"recv": "decomposed-exemplars", "send": "racebird"}
+        "initial": {
+          "recv": "obfs4",
+          "send": "twoSixIndirectComposition"
+        },
+        "final": {
+          "recv": "twoSixIndirectComposition",
+          "send": "obfs4"
+        }
       }
     },
     {
@@ -23,8 +36,14 @@
       "id": "dialer",
       "ip": "10.36.1.2",
       "slots": {
-        "initial": {"recv": "decomposed-exemplars", "send": "racebird"},
-        "final": {"send": "decomposed-exemplars", "recv": "racebird"}
+        "initial": {
+          "recv": "twoSixIndirectComposition",
+          "send": "obfs4"
+        },
+        "final": {
+          "send": "twoSixIndirectComposition",
+          "recv": "obfs4"
+        }
       }
     }
   ]
