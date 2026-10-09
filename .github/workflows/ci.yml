@@ -260,31 +260,38 @@ jobs:
       image: ghcr.io/tst-race/raceboat/raceboat-plugin-builder:${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
     strategy:
       matrix:
-        plugin: [racebird, decomposed-exemplars]
+        include:
+          - plugin: racebird
+            ref: main
+          # test/adapter.py (needed by test/integration/generate_scenario.py)
+          # only exists on integration-testing, not yet merged to main.
+          - plugin: decomposed-exemplars
+            ref: integration-testing
     steps:
       - name: Checkout ${{ matrix.plugin }}
         uses: actions/checkout@v3
         with:
           repository: tst-race/${{ matrix.plugin }}
-          path: ${{ matrix.plugin }}
+          ref: ${{ matrix.ref }}
+          path: plugins/${{ matrix.plugin }}
 
       - name: Build ${{ matrix.plugin }} artifacts
-        working-directory: ${{ matrix.plugin }}
+        working-directory: plugins/${{ matrix.plugin }}
         env:
           GOFLAGS: "-buildvcs=false"
         run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE/${{ matrix.plugin }}"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/plugins/${{ matrix.plugin }}"
           ./build_artifacts.sh
 
       - name: Create Build Artifact
-        working-directory: ${{ matrix.plugin }}
+        working-directory: plugins/${{ matrix.plugin }}
         run: tar czf "${{ matrix.plugin }}-kit.tar.gz" ./kit
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: "${{ matrix.plugin }}-kit"
-          path: "${{ matrix.plugin }}/${{ matrix.plugin }}-kit.tar.gz"
+          path: "plugins/${{ matrix.plugin }}/${{ matrix.plugin }}-kit.tar.gz"
           retention-days: 1
 
   integration-tests:
@@ -301,30 +308,32 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: tst-race/racebird
-          path: racebird
+          path: plugins/racebird
 
       - name: Checkout decomposed-exemplars
         uses: actions/checkout@v3
         with:
           repository: tst-race/decomposed-exemplars
-          path: decomposed-exemplars
+          # test/adapter.py only exists on integration-testing, not yet merged to main.
+          ref: integration-testing
+          path: plugins/decomposed-exemplars
 
       - name: Download racebird build artifact
         uses: actions/download-artifact@v4
         with:
           name: racebird-kit
-          path: racebird
+          path: plugins/racebird
 
       - name: Download decomposed-exemplars build artifact
         uses: actions/download-artifact@v4
         with:
           name: decomposed-exemplars-kit
-          path: decomposed-exemplars
+          path: plugins/decomposed-exemplars
 
       - name: Extract plugin kits
         run: |
-          tar xzf racebird/racebird-kit.tar.gz -C racebird
-          tar xzf decomposed-exemplars/decomposed-exemplars-kit.tar.gz -C decomposed-exemplars
+          tar xzf plugins/racebird/racebird-kit.tar.gz -C plugins/racebird
+          tar xzf plugins/decomposed-exemplars/decomposed-exemplars-kit.tar.gz -C plugins/decomposed-exemplars
 
       - name: Log in to Container Registry
         uses: docker/login-action@v2
