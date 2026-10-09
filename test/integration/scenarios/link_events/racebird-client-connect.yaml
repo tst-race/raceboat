@@ -1,0 +1,11 @@
+# Best-effort default convention for client-connect mode (2 connectors). The
+# listener (server) creates its listen link, each connector (client) loads it.
+# obfs4 (racebird, LD_BIDI+TT_UNICAST) merges send/recv into a single physical
+# link, so there's exactly one link per connector - `listener` aggregates
+# 1 link/connector * 2 connectors = 2, `connector` (role keyword) auto-expands
+# to each of dialer/dialer2 independently expecting 1 load.
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: obfs4, count: 2}
+  2:
+    - {node: connector, action: LOAD, channel: obfs4, count: 1}

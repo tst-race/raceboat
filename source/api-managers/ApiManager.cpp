@@ -956,6 +956,9 @@ void ApiManagerInternal::receiveEncPkg(
 
   std::shared_ptr<std::vector<uint8_t>> contents =
       std::make_shared<std::vector<uint8_t>>(pkg.getCipherText());
+  // Snapshot of the full, still packageId-prefixed bytes as delivered,
+  // before any stripping - used below to detect self-echoed packages.
+  const std::vector<uint8_t> fullWireBytes = *contents;
 
   const ConnectionID &connId = connIDs.front();
   Contexts contexts;
@@ -974,6 +977,23 @@ void ApiManagerInternal::receiveEncPkg(
                                        contents->end());
       helper::logDebug(logPrefix + " found package id");
 
+    } else if (Contexts packageIdOnlyContexts = getContextsByPackageId(packageId);
+               !packageIdOnlyContexts.empty()) {
+      // The exact (packageId, connId) pair was never registered, but this
+      // packageId IS bound to an existing conduit under a different connId.
+      // packageId is a random, globally-unique per-conduit tag baked into
+      // the wire format for exactly this purpose (see RoundTrip/ConduitContext),
+      // so it's authoritative even when a plugin delivers a long-lived
+      // conduit's later messages on a different connId than the one first
+      // observed at setup (e.g. multiple clients multiplexed on one shared
+      // link, where "the" connId isn't necessarily stable for a conduit's
+      // whole lifetime). Deliver it, and self-heal by also registering this
+      // connId so future packages on it take the fast exact-match path.
+      contexts = packageIdOnlyContexts;
+      *contents = std::vector<uint8_t>(contents->begin() + packageIdLen,
+                                       contents->end());
+      packageIdContextMap[packageId + connId] = contexts;
+      helper::logDebug(logPrefix + " found package id via packageId-only fallback (new connId)");
     } else {
       // buffer messages that might be for conduits/packageIds we have
       // not _yet_ resumed
@@ -993,6 +1013,14 @@ void ApiManagerInternal::receiveEncPkg(
   }
 
   for (auto context : contexts) {
+    if (context->wasRecentlySent(fullWireBytes)) {
+      // Self-echo: a shared/broadcast-style link delivered this conduit's
+      // own recently-sent package back to its own receive path. Discard
+      // instead of queuing it as if it were new data from the peer.
+      helper::logDebug(logPrefix + " discarding self-echoed package for context handle=" +
+                       std::to_string(context->handle));
+      continue;
+    }
     context->updateReceiveEncPkg(connId, contents);
     triggerEvent(*context, EVENT_RECEIVE_PACKAGE);
   }
@@ -1162,14 +1190,16 @@ RaceHandle ApiManagerInternal::startPreConduitStateMachine(
     const ConnectionID &recvConnId, const ChannelId &recvChannel,
     const ChannelId &sendChannel, const std::string &sendRole,
     const std::string &sendLinkAddress, const std::string &packageId,
-    std::vector<std::vector<uint8_t>> recvMessages) {
+    std::vector<std::vector<uint8_t>> recvMessages,
+    RaceHandle existingSendConnSMHandle, const ConnectionID &existingSendConnId) {
         helper::logInfo(
                          " START PRECONN OBJECT being called");
   // create a connection context and copy information from the send/recv context
   auto context = newPreConduitContext();
   context->updatePreConduitStateMachineStart(
       contextHandle, recvHandle, recvConnId, recvChannel, sendChannel, sendRole,
-      sendLinkAddress, packageId, recvMessages);
+      sendLinkAddress, packageId, recvMessages,
+      existingSendConnSMHandle, existingSendConnId);
 
   EventResult result = preConduitEngine.start(*context);
   if (result != EventResult::SUCCESS) {
@@ -1183,6 +1213,17 @@ RaceHandle ApiManagerInternal::startPreConduitStateMachine(
 
   recvContextIt->second->updateDependent(context->handle);
   triggerEvent(*recvContextIt->second, EVENT_ADD_DEPENDENT);
+
+  // Also register as a dependent of the reused preset send connSM (if any),
+  // so its later detachConnSM call is a correctly-tracked ref-count
+  // decrement instead of detaching a connection we never registered with.
+  if (existingSendConnSMHandle != NULL_RACE_HANDLE) {
+    auto sendContextIt = activeContexts.find(existingSendConnSMHandle);
+    if (sendContextIt != activeContexts.end()) {
+      sendContextIt->second->updateDependent(context->handle);
+      triggerEvent(*sendContextIt->second, EVENT_ADD_DEPENDENT);
+    }
+  }
 
   return context->handle;
 }
@@ -1442,12 +1483,17 @@ ApiManagerInternal::getContexts(const std::string &id) {
 
 ApiManagerInternal::Contexts
 ApiManagerInternal::getContextsByPackageId(const std::string &packageId) {
+  // packageIdContextMap is keyed by "packageId + connId" (packageId is
+  // always exactly packageIdLen bytes), so an exact-match lookup on
+  // packageId alone would never hit. Scan for any key with this packageId
+  // as its prefix, regardless of which connId it's currently paired with.
   Contexts contexts;
-  auto it = packageIdContextMap.find(packageId);
-  if (it != packageIdContextMap.end()) {
-    return it->second;
+  for (auto &[key, ctxSet] : packageIdContextMap) {
+    if (key.compare(0, packageId.size(), packageId) == 0) {
+      contexts.insert(ctxSet.begin(), ctxSet.end());
+    }
   }
-  return {};
+  return contexts;
 }
 
 ApiManagerInternal::Contexts

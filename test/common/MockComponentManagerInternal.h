@@ -67,7 +67,7 @@ public:
         ON_CALL(*this, encodingComponentFromEncodingParams(_))
             .WillByDefault([this](const EncodingParameters &params) {
                 LOG_EXPECT(this->logger, "encodingComponentFromEncodingParams", params);
-                return &encoding;
+                return std::vector<Raceboat::EncodingComponentWrapper *>{&encoding};
             });
         ON_CALL(*this, getTransport()).WillByDefault([this]() {
             LOG_EXPECT(this->logger, "getTransport");
@@ -238,7 +238,7 @@ public:
     MOCK_METHOD(Raceboat::CMTypes::State, getState, (), (override));
     MOCK_METHOD(const std::string &, getCompositionId, (), (override));
 
-    MOCK_METHOD(Raceboat::EncodingComponentWrapper *, encodingComponentFromEncodingParams,
+    MOCK_METHOD(std::vector<Raceboat::EncodingComponentWrapper *>, encodingComponentFromEncodingParams,
                 (const EncodingParameters &params), (override));
     MOCK_METHOD(Raceboat::TransportComponentWrapper *, getTransport, (), (override));
     MOCK_METHOD(Raceboat::UserModelComponentWrapper *, getUserModel, (), (override));

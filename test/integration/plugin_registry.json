@@ -1,4 +1,5 @@
 {
-  "racebird": "../../../racebird",
-  "decomposed-exemplars": "../../../decomposed-exemplars"
+  "racebird": "../../../plugins/racebird",
+  "decomposed-exemplars": "../../../plugins/decomposed-exemplars",
+  "skyhook": "../../../plugins/skyhook"
 }

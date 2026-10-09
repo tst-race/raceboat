@@ -1,0 +1,14 @@
+# Best-effort default-convention spec (2 connectors, no linkDirectionOverrides).
+# initial=decomposed-exemplars (never merges -> 2 links/connector);
+# final=racebird's obfs4 (merges -> 1 link/connector). `listener` aggregates
+# counts across both connectors (dialer/dialer2), `connector` (role
+# keyword) auto-expands to each independently.
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 4}
+  2:
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 2}
+  3:
+    - {node: listener, action: CREATE, channel: obfs4, slot: final, count: 2}
+  4:
+    - {node: connector, action: LOAD, channel: obfs4, slot: final, count: 1}

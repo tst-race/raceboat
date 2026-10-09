@@ -30,7 +30,7 @@ Examples:
   python3 build-test.py --plugin-dir ../../racebird --rebuild-raceboat-code --rebuild-plugin
 
     # Multi-client integration test
-    python3 build-test.py --plugin-dir ../../racebird --integration-test-args-passthrough --additional-clients rbclient2
+    python3 build-test.py --plugin-dir ../../racebird --integration-test-args-passthrough --additional-clients dialer2
 """
 
 import argparse

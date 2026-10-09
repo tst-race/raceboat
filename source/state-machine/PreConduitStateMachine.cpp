@@ -37,7 +37,8 @@ void PreConduitContext::updatePreConduitStateMachineStart(
     const ConnectionID &_recvConnId, const ChannelId &_recvChannel,
     const ChannelId &_sendChannel, const std::string &_sendRole,
     const std::string &_sendLinkAddress, const std::string &_packageId,
-    std::vector<std::vector<uint8_t>> recvMessages) {
+    std::vector<std::vector<uint8_t>> recvMessages,
+    RaceHandle _existingSendConnSMHandle, const ConnectionID &_existingSendConnId) {
   this->parentHandle = contextHandle;
   this->recvConnSMHandle = recvHandle;
   this->recvConnId = _recvConnId;
@@ -47,6 +48,8 @@ void PreConduitContext::updatePreConduitStateMachineStart(
   this->recvChannel = _recvChannel;
   this->packageId = _packageId;
   this->recvQueue = recvMessages;
+  this->existingSendConnSMHandle = _existingSendConnSMHandle;
+  this->existingSendConnId = _existingSendConnId;
 }
 
 void PreConduitContext::updateReceiveEncPkg(
@@ -112,6 +115,16 @@ struct StatePreConduitAccepted : public PreConduitState {
       return EventResult::SUCCESS;
     }
 
+    // Reuse the listener's pre-established send link (ReceiveOptions::
+    // send_address) instead of creating a new, redundant one per client.
+    if (!ctx.existingSendConnId.empty()) {
+      helper::logInfo(logPrefix + "Reusing preset send connection for reply");
+      ctx.sendConnSMHandle = ctx.existingSendConnSMHandle;
+      ctx.sendConnId = ctx.existingSendConnId;
+      ctx.pendingEvents.push(EVENT_ALWAYS);
+      return EventResult::SUCCESS;
+    }
+
     // Original behavior: create separate send connection
     ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
                                                              ctx.handle, ctx.sendChannel, ctx.sendRole, ctx.sendLinkAddress, false, true);
@@ -134,10 +147,15 @@ struct StatePreConduitOpening : public PreConduitState {
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
-    
+
     // If using bidirectional connection, it's already connected
     if (ctx.usingSingleBidiConnection && !ctx.sendConnId.empty()) {
       helper::logDebug(logPrefix + "Bidirectional connection already established");
+      ctx.pendingEvents.push(EVENT_CONN_STATE_MACHINE_CONNECTED);
+    }
+    // Reused preset send connection is also already connected.
+    if (!ctx.existingSendConnId.empty() && ctx.sendConnId == ctx.existingSendConnId) {
+      helper::logDebug(logPrefix + "Preset send connection already established");
       ctx.pendingEvents.push(EVENT_CONN_STATE_MACHINE_CONNECTED);
     }
     

@@ -1,0 +1,31 @@
+# NEEDS AUDIT: "final" is forced to LD_CREATOR_TO_LOADER, which breaks
+# twoSixIndirectComposition's native single-bidi merge the same way
+# LD_LOADER_TO_CREATOR does in bootstrap-decomposed-decomposed-final-l2c.yaml.
+# That sibling scenario's real logs show each side independently CREATEing its
+# own recv-direction link and LOADing the peer's send-direction address (1
+# create + 1 load per side, in the order: connector creates -> listener loads
+# +creates -> connector loads) rather than "listener creates both, connector
+# loads both". This file assumes LD_CREATOR_TO_LOADER produces the same
+# create/load COUNTS and ORDER (just a different physical direction
+# assignment), but that has NOT been confirmed against a real run of this
+# specific (C2L) scenario - verify against listener/dialer logs.
+# "initial" uses a distinct composition (twoSixIndirectCompositionReactive,
+# set directly as the "initial" slot's value in the scenario json) so its
+# manifest channel_properties entry stays isolated from "final"'s
+# LD_CREATOR_TO_LOADER override - both slots resolve to the same plugin, and
+# a shared channel gid would otherwise leak the override into "initial" too
+# (see generate_scenario.py's _apply_link_direction_overrides docstring).
+# "initial" itself is unforced, so it follows the default convention (see
+# bootstrap-decomposed-decomposed.yaml).
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: twoSixIndirectCompositionReactive, slot: initial, count: 2}
+  2:
+    - {node: connector, action: LOAD, channel: twoSixIndirectCompositionReactive, slot: initial, count: 2}
+  3:
+    - {node: connector, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
+  4:
+    - {node: listener, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
+  5:
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}

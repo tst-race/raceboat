@@ -30,11 +30,13 @@ std::string recvOptionsToString(const ReceiveOptions &recvOptions) {
   std::stringstream ss;
 
   ss << "RecvOptions {";
-  ss << "recv_channel: '" << recvOptions.recv_channel << "', ";
   ss << "send_channel: '" << recvOptions.send_channel << "', ";
-  ss << "alt_channel: '" << recvOptions.alt_channel << "', ";
   ss << "send_role: '" << recvOptions.send_role << "', ";
+  ss << "send_address: '" << recvOptions.send_address << "', ";
+  ss << "recv_channel: '" << recvOptions.recv_channel << "', ";
   ss << "recv_role: '" << recvOptions.recv_role << "', ";
+  ss << "recv_address: '" << recvOptions.recv_address << "', ";
+  ss << "alt_channel: '" << recvOptions.alt_channel << "', ";
   ss << "timeout_ms: '" << recvOptions.timeout_ms << "'}";
   return ss.str();
 }
@@ -43,12 +45,13 @@ std::string sendOptionsToString(const SendOptions &sendOptions) {
   std::stringstream ss;
 
   ss << "SendOptions {";
-  ss << "recv_channel: '" << sendOptions.recv_channel << "', ";
   ss << "send_channel: '" << sendOptions.send_channel << "', ";
-  ss << "alt_channel: '" << sendOptions.alt_channel << "', ";
-  ss << "send_address: '" << sendOptions.send_address << "', ";
   ss << "send_role: '" << sendOptions.send_role << "', ";
+  ss << "send_address: '" << sendOptions.send_address << "', ";
+  ss << "recv_channel: '" << sendOptions.recv_channel << "', ";
+  ss << "recv_address: '" << sendOptions.recv_address << "', ";
   ss << "recv_role: '" << sendOptions.recv_role << "', ";
+  ss << "alt_channel: '" << sendOptions.alt_channel << "', ";
   ss << "timeout_ms: '" << sendOptions.timeout_ms << "'}";
   return ss.str();
 }
@@ -58,12 +61,12 @@ std::string resumeOptionsToString(const ResumeOptions &resumeOptions) {
 
   ss << "ResumeOptions {";
   ss << "package_id: '" << resumeOptions.package_id << "', ";
-  ss << "recv_channel: '" << resumeOptions.recv_channel << "', ";
-  ss << "recv_role: '" << resumeOptions.recv_role << "', ";
-  ss << "recv_address: '" << resumeOptions.recv_address << "', ";
   ss << "send_channel: '" << resumeOptions.send_channel << "', ";
   ss << "send_role: '" << resumeOptions.send_role << "', ";
   ss << "send_address: '" << resumeOptions.send_address << "', ";
+  ss << "recv_channel: '" << resumeOptions.recv_channel << "', ";
+  ss << "recv_role: '" << resumeOptions.recv_role << "', ";
+  ss << "recv_address: '" << resumeOptions.recv_address << "', ";
   ss << "timeout_ms: '" << resumeOptions.timeout_ms << "'}";
   return ss.str();
 }
@@ -72,15 +75,15 @@ std::string bootstrapConnectionOptionsToString(const BootstrapConnectionOptions 
   std::stringstream ss;
 
   ss << "BootstrapConnectionOptions {";
-  ss << "init_recv_channel: '" << bootstrapConnectionOptions.init_recv_channel << "', ";
   ss << "init_send_channel: '" << bootstrapConnectionOptions.init_send_channel << "', ";
-  ss << "final_recv_channel: '" << bootstrapConnectionOptions.final_recv_channel << "', ";
-  ss << "final_send_channel: '" << bootstrapConnectionOptions.final_send_channel << "', ";
-  ss << "init_send_address: '" << bootstrapConnectionOptions.init_send_address << "', ";
-  ss << "init_recv_address: '" << bootstrapConnectionOptions.init_recv_address << "', ";
   ss << "init_send_role: '" << bootstrapConnectionOptions.init_send_role << "', ";
+  ss << "init_send_address: '" << bootstrapConnectionOptions.init_send_address << "', ";
+  ss << "init_recv_channel: '" << bootstrapConnectionOptions.init_recv_channel << "', ";
   ss << "init_recv_role: '" << bootstrapConnectionOptions.init_recv_role << "', ";
+  ss << "init_recv_address: '" << bootstrapConnectionOptions.init_recv_address << "', ";
+  ss << "final_send_channel: '" << bootstrapConnectionOptions.final_send_channel << "', ";
   ss << "final_send_role: '" << bootstrapConnectionOptions.final_send_role << "', ";
+  ss << "final_recv_channel: '" << bootstrapConnectionOptions.final_recv_channel << "', ";
   ss << "final_recv_role: '" << bootstrapConnectionOptions.final_recv_role << "', ";
   ss << "timeout_seconds: '" << bootstrapConnectionOptions.timeout_ms << "'}";
   return ss.str();

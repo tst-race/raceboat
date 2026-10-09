@@ -86,6 +86,10 @@ struct CmdOptions {
   LinkAddress final_send_address;
   LinkAddress final_recv_address;
   int timeout_ms = 0;
+  // Distinguishes "--timeout 0" (explicit) from "--timeout not passed" (both
+  // otherwise leave timeout_ms == 0); only the explicit form enables the
+  // immediate-teardown-on-local-disconnect behavior.
+  bool timeout_explicitly_set = false;
   bool multi_channel = false;
 
   int num_packages = -1;
@@ -258,6 +262,7 @@ static std::optional<CmdOptions> parseOpts(int argc, char **argv) {
       try {
         // convert from seconds to milliseconds
         opts.timeout_ms = static_cast<int>(ceil(std::stod(optarg) * 1000));
+        opts.timeout_explicitly_set = true;
         fprintf(stdout, "timeout %d\n", opts.timeout_ms);
       } catch (std::exception &e) {
         fprintf(stderr, "%s: received invalid argument for timeout %s\n",
@@ -750,7 +755,8 @@ void forward_conduit_to_local(std::shared_ptr<Raceboat::Conduit> conduit, int lo
 }
 
 void forward_local_to_conduit_client(int local_sock, std::shared_ptr<Raceboat::Conduit> conduit, 
-                              std::shared_ptr<std::atomic_int> activityTimeoutTs, const int timeoutSeconds) {
+                              std::shared_ptr<std::atomic_int> activityTimeoutTs, const int timeoutSeconds,
+                              bool exitOnClientDisconnect) {
   local_sock = dup(local_sock);
   std::vector<uint8_t> buffer(BUF_SIZE);
   printf("local_to_conduit with socket fd %d, and %d second timeout\n", local_sock, timeoutSeconds);
@@ -785,9 +791,15 @@ void forward_local_to_conduit_client(int local_sock, std::shared_ptr<Raceboat::C
       perror(buf);
       break;
     } else { // 0 - indicates graceful disconnect
-      printf("Remote socket disconnected, keeping conduit open until timeout\n");
-      client_disconnect = true;
-      // This will cause the conduit_to_local thread to exit but _not_ close the conduit
+      if (exitOnClientDisconnect) {
+        printf("Remote socket disconnected, timeout=0 configured - tearing down conduit immediately\n");
+      } else {
+        printf("Remote socket disconnected, keeping conduit open until timeout\n");
+        client_disconnect = true;
+      }
+      // This unblocks the conduit_to_local thread; the conduit is left open
+      // for a possible reconnect only when NOT in immediate-teardown mode
+      // (client_disconnect stays false below, so the tail close() below runs)
       conduit->cancelRead();
       printf("conduit.cancelRead Called\n");
       break;
@@ -863,12 +875,12 @@ void forward_conduit_to_local_client(std::shared_ptr<Raceboat::Conduit> conduit,
   printf("Exiting conduit_to_local_client loop\n");
 }
 
-int relay_data_loop_client(const int client_sock, std::shared_ptr<Raceboat::Conduit> conduit, const int timeoutSeconds) {
+int relay_data_loop_client(const int client_sock, std::shared_ptr<Raceboat::Conduit> conduit, const int timeoutSeconds, bool exitOnClientDisconnect) {
   printf("relay_data_loop socket: %d with race read timeout %d seconds\n", client_sock, timeoutSeconds);
   std::shared_ptr<std::atomic_int> activityTimeoutTs = std::make_shared<std::atomic_int>(now() + timeoutSeconds);
 
-  std::thread local_to_conduit_thread([client_sock, conduit, activityTimeoutTs, timeoutSeconds]() {
-    forward_local_to_conduit_client(client_sock, conduit, activityTimeoutTs, timeoutSeconds);
+  std::thread local_to_conduit_thread([client_sock, conduit, activityTimeoutTs, timeoutSeconds, exitOnClientDisconnect]() {
+    forward_local_to_conduit_client(client_sock, conduit, activityTimeoutTs, timeoutSeconds, exitOnClientDisconnect);
   });
 
   std::thread conduit_to_local_thread([client_sock, conduit, activityTimeoutTs, timeoutSeconds]() {
@@ -908,7 +920,8 @@ void relay_data_loop(const int client_sock, std::shared_ptr<Raceboat::Conduit> c
 void client_connection_loop(int server_sock,
                             const BootstrapConnectionOptions &conn_opt,
                             Race &race,
-                            bool bootstrapping) {
+                            bool bootstrapping,
+                            bool exitOnClientDisconnect) {
   pollfd poll_fd;
   memset(&poll_fd, 0, sizeof(poll_fd));
   poll_fd.fd = server_sock;
@@ -956,6 +969,7 @@ void client_connection_loop(int server_sock,
                 conn_opt.init_send_address; // generated in handle_server_connect
               send_opt.recv_channel = conn_opt.init_recv_channel;
               send_opt.recv_role = conn_opt.init_recv_role;
+              send_opt.recv_address = conn_opt.init_recv_address;
               send_opt.alt_channel = conn_opt.final_send_channel;
 
               std::tie(status, tmp_connection) = race.dial_str(send_opt, "");
@@ -969,10 +983,17 @@ void client_connection_loop(int server_sock,
         if (connection->getHandle() != NULL_RACE_HANDLE) {
           printf("Conduit connection success\n");
           // block so accept() isn't called until after socket error
-          auto currentTimeoutTs = relay_data_loop_client(client_sock->load(), connection, timeoutSeconds);
+          auto currentTimeoutTs = relay_data_loop_client(client_sock->load(), connection, timeoutSeconds, exitOnClientDisconnect);
           client_sock->store(0);
           printf("Exited relay_data_loop_client\n");
           printf("connect.getHandle() %lu\n", connection->getHandle());
+          if (exitOnClientDisconnect) {
+            // timeout=0 was explicitly requested: the conduit has already been
+            // torn down by relay_data_loop_client, so exit instead of waiting
+            // for a possible reconnect.
+            printf("timeout=0 configured: exiting client connection loop after local disconnect\n");
+            break;
+          }
           if (connection->getHandle() != NULL_RACE_HANDLE) {
             std::thread stale_conduit_timeout_thread([client_sock, connection, currentTimeoutTs]() {
               int sleepTime = currentTimeoutTs - now();
@@ -1041,6 +1062,7 @@ int handle_client_connect(const CmdOptions &opts) {
       opts.init_send_address; // generated in handle_server_connect
   conn_opt.init_recv_channel = opts.init_recv_channel;
   conn_opt.init_recv_role = opts.init_recv_role;
+  conn_opt.init_recv_address = opts.init_recv_address;
   conn_opt.final_send_channel = "";
   conn_opt.final_send_role = "";
   conn_opt.final_recv_channel = "";
@@ -1061,7 +1083,10 @@ int handle_client_connect(const CmdOptions &opts) {
     return -1;
   }
 
-  client_connection_loop(server_sock, conn_opt, race, false);
+  // --timeout 0 (explicitly passed) means: don't wait for the local app to
+  // reconnect on disconnect - tear down the conduit and exit immediately.
+  bool exitOnClientDisconnect = opts.timeout_explicitly_set && opts.timeout_ms == 0;
+  client_connection_loop(server_sock, conn_opt, race, false, exitOnClientDisconnect);
 
   printf("closing local socket\n");
   close_socket(server_sock);
@@ -1092,6 +1117,7 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
       opts.init_send_address; // generated in handle_server_connect
   conn_opt.init_recv_channel = opts.init_recv_channel;
   conn_opt.init_recv_role = opts.init_recv_role;
+  conn_opt.init_recv_address = opts.init_recv_address;
   conn_opt.final_send_channel = opts.final_send_channel;
   conn_opt.final_send_role = opts.final_send_role;
   conn_opt.final_recv_channel = opts.final_recv_channel;
@@ -1112,7 +1138,10 @@ int handle_client_bootstrap_connect(const CmdOptions &opts) {
     return -1;
   }
 
-  client_connection_loop(server_sock, conn_opt, race, true);
+  // --timeout 0 (explicitly passed) means: don't wait for the local app to
+  // reconnect on disconnect - tear down the conduit and exit immediately.
+  bool exitOnClientDisconnect = opts.timeout_explicitly_set && opts.timeout_ms == 0;
+  client_connection_loop(server_sock, conn_opt, race, true, exitOnClientDisconnect);
 
   printf("closing local socket\n");
   close_socket(server_sock);
@@ -1147,6 +1176,7 @@ ApiStatus server_connections_loop(Race &race, BootstrapConnectionOptions &conn_o
       recv_opt.send_channel = conn_opt.init_send_channel;
       recv_opt.send_role = conn_opt.init_send_role;
       recv_opt.recv_address = conn_opt.init_recv_address;
+      recv_opt.send_address = conn_opt.init_send_address;
       std::tie(status1, link_addr, listener) = race.listen(recv_opt);
   }
   if (status1 != ApiStatus::OK) {

@@ -1,0 +1,27 @@
+# NEEDS AUDIT: "initial" is a genuinely mixed slot - the listener and
+# connector each use a DIFFERENT plugin/channel per direction (listener
+# recv=racebird/send=decomposed-exemplars; connector
+# recv=decomposed-exemplars/send=racebird). There's no single "bidi channel"
+# here to reason about via link_topology.py's is_single_bidi_channel() - each
+# direction is its own separate physical link. This assumes the general
+# "whoever RECEIVES on a channel/direction CREATEs its link, whoever SENDs
+# LOADs the peer's address" convention (which matches the confirmed override
+# behavior seen in bootstrap-*-final-l2c.yaml), but has NOT been confirmed
+# against a real run of this specific mixed-slot scenario.
+#
+# Note: the scenario's linkDirectionOverrides key targets
+# decomposed-exemplars's "final" slot, but "final" here actually uses plain
+# racebird for both nodes (decomposed-exemplars only appears in "initial") -
+# so the override is a no-op for this scenario, and "final" follows the plain
+# default merged-bidi convention (see bootstrap-racebird-racebird.yaml).
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}
+    - {node: connector, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
+  2:
+    - {node: connector, action: LOAD, channel: obfs4, slot: initial, count: 1}
+    - {node: listener, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
+  3:
+    - {node: listener, action: CREATE, channel: obfs4, slot: final, count: 1}
+  4:
+    - {node: connector, action: LOAD, channel: obfs4, slot: final, count: 1}

@@ -234,6 +234,11 @@ bool ComponentPackageManager::generateFragmentsForPackage(
         
         fragments[packageFragment->handle] = packageFragment.get();
         actionInfo->fragments.push_back(packageFragment.get());
+        if (packageInfo->link != link) {
+          helper::logError("ComponentPackageManager::generateFragmentsForPackage: DIAG "
+                           "MISMATCH assigning package (owned by link " +
+                           packageInfo->link->linkId + ") to action on link " + link->linkId);
+        }
         packageInfo->packageFragments.push_back(std::move(packageFragment));
         actionInfo->linkId = link->linkId;
 
@@ -564,10 +569,15 @@ void ComponentPackageManager::generateFragmentsForAllPackages() {
       }
 
       // don't remove packages from actions that are already being encoded for
+      bool anyEncodingInFlight = false;
       for (auto &encodingInfo : actionInfo->encoding) {
         if (encodingInfo.state != EncodingState::UNENCODED) {
-          continue;
+          anyEncodingInFlight = true;
+          break;
         }
+      }
+      if (anyEncodingInFlight) {
+        continue;
       }
 
       // Reset package state for any currently enqueued content

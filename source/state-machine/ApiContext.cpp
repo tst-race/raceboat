@@ -45,6 +45,16 @@ bool ApiContext::shouldCreateReceiver(const ChannelId &channelId) {
   return shouldCreate(channelId, true);
 }
 
+bool ApiContext::isValidInitSendChannelDirection(const ChannelId &channelId) {
+  ChannelProperties props = manager.getCore().getChannelManager().getChannelProperties(channelId);
+  return props.linkDirection != LD_CREATOR_TO_LOADER;
+}
+
+bool ApiContext::isBidiChannel(const ChannelId &channelId) {
+  ChannelProperties props = manager.getCore().getChannelManager().getChannelProperties(channelId);
+  return props.linkDirection == LD_BIDI;
+}
+
 bool ApiContext::shouldUseSingleBidiLink(const ChannelId &sendChannel, 
                                          const ChannelId &recvChannel) {
   // Can only use single bidirectional link if both channels are the same

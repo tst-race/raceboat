@@ -1,0 +1,50 @@
+# Link event spec for scenarios/bootstrap-decomposed-decomposed-final-l2c.json
+#
+# This scenario overrides BOTH slots to LD_LOADER_TO_CREATOR (see the
+# scenario's linkDirectionOverrides), which flips the "usual" bootstrap
+# roles: normally the listener creates the final link and the connector
+# loads it, but here the override means the *initiator of each direction*
+# ends up on the opposite side of create/load than the plain-LD_BIDI default
+# - which is exactly the kind of scenario link_topology.py's old hardcoded
+# "listener always creates final" assumption gets wrong (see its own
+# [MISMATCH] output against this same scenario). This spec instead just
+# describes the sequence actually observed, in whichever direction it goes.
+#
+# twoSixIndirectComposition is LD_BIDI + TT_MULTICAST (see
+# decomposed-exemplars/source/manifest.json), so it is NOT a "single bidi"
+# channel - each side opens two separate physical links (one send, one
+# recv) rather than merging them into one, which is why both listener and
+# dialer each perform one CREATE *and* one LOAD per slot below, instead
+# of a single node creating and the other only loading.
+steps:
+  # The listener (listener) always creates the "initial" phase's
+  # dialer-facing recv link first - the out-of-band-known bootstrap address
+  # a connector doesn't yet know how to reach any other way.
+  1:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial}
+
+  # The connector (dialer) dials in: loads the initial send link, then
+  # (per the LD_LOADER_TO_CREATOR override) creates its own initial recv
+  # link and its final recv link, all as part of the same dial phase.
+  2:
+    - {node: dialer, action: LOAD,   channel: twoSixIndirectComposition, slot: initial}
+    - {node: dialer, action: CREATE, channel: twoSixIndirectComposition, slot: initial}
+    - {node: dialer, action: CREATE, channel: twoSixIndirectComposition, slot: final}
+
+  # The listener (listener) then loads the initial send link and the
+  # final send link the connector just published, and creates its own final
+  # recv link.
+  3:
+    - {node: listener, action: LOAD,   channel: twoSixIndirectComposition, slot: initial}
+    - {node: listener, action: LOAD,   channel: twoSixIndirectComposition, slot: final}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final}
+
+  # The listener (listener) loads the remaining initial recv-direction
+  # link the connector created in step 2.
+  4:
+    - {node: listener, action: LOAD, channel: twoSixIndirectComposition, slot: initial}
+
+  # Finally the connector (dialer) loads the final send-direction link
+  # the listener created in step 3 - completing the final-slot bidi pair.
+  5:
+    - {node: dialer, action: LOAD, channel: twoSixIndirectComposition, slot: final}
