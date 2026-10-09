@@ -177,7 +177,17 @@ def build_channel_registry(
     channel_registry: Dict[str, ChannelInfo] = {}
 
     for plugin_name, plugin_dir in registry.items():
-        adapter = adapters.setdefault(plugin_name, load_adapter(plugin_dir))
+        if plugin_name not in adapters:
+            try:
+                adapters[plugin_name] = load_adapter(plugin_dir)
+            except FileNotFoundError as e:
+                # Not every plugin in plugin_registry.json has a test adapter
+                # yet - skip it here and let resolution below fail with a
+                # clear "missing component"/"unknown channel" error only if a
+                # scenario actually needs something this plugin provides.
+                print(f"  [channel registry] skipping '{plugin_name}' (role={role}): {e}")
+                continue
+        adapter = adapters[plugin_name]
         kit_dir = adapter.kit_dir(role)
         manifest_path = kit_dir / "manifest.json"
         if not manifest_path.exists():
