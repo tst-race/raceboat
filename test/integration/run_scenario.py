@@ -40,6 +40,24 @@ def main() -> int:
 
     wait_time = args.wait_time if args.wait_time is not None else scenario.get("wait_time", 10)
 
+    if scenario["mode"] in ("send", "send-recv"):
+        # These modes don't proxy a persistent local socket (no TCP stub
+        # client/server involved) - see run-send-recv-test.py's docstring.
+        cmd = [
+            sys.executable,
+            str(INTEGRATION_DIR / "run-send-recv-test.py"),
+            "--compose-file", str(compose_path),
+            "--wait-time", str(wait_time),
+            "--name", f"{args.scenario_id} Integration Test",
+            "--listener-container", listener_nodes[0],
+            "--connector-container", connector_nodes[0],
+            "--mode", scenario["mode"],
+            "--send-message", scenario.get("send_message", "Hello from integration test"),
+        ]
+        if scenario["mode"] == "send-recv":
+            cmd += ["--reply-message", scenario.get("reply_message", "Reply from integration test")]
+        return subprocess.run(cmd).returncode
+
     cmd = [
         sys.executable,
         str(INTEGRATION_DIR / "run-integration-test.py"),

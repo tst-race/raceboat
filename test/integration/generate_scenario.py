@@ -30,11 +30,12 @@ import argparse
 import importlib.util
 import json
 import os
+import shlex
 import shutil
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from adapter_types import NodeContribution, NodeRequest  # noqa: E402
@@ -56,6 +57,25 @@ MODE_ROLE_FLAGS = {
         "listener": "server-bootstrap-connect",
         "connector": "client-bootstrap-connect",
     },
+    # Simpler, non-socket-proxying race-cli modes: a single message piped in
+    # via stdin on one side, instead of a persistent local-socket proxy (see
+    # raceboat/app/race-cli/main.cpp's handle_send_oneshot/handle_recv_oneshot/
+    # handle_send_recv/handle_recv_respond and raceboat/README.md's "Basic
+    # Push"/"Request-Reply" sections). "send" is a one-way, fire-and-forget
+    # push (listener side --recv just prints what it receives); "send-recv"
+    # is a single request/reply exchange (listener side --recv-reply reads its
+    # own reply message from stdin up front, then echoes it back to every
+    # request it receives).
+    "send": {"listener": "recv", "connector": "send"},
+    "send-recv": {"listener": "recv-reply", "connector": "send-recv"},
+}
+
+# Modes whose race-cli invocation reads a message from stdin rather than
+# proxying a local socket - node role -> whether that role's command needs a
+# piped stdin message for a given scenario mode.
+STDIN_MESSAGE_ROLES = {
+    "send": {"connector"},
+    "send-recv": {"connector", "listener"},
 }
 
 # --recv-channel/--send-channel flag names per scenario slot.
@@ -283,7 +303,7 @@ def _process_node(
             node.contribution_channels[(slot, direction)] = channel_name
 
 
-def _build_command(scenario: dict, node: Node) -> str:
+def _build_command(scenario: dict, node: Node) -> List[str]:
     mode_flag = MODE_ROLE_FLAGS[scenario["mode"]][node.role]
     parts = [
         "race-cli", "-m", f"--{mode_flag}", "--debug",
@@ -296,6 +316,12 @@ def _build_command(scenario: dict, node: Node) -> str:
         parts.append(f"--{send_flag}={node.contributions[(slot, 'send')].channel_name}")
     if "timeout" in scenario:
         parts.append(f"--timeout={scenario['timeout']}")
+    if node.role == "listener" and scenario["mode"] in ("send", "send-recv"):
+        # --recv/--recv-reply otherwise loop forever (see
+        # handle_recv_oneshot/handle_recv_respond in race-cli/main.cpp) -
+        # bound it to one exchange by default so the container exits on its
+        # own instead of needing to be force-stopped.
+        parts.append(f"--num-packages={scenario.get('num_packages', 1)}")
     seen_contributions: set = set()
     for (slot, direction), contribution in node.contributions.items():
         if id(contribution) in seen_contributions:
@@ -324,10 +350,22 @@ def _build_command(scenario: dict, node: Node) -> str:
                 # direction it's actually assigned to in this slot.
                 flag = "recv-address" if direction == "recv" else "send-address"
             parts.append(f"--{flag}={_quote_shell_arg(value)}")
-    # YAML folded scalars (">") join lines with a single space on their own -
-    # no shell-style "\" continuations, which would end up as literal
-    # characters and get misparsed as escaped-space tokens by docker.
-    return "\n      ".join(parts)
+    return parts
+
+
+def _stdin_message_for(scenario: dict, node: Node) -> Optional[str]:
+    """The "send"/"send-recv" modes read a single message from stdin instead
+    of proxying a local socket (see race-cli/main.cpp's readStdin() calls in
+    handle_send_oneshot/handle_send_recv/handle_recv_respond) - returns that
+    message for a node's role under the scenario's mode, or None if this
+    node's command doesn't read stdin."""
+    if node.role not in STDIN_MESSAGE_ROLES.get(scenario["mode"], set()):
+        return None
+    if node.role == "listener":
+        # --recv-reply's reply is also read from stdin up front (see
+        # handle_recv_respond) - sent back verbatim for every request received.
+        return scenario.get("reply_message", "Reply from integration test")
+    return scenario.get("send_message", "Hello from integration test")
 
 
 def _merge_sidecar_services(nodes: List[Node]) -> Dict[str, dict]:
@@ -440,8 +478,25 @@ def _render_compose(scenario: dict, nodes: List[Node], output_dir: Path, image_t
         lines.append("    networks:")
         lines.append(f"      {network['name']}:")
         lines.append(f"        ipv4_address: {node.ip}")
-        lines.append("    command: >")
-        lines.append("      " + _build_command(scenario, node))
+        command_parts = _build_command(scenario, node)
+        stdin_message = _stdin_message_for(scenario, node)
+        if stdin_message is not None:
+            # "send"/"send-recv" modes read their message from stdin (see
+            # _stdin_message_for) - route it in with a shell pipe, which
+            # needs an actual shell rather than the exec-form argv the other
+            # modes use directly.
+            shell_command = "echo " + shlex.quote(stdin_message) + " | " + " ".join(command_parts)
+            lines.append("    command:")
+            lines.append("      - sh")
+            lines.append("      - -c")
+            lines.append("      - " + json.dumps(shell_command))
+        else:
+            # YAML folded scalars (">") join lines with a single space on
+            # their own - no shell-style "\" continuations, which would end
+            # up as literal characters and get misparsed as escaped-space
+            # tokens by docker.
+            lines.append("    command: >")
+            lines.append("      " + "\n      ".join(command_parts))
         lines.append("")
 
     sidecars = _merge_sidecar_services(nodes)
