@@ -123,3 +123,25 @@ TEST_F(FileSystemTestFixture, makePluginInstallPath) {
   fs::path installPath = fst.makePluginInstallPath(fileName, pluginId);
   EXPECT_STREQ(installPath.c_str(), expectedInstallPath.c_str());
 }
+
+TEST_F(FileSystemTestFixture, sanitizeFilePath) {
+  // Test that invalid characters are replaced with underscores
+  fs::path invalidPath("lastTimestamp:twosix-whiteboard:5000:shared_8e71a650b110");
+  fs::path sanitized = FileSystem::sanitizeFilePath(invalidPath);
+  // Colons should be replaced with underscores
+  EXPECT_STREQ(sanitized.c_str(), "lastTimestamp_twosix-whiteboard_5000_shared_8e71a650b110");
+
+  // Test that valid paths are not modified
+  fs::path validPath("myFile");
+  EXPECT_STREQ(FileSystem::sanitizeFilePath(validPath).c_str(), "myFile");
+
+  // Test nested paths
+  fs::path nestedPath("dir1" / "file:name" / "dir2" / "file>name");
+  fs::path sanitizedNested = FileSystem::sanitizeFilePath(nestedPath);
+  EXPECT_STREQ(sanitizedNested.c_str(), "dir1/file_name/dir2/file_name");
+
+  // Test all invalid characters
+  fs::path allInvalid("\"file<>test|>*.txt");
+  fs::path sanitizedAll = FileSystem::sanitizeFilePath(allInvalid);
+  EXPECT_STREQ(sanitizedAll.c_str(), "_file_test__.*_.txt");
+}
