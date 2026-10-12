@@ -2,13 +2,14 @@
 # CREATE/LOAD counts below assume the default convention (listener creates
 # all links for a slot, connector loads all) - NOT independently verified by
 # existing tooling; audit against a real run's logs before relying on this.
-# twoSixIndirectComposition is LD_BIDI+TT_MULTICAST (never merges), so the
-# send and recv directions are separate physical links - 2 per slot.
+# twoSixIndirectComposition is LD_BIDI+TT_MULTICAST. For the initial slot,
+# the bootstrap handshake merges bidi into a single link (1 link). For the
+# final slot, send and recv directions are separate physical links - 2 per slot.
 steps:
   1:
-    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 2}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
   2:
-    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 2}
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
   3:
     - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 2}
   4:

@@ -136,7 +136,7 @@ TEST_F(FileSystemTestFixture, sanitizeFilePath) {
   EXPECT_STREQ(FileSystem::sanitizeFilePath(validPath).c_str(), "myFile");
 
   // Test nested paths
-  fs::path nestedPath("dir1" / "file:name" / "dir2" / "file>name");
+  fs::path nestedPath = fs::path("dir1") / "file:name" / "dir2" / "file>name";
   fs::path sanitizedNested = FileSystem::sanitizeFilePath(nestedPath);
   EXPECT_STREQ(sanitizedNested.c_str(), "dir1/file_name/dir2/file_name");
 
