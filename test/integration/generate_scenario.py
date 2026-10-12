@@ -426,14 +426,33 @@ def _apply_link_direction_overrides(scenario: dict, nodes: List[Node], output_di
     overrides = scenario.get("linkDirectionOverrides", {})
     if not overrides:
         return
-    for channel_name, slot_overrides in overrides.items():
-        for slot, link_direction in slot_overrides.items():
-            if link_direction not in LINK_DIRECTIONS:
-                raise ValueError(
-                    f"linkDirectionOverrides: unknown linkDirection '{link_direction}' "
-                    f"for channel '{channel_name}' slot '{slot}' "
-                    f"(expected one of {sorted(LINK_DIRECTIONS)})"
-                )
+
+    # Detect format: if keys match node IDs, it's per-node format
+    node_ids = {node.id for node in nodes}
+    is_per_node = any(key in node_ids for key in overrides.keys())
+
+    # Validate link directions
+    if is_per_node:
+        for node_id, node_overrides in overrides.items():
+            if node_id not in node_ids:
+                continue
+            for channel_name, slot_overrides in node_overrides.items():
+                for slot, link_direction in slot_overrides.items():
+                    if link_direction not in LINK_DIRECTIONS:
+                        raise ValueError(
+                            f"linkDirectionOverrides: unknown linkDirection '{link_direction}' "
+                            f"for node '{node_id}' channel '{channel_name}' slot '{slot}' "
+                            f"(expected one of {sorted(LINK_DIRECTIONS)})"
+                        )
+    else:
+        for channel_name, slot_overrides in overrides.items():
+            for slot, link_direction in slot_overrides.items():
+                if link_direction not in LINK_DIRECTIONS:
+                    raise ValueError(
+                        f"linkDirectionOverrides: unknown linkDirection '{link_direction}' "
+                        f"for channel '{channel_name}' slot '{slot}' "
+                        f"(expected one of {sorted(LINK_DIRECTIONS)})"
+                    )
 
     patched: set = set()
     for node in nodes:
@@ -443,9 +462,19 @@ def _apply_link_direction_overrides(scenario: dict, nodes: List[Node], output_di
                 continue
             seen_contributions.add(id(contribution))
             channel_name = node.contribution_channels[(slot, _direction)]
-            slot_overrides = overrides.get(channel_name, {})
+
+            # Get overrides for this node
+            if is_per_node:
+                node_overrides = overrides.get(node.id, {})
+                slot_overrides = node_overrides.get(channel_name, {})
+            else:
+                slot_overrides = overrides.get(channel_name, {})
+
             if slot not in slot_overrides:
                 continue
+
+            link_direction = slot_overrides[slot]
+
             manifest_path = output_dir / "kits" / node.id / contribution.kit_dir.name / "manifest.json"
             manifest = json.loads(manifest_path.read_text())
             props = manifest.get("channel_properties", {}).get(channel_name)
@@ -454,9 +483,10 @@ def _apply_link_direction_overrides(scenario: dict, nodes: List[Node], output_di
                     f"linkDirectionOverrides: channel '{channel_name}' not found in "
                     f"channel_properties of {manifest_path}"
                 )
-            props["linkDirection"] = slot_overrides[slot]
+            props["linkDirection"] = link_direction
             manifest_path.write_text(json.dumps(manifest, indent=4))
-            patched.add((node.id, slot, channel_name, slot_overrides[slot]))
+            patched.add((node.id, slot, channel_name, link_direction))
+
     for node_id, slot, channel_name, link_direction in sorted(patched):
         print(f"  [linkDirectionOverrides] {node_id}: {channel_name} "
               f"(slot={slot}) -> {link_direction}")
@@ -467,7 +497,11 @@ def _render_compose(scenario: dict, nodes: List[Node], output_dir: Path, image_t
     lines = ["services:"]
     for node in nodes:
         lines.append(f"  {node.id}:")
-        lines.append(f"    image: ghcr.io/tst-race/raceboat/raceboat-runtime:{image_tag}")
+        # Use local image without registry prefix when tag is "local"
+        if image_tag == "local":
+            lines.append(f"    image: raceboat-runtime:local")
+        else:
+            lines.append(f"    image: ghcr.io/tst-race/raceboat/raceboat-runtime:{image_tag}")
         lines.append(f"    container_name: {node.id}")
         lines.append(f'    user: "{_host_user_directive()}"')
         listener_ids = [n.id for n in nodes if n.role == "listener"]

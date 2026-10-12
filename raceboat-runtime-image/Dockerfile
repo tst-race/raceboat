@@ -44,7 +44,8 @@ RUN apt-get update && yes | apt-get install -y \
     libevent-2.1-7 \
     parallel \
     libjpeg62-dev \
-    libavdevice-dev
+    libavdevice-dev \
+    libcpprest2.10
     # ffmpeg \
 
 # COPY libflickcurl.so /usr/local/lib/libflickcurl.so

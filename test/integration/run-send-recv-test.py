@@ -116,6 +116,17 @@ def main() -> int:
         fail(f"connector container did not exit cleanly: {wait_result.stderr.strip()}",
              compose_file, listener_container, connector_container)
 
+    # For send mode, also wait for listener to receive and exit
+    if args.mode == 'send':
+        print(f"Waiting up to {args.exit_timeout}s for listener to finish receiving...")
+        wait_result = subprocess.run(
+            ['docker', 'wait', listener_container],
+            capture_output=True, text=True, timeout=args.exit_timeout + 10,
+        )
+        if wait_result.returncode != 0:
+            fail(f"listener container did not exit cleanly: {wait_result.stderr.strip()}",
+                 compose_file, listener_container, connector_container)
+
     print(f"\n{colored('[3/3] Evaluating results...', YELLOW)}")
     listener_log = container_logs(listener_container)
     connector_log = container_logs(connector_container)

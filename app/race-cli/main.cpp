@@ -361,7 +361,9 @@ std::vector<uint8_t> readStdin() {
   while ((c = getchar()) != EOF) {
     buffer.push_back(c);
   }
-  buffer.pop_back(); // pop trailing newline
+  if (!buffer.empty()) {
+    buffer.pop_back(); // pop trailing newline
+  }
   return buffer;
 }
 
@@ -422,12 +424,15 @@ int handle_recv_oneshot(const CmdOptions &opts) {
   int packages_remaining = opts.num_packages;
   while (opts.num_packages == -1 || packages_remaining > 0) {
     auto [status2, received_message] = listener.receive_str();
+    fprintf(stderr, "DEBUG CLI: receive_str returned status=%d, message='%s'\n", static_cast<int>(status2), received_message.c_str());
+    fflush(stderr);
     if (status2 != ApiStatus::OK) {
       RaceLog::logError("RaceCli", "Receive failed\n", "");
       return 1;
     }
 
     printf("%s\n", received_message.c_str());
+    fflush(stdout);
 
     packages_remaining--;
   }
@@ -448,6 +453,7 @@ int handle_send_recv(const CmdOptions &opts) {
   send_opt.send_address = opts.init_send_address;
   send_opt.recv_channel = opts.init_recv_channel;
   send_opt.recv_role = opts.init_recv_role;
+  send_opt.recv_address = opts.init_recv_address;
   send_opt.alt_channel = opts.alt_channel;
 
   // TODO: support channel role for alt channel

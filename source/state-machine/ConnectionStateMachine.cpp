@@ -201,6 +201,8 @@ struct StateConnLinkEstablished : public ConnState {
       nlohmann::json updatedJson =
           nlohmann::json::parse(ctx.updatedLinkAddress);
       nlohmann::json originalJson = nlohmann::json::parse(ctx.linkAddress);
+      helper::logDebug(logPrefix + "Comparing addresses - requested: " +
+                       originalJson.dump() + " received: " + updatedJson.dump());
       if (!detail::containsRequestedAddressFields(originalJson, updatedJson)) {
         helper::logError(logPrefix +
                          "received link address does not preserve requested "
