@@ -5,10 +5,11 @@
 # here to reason about via link_topology.py's is_single_bidi_channel() - each
 # direction is its own separate physical link.
 #
-# Actual observed behavior: obfs4 (racebird) is used for listener's recv and
-# dialer's send in the initial slot. Both sides create/load 2 links each
-# (one per direction since the mixed slot doesn't merge bidi). The final
-# slot uses obfs4 (merged bidi -> 1 link).
+# Actual observed behavior:
+# - Listener creates: 1 obfs4 for initial recv + 1 obfs4 for final bidi = 2 total
+# - Dialer creates: 1 twoSixIndirectComposition for initial recv = 1 total
+# - Listener loads: 1 twoSixIndirectComposition for initial send = 1 total
+# - Dialer loads: 1 obfs4 for initial send + 1 obfs4 for final bidi = 2 total
 #
 # Note: the scenario's linkDirectionOverrides key targets
 # decomposed-exemplars's "final" slot, but "final" here actually uses plain
@@ -17,12 +18,10 @@
 # default merged-bidi convention (see bootstrap-racebird-racebird.yaml).
 steps:
   1:
-    - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 2}
-    - {node: connector, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
-  2:
-    - {node: connector, action: LOAD, channel: obfs4, slot: initial, count: 2}
-    - {node: listener, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
-  3:
+    - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}
     - {node: listener, action: CREATE, channel: obfs4, slot: final, count: 1}
-  4:
-    - {node: connector, action: LOAD, channel: obfs4, slot: final, count: 1}
+    - {node: dialer, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
+  2:
+    - {node: dialer, action: LOAD, channel: obfs4, slot: initial, count: 1}
+    - {node: dialer, action: LOAD, channel: obfs4, slot: final, count: 1}
+    - {node: listener, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
