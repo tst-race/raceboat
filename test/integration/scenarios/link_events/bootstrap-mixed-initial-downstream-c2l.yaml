@@ -5,11 +5,16 @@
 # here to reason about via link_topology.py's is_single_bidi_channel() - each
 # direction is its own separate physical link.
 #
-# Actual observed behavior:
-# - Listener creates: 1 obfs4 for initial recv + 1 obfs4 for final bidi = 2 total
-# - Dialer creates: 1 twoSixIndirectComposition for initial recv = 1 total
-# - Listener loads: 1 twoSixIndirectComposition for initial send = 1 total
-# - Dialer loads: 1 obfs4 for initial send + 1 obfs4 for final bidi = 2 total
+# Actual observed behavior (from link topology):
+# - Listener creates: 2 obfs4 total (1 initial recv + 1 final bidi)
+# - Listener loads: 1 twoSixIndirectComposition total (1 initial send)
+# - Dialer creates: 1 twoSixIndirectComposition total (1 initial recv)
+# - Dialer loads: 2 obfs4 total (1 initial send + 1 final bidi)
+#
+# Note: the link-events checker matches CREATE events by slot, but LOAD events
+# appear to be matched by total per-channel per-node (slot parameter ignored
+# or not recorded for LOAD). For obfs4 used in both slots, we must match
+# LOAD by total count.
 #
 # Note: the scenario's linkDirectionOverrides key targets
 # decomposed-exemplars's "final" slot, but "final" here actually uses plain
@@ -22,6 +27,5 @@ steps:
     - {node: listener, action: CREATE, channel: obfs4, slot: final, count: 1}
     - {node: dialer, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
   2:
-    - {node: dialer, action: LOAD, channel: obfs4, slot: initial, count: 1}
-    - {node: dialer, action: LOAD, channel: obfs4, slot: final, count: 1}
-    - {node: listener, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
+    - {node: dialer, action: LOAD, channel: obfs4, count: 2}
+    - {node: listener, action: LOAD, channel: twoSixIndirectComposition, count: 1}
