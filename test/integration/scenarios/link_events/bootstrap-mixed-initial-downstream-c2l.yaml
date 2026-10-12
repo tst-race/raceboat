@@ -11,12 +11,19 @@
 # - Dialer creates: 1 twoSixIndirectComposition total (1 initial recv)
 # - Dialer loads: 2 obfs4 total (1 initial send + 1 final bidi)
 #
-# Steps are ordered TEMPORALLY to satisfy the cursor mechanism in
-# link_events.py (events in step N+1 must occur after step N's latest event):
-# 1. Initial slot CREATEs (both channels)
-# 2. Initial slot LOADs (both channels) - happen before final slot CREATEs
-# 3. Final slot CREATE (obfs4)
-# 4. Final slot LOAD (obfs4)
+# ACTUAL TEMPORAL ORDER (from log timestamps):
+# 1. listener CREATE obfs4 (initial) ~05:02:34
+# 2. dialer LOAD obfs4 (initial) ~05:02:40-05:02:57 (before dialer CREATE)
+# 3. dialer CREATE twoSixIndirectComposition (initial) ~05:02:57.611
+# 4. listener LOAD twoSixIndirectComposition (initial) ~05:02:57.630
+# 5. listener CREATE obfs4 (final) ~05:02:57.633
+# 6. dialer LOAD obfs4 (final) ~05:03:07
+#
+# Steps ordered to satisfy cursor mechanism (step N+1 events after step N's latest):
+# 1. listener CREATE initial + dialer LOAD initial (latest ~05:02:57)
+# 2. dialer CREATE initial + listener LOAD initial (latest ~05:02:57.630)
+# 3. listener CREATE final (latest ~05:02:57.633)
+# 4. dialer LOAD final (latest ~05:03:07)
 #
 # Note: the scenario's linkDirectionOverrides key targets
 # decomposed-exemplars's "final" slot, but "final" here actually uses plain
@@ -26,9 +33,9 @@
 steps:
   1:
     - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}
-    - {node: dialer, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
-  2:
     - {node: dialer, action: LOAD, channel: obfs4, slot: initial, count: 1}
+  2:
+    - {node: dialer, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
     - {node: listener, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
   3:
     - {node: listener, action: CREATE, channel: obfs4, slot: final, count: 1}
