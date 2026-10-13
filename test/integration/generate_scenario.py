@@ -93,6 +93,43 @@ def load_registry() -> Dict[str, Path]:
     return {name: (INTEGRATION_DIR / rel_path).resolve() for name, rel_path in registry.items()}
 
 
+def _get_effective_link_direction(
+    scenario: dict,
+    node_id: str,
+    channel_name: str,
+    slot: str,
+    kit_dir: Path,
+) -> str:
+    """Compute effective link direction after applying linkDirectionOverrides."""
+    # Start with default from manifest
+    manifest_path = kit_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    props = manifest.get("channel_properties", {}).get(channel_name)
+    if props is None:
+        # Default to LD_BIDI if not found
+        default_direction = "LD_BIDI"
+    else:
+        default_direction = props.get("linkDirection", "LD_BIDI")
+
+    # Apply overrides
+    overrides = scenario.get("linkDirectionOverrides", {})
+    if not overrides:
+        return default_direction
+
+    # Detect format: per-node or global
+    # scenario["nodes"] is a list of dicts with "id" key
+    node_ids = {n["id"] for n in scenario.get("nodes", [])}
+    is_per_node = any(key in node_ids for key in overrides.keys())
+
+    if is_per_node:
+        node_overrides = overrides.get(node_id, {})
+        slot_overrides = node_overrides.get(channel_name, {})
+    else:
+        slot_overrides = overrides.get(channel_name, {})
+
+    return slot_overrides.get(slot, default_direction)
+
+
 def load_adapter(plugin_dir: Path):
     adapter_path = plugin_dir / "test" / "adapter.py"
     if not adapter_path.exists():
@@ -260,7 +297,7 @@ class Node:
 
 def _process_node(
     node: Node, channel_registry: Dict[str, ChannelInfo], adapters: dict,
-    context: dict, resolution_log: List[str],
+    context: dict, resolution_log: List[str], scenario: dict,
 ):
     for slot, channel_spec in node.slots.items():
         directions = (
@@ -286,6 +323,12 @@ def _process_node(
                 owner_plugin, owner_kit_dir = info.plugin_dirs[0]
                 adapter = adapters[owner_plugin]
                 peer_context = context.get((channel_name, slot), {})
+
+                # Compute effective link direction for this slot/direction/channel
+                effective_link_direction = _get_effective_link_direction(
+                    scenario, node.id, channel_name, slot, owner_kit_dir
+                )
+
                 request = NodeRequest(
                     role=node.role,
                     node_id=node.id,
@@ -294,6 +337,7 @@ def _process_node(
                     peer_context=peer_context,
                     composition_name=channel_name if info.is_composition else None,
                     direction=direction if split else None,
+                    effective_link_direction=effective_link_direction,
                 )
                 contribution = adapter.generate_node_contribution(request)
                 contribution.channel_name = channel_name
@@ -580,7 +624,7 @@ def generate(scenario_id: str, image_tag: str) -> Path:
     for node in sorted(nodes, key=lambda n: n.role != "listener"):
         if node.role not in channel_registries:
             channel_registries[node.role] = build_channel_registry(registry, adapters, node.role)
-        _process_node(node, channel_registries[node.role], adapters, context, resolution_log)
+        _process_node(node, channel_registries[node.role], adapters, context, resolution_log, scenario)
 
     # Explicit feedback on which plugin(s) were pulled in for each
     # channel/composition gid used by this scenario, so a developer reading a

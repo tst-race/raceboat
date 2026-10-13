@@ -1,0 +1,24 @@
+# client-connect-mixed-l2c-c2l link-event spec
+#
+# Non-bootstrap scenario demonstrating L2C (upstream) + C2L (downstream) mix.
+# Listener slot: recv=twoSixIndirectComposition (L2C), send=twoSixIndirectCompositionFile (C2L)
+# Connector slot: recv=twoSixIndirectCompositionFile (C2L), send=twoSixIndirectComposition (L2C)
+#
+# Expected behavior per linkDirection:
+# - twoSixIndirectComposition (LD_LOADER_TO_CREATOR):
+#     shouldCreateSender=false, shouldCreateReceiver=true
+#     Listener recv (upstream): CREATE
+#     Connector send (upstream): LOAD
+# - twoSixIndirectCompositionFile (LD_CREATOR_TO_LOADER):
+#     shouldCreateSender=true, shouldCreateReceiver=false
+#     Listener send (downstream): CREATE
+#     Connector recv (downstream): LOAD
+#
+# Total: 2 CREATEs on listener, 2 LOADs on connector
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, count: 1}
+    - {node: listener, action: CREATE, channel: twoSixIndirectCompositionFile, count: 1}
+  2:
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, count: 1}
+    - {node: connector, action: LOAD, channel: twoSixIndirectCompositionFile, count: 1}

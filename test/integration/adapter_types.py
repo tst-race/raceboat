@@ -70,6 +70,11 @@ class NodeRequest:
     # "recv" direction on a listener role and the "send" direction on a
     # connector role, leaving the other direction's contribution address-less.
     direction: Optional[str] = None
+    # Effective link direction after applying scenario linkDirectionOverrides.
+    # One of "LD_BIDI", "LD_LOADER_TO_CREATOR", "LD_CREATOR_TO_LOADER".
+    # Used by adapters to determine if a bootstrap initial direction should
+    # be dynamic (default) or use pre-specified addresses (when overridden).
+    effective_link_direction: Optional[str] = None
 
 
 @dataclass

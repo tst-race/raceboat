@@ -91,6 +91,7 @@ public:
   RaceHandle presetSendConnSMHandle = NULL_RACE_HANDLE;
   ConnectionID presetSendConnId;
   bool presetSendLinkReady = false;
+  std::string presetSendLinkAddress;
 
   std::queue<RaceHandle> preConduitSM;
 };

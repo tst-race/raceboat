@@ -28,6 +28,7 @@
 #include "api-managers/ApiManager.h"
 #include "base64.h"
 #include "helper.h"
+#include <nlohmann/json.hpp>
 
 namespace Raceboat {
 
@@ -89,9 +90,14 @@ void ApiListenContext::updateConnStateMachineConnected(
 };
 
 void ApiListenContext::updateConnStateMachineLinkEstablished(
-    RaceHandle connSMHandle, LinkID /* linkId */, std::string /* linkAddress */) {
+    RaceHandle connSMHandle, LinkID /* linkId */, std::string linkAddress) {
+  MAKE_LOG_PREFIX();
   if (connSMHandle == recvConnSMHandle) {
     recvLinkEstablished = true;
+  } else if (connSMHandle == presetSendConnSMHandle) {
+    presetSendLinkReady = true;
+    presetSendLinkAddress = linkAddress;
+    helper::logInfo(logPrefix + "Preset send link established with address: " + linkAddress);
   }
 };
 
@@ -195,14 +201,24 @@ struct StateListenWaitingForSendConnection : public ListenState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
-    // Pre-establish the reply send link once, up front, when the caller
-    // knows it out of band (ReceiveOptions::send_address) - so every
-    // accepted conduit reuses ONE link instead of each creating its own
-    // duplicate from whatever address its dial handshake happens to carry.
-    // Skipped when using a single bidi connection, since that one
-    // connection already carries both directions.
-    if (ctx.usingSingleBidiConnection || ctx.opts.send_address.empty() ||
-        ctx.presetSendConnSMHandle != NULL_RACE_HANDLE) {
+    // If using single bidi connection or no send address, we don't need a
+    // preset send link - transition immediately to CONNECTION_OPEN.
+    if (ctx.usingSingleBidiConnection || ctx.opts.send_address.empty()) {
+      helper::logDebug(logPrefix + "No preset send link needed, signaling SATISFIED");
+      ctx.pendingEvents.push(EVENT_SATISFIED);
+      return EventResult::SUCCESS;
+    }
+
+    // If preset send link is already established, we're ready to proceed.
+    if (ctx.presetSendLinkReady) {
+      helper::logDebug(logPrefix + "Preset send link ready, signaling SATISFIED");
+      ctx.pendingEvents.push(EVENT_SATISFIED);
+      return EventResult::SUCCESS;
+    }
+
+    // If preset send connection already created, wait for link to be established.
+    if (ctx.presetSendConnSMHandle != NULL_RACE_HANDLE) {
+      helper::logDebug(logPrefix + "Preset send connection exists, waiting for link establishment");
       return EventResult::SUCCESS;
     }
 
@@ -238,7 +254,22 @@ struct StateListenConnectionOpen : public ListenState {
     auto &ctx = getContext(context);
     RaceHandle receiverHandle = ctx.manager.getCore().generateHandle();
 
-    ctx.listenCb(ApiStatus::OK, ctx.recvLinkAddress, receiverHandle);
+    // If using different channels for send and recv, and we have a preset send
+    // link established (or will establish one), return a combined link address
+    // containing both addresses so the dialer can connect to both channels.
+    LinkAddress linkAddressToReturn = ctx.recvLinkAddress;
+    if (!ctx.usingSingleBidiConnection && !ctx.opts.send_channel.empty() &&
+        ctx.opts.send_channel != ctx.recvChannelId && !ctx.presetSendLinkAddress.empty()) {
+      nlohmann::json json;
+      json["recvLinkAddress"] = ctx.recvLinkAddress;
+      json["sendLinkAddress"] = ctx.presetSendLinkAddress;
+      json["recvChannel"] = ctx.recvChannelId;
+      json["sendChannel"] = ctx.opts.send_channel;
+      linkAddressToReturn = json.dump();
+      helper::logInfo(logPrefix + "Returning combined link address for multi-channel listen: " + linkAddressToReturn);
+    }
+
+    ctx.listenCb(ApiStatus::OK, linkAddressToReturn, receiverHandle);
     ctx.listenCb = {};
 
     ctx.manager.registerHandle(ctx, receiverHandle);
@@ -501,7 +532,11 @@ ListenStateEngine::ListenStateEngine() {
 
   // clang-format off
     declareStateTransition(STATE_LISTEN_INITIAL,                       EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED, STATE_LISTEN_WAITING_FOR_SEND_CONNECTION);
-    declareStateTransition(STATE_LISTEN_WAITING_FOR_SEND_CONNECTION,   EVENT_CONN_STATE_MACHINE_CONNECTED,        STATE_LISTEN_CONNECTION_OPEN);
+    // Re-enter on CONNECTED and LINK_ESTABLISHED to check if preset send link is ready
+    declareStateTransition(STATE_LISTEN_WAITING_FOR_SEND_CONNECTION,   EVENT_CONN_STATE_MACHINE_CONNECTED,        STATE_LISTEN_WAITING_FOR_SEND_CONNECTION);
+    declareStateTransition(STATE_LISTEN_WAITING_FOR_SEND_CONNECTION,   EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED, STATE_LISTEN_WAITING_FOR_SEND_CONNECTION);
+    // Transition to CONNECTION_OPEN when preset send link is ready (signaled by EVENT_SATISFIED)
+    declareStateTransition(STATE_LISTEN_WAITING_FOR_SEND_CONNECTION,   EVENT_SATISFIED,                       STATE_LISTEN_CONNECTION_OPEN);
     declareStateTransition(STATE_LISTEN_CONNECTION_OPEN,               EVENT_ALWAYS,                       STATE_LISTEN_WAITING);
     declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_RECEIVE_PACKAGE,              STATE_LISTEN_WAITING);
     declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_ACCEPT,                       STATE_LISTEN_WAITING);
