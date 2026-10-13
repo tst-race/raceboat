@@ -141,11 +141,13 @@ struct StateRecvConnectionOpen : public RecvState {
     if (!ctx.opts.send_address.empty() && ctx.opts.send_channel == ctx.opts.recv_channel) {
       helper::logDebug(logPrefix + "Establishing send link for decomposed channel: " +
                        ctx.opts.send_channel + " at " + ctx.opts.send_address);
-      // Start a connection state machine for the send link (creating=false, sending=true)
-      // since we're loading the peer's send address
+      // Respect channel's linkDirection for send side
+      bool sendCreating = ctx.shouldCreateSender(ctx.opts.send_channel);
+      helper::logDebug(logPrefix + "recv: send linkDirection for '" + ctx.opts.send_channel +
+                       "' -> creating=" + (sendCreating ? "true" : "false"));
       RaceHandle sendConnHandle = ctx.manager.startConnStateMachine(
           ctx.handle, ctx.opts.send_channel, ctx.opts.send_role, ctx.opts.send_address,
-          false, true);
+          sendCreating, true);
       if (sendConnHandle != NULL_RACE_HANDLE) {
         ctx.manager.registerHandle(ctx, sendConnHandle);
       } else {

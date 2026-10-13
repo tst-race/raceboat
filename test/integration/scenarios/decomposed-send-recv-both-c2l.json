@@ -1,17 +1,17 @@
 {
-  "id": "decomposed-send-recv-c2l",
+  "id": "decomposed-send-recv-both-c2l",
   "mode": "send-recv",
-  "wait_time": 15,
-  "send_message": "Hello from decomposed-send-recv-c2l integration test",
-  "reply_message": "Reply from decomposed-send-recv-c2l integration test",
+  "wait_time": 20,
+  "send_message": "Hello from decomposed-send-recv-both-c2l integration test",
+  "reply_message": "Reply from decomposed-send-recv-both-c2l integration test",
   "network": {
-    "name": "decomposed-send-recv-c2l-network",
-    "subnet": "10.43.1.0/24"
+    "name": "decomposed-send-recv-both-c2l-network",
+    "subnet": "10.43.2.0/24"
   },
   "linkDirectionOverrides": {
     "listener": {
       "twoSixIndirectComposition": {
-        "channel": "LD_LOADER_TO_CREATOR"
+        "channel": "LD_CREATOR_TO_LOADER"
       }
     },
     "dialer": {
@@ -24,7 +24,7 @@
     {
       "role": "listener",
       "id": "listener",
-      "ip": "10.43.1.3",
+      "ip": "10.43.2.3",
       "slots": {
         "channel": "twoSixIndirectComposition"
       }
@@ -32,7 +32,7 @@
     {
       "role": "connector",
       "id": "dialer",
-      "ip": "10.43.1.2",
+      "ip": "10.43.2.2",
       "slots": {
         "channel": "twoSixIndirectComposition"
       }

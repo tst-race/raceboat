@@ -56,30 +56,30 @@ def main() -> int:
         ]
         if scenario["mode"] == "send-recv":
             cmd += ["--reply-message", scenario.get("reply_message", "Reply from integration test")]
-        return subprocess.run(cmd).returncode
-
-    cmd = [
-        sys.executable,
-        str(INTEGRATION_DIR / "run-integration-test.py"),
-        "--compose-file", str(compose_path),
-        "--wait-time", str(wait_time),
-        "--name", f"{args.scenario_id} Integration Test",
-        "--server-container", listener_nodes[0],
-        "--client-container", connector_nodes[0],
-        "--additional-clients", *connector_nodes[1:],
-    ]
-    # Optional, opt-in scenario fields for multi-message stress tests: point
-    # at alternate stub scripts and/or set how many sequential round-trip
-    # messages each client exchanges (see tcp-stub-*-multimsg.py). Absent
-    # from every pre-existing scenario, so default single-message behavior
-    # is unaffected.
-    if "stub_server" in scenario:
-        cmd += ["--server-stub-path", str(INTEGRATION_DIR / scenario["stub_server"])]
-    if "stub_client" in scenario:
-        cmd += ["--client-stub-path", str(INTEGRATION_DIR / scenario["stub_client"])]
-    if "messages" in scenario:
-        cmd += ["--messages", str(scenario["messages"])]
-    returncode = subprocess.run(cmd).returncode
+        returncode = subprocess.run(cmd).returncode
+    else:
+        cmd = [
+            sys.executable,
+            str(INTEGRATION_DIR / "run-integration-test.py"),
+            "--compose-file", str(compose_path),
+            "--wait-time", str(wait_time),
+            "--name", f"{args.scenario_id} Integration Test",
+            "--server-container", listener_nodes[0],
+            "--client-container", connector_nodes[0],
+            "--additional-clients", *connector_nodes[1:],
+        ]
+        # Optional, opt-in scenario fields for multi-message stress tests: point
+        # at alternate stub scripts and/or set how many sequential round-trip
+        # messages each client exchanges (see tcp-stub-*-multimsg.py). Absent
+        # from every pre-existing scenario, so default single-message behavior
+        # is unaffected.
+        if "stub_server" in scenario:
+            cmd += ["--server-stub-path", str(INTEGRATION_DIR / scenario["stub_server"])]
+        if "stub_client" in scenario:
+            cmd += ["--client-stub-path", str(INTEGRATION_DIR / scenario["stub_client"])]
+        if "messages" in scenario:
+            cmd += ["--messages", str(scenario["messages"])]
+        returncode = subprocess.run(cmd).returncode
 
     logs_dir = compose_path.parent / "logs"
     print_link_topology_summary(scenario, logs_dir)

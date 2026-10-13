@@ -482,6 +482,7 @@ int handle_recv_respond(const CmdOptions &opts) {
   recv_opt.recv_role = opts.init_recv_role;
 
   recv_opt.recv_address = opts.init_recv_address;
+  recv_opt.send_address = opts.init_send_address;
   recv_opt.send_channel = opts.init_send_channel;
   recv_opt.send_role = opts.init_send_role;
   recv_opt.alt_channel = opts.alt_channel;

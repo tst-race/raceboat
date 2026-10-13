@@ -31,7 +31,23 @@ LOG_LINE_RE = re.compile(
     r"Socket::establish: slot=(?P<slot>\w+) channel=(?P<channel>\S+) "
     r"role=(?P<role>creator|loader)"
 )
+
+# Matches CompositeWrapper/LoaderWrapper/PluginWrapper createLink/loadLinkAddress
+# log lines (used by decomposed plugins in send/send-recv modes).
+COMPOSITE_WRAPPER_RE = re.compile(
+    r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+): .*"
+    r"Raceboat::(?:CompositeWrapper|LoaderWrapper|PluginWrapper)::"
+    r"(?P<method>createLink|createLinkFromAddress|loadLinkAddress)"
+    r": called with getId\(\)=(?P<channel>[^,\s]+)"
+)
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
+
+# Map method names to actions
+METHOD_TO_ACTION = {
+    "createLink": "CREATE",
+    "createLinkFromAddress": "CREATE",
+    "loadLinkAddress": "LOAD",
+}
 
 ROLE_ALIASES = {
     "listener": "listener", "server": "listener",
@@ -70,14 +86,25 @@ def extract_log_events(log_path: Path) -> List[LogEvent]:
     events = []
     for line in log_path.read_text(errors="replace").splitlines():
         m = LOG_LINE_RE.match(line)
-        if not m:
+        if m:
+            events.append(LogEvent(
+                timestamp=datetime.strptime(m["ts"], TIMESTAMP_FORMAT),
+                action=ACTION_FOR_ROLE[m["role"]],
+                channel=m["channel"],
+                slot=m["slot"],
+            ))
             continue
-        events.append(LogEvent(
-            timestamp=datetime.strptime(m["ts"], TIMESTAMP_FORMAT),
-            action=ACTION_FOR_ROLE[m["role"]],
-            channel=m["channel"],
-            slot=m["slot"],
-        ))
+        # Try CompositeWrapper format
+        m = COMPOSITE_WRAPPER_RE.match(line)
+        if m:
+            # For send-recv mode, slot is always "channel"
+            events.append(LogEvent(
+                timestamp=datetime.strptime(m["ts"], TIMESTAMP_FORMAT),
+                action=METHOD_TO_ACTION[m["method"]],
+                channel=m["channel"],
+                slot="channel",
+            ))
+            continue
     return events
 
 

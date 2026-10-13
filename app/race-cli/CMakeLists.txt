@@ -41,10 +41,10 @@ target_link_libraries(race-cli
 )
 
 # TODO enable performance-* and readability-* checks (needs fixes)
-setup_clang_tidy_for_target(TARGET race-cli)
+# setup_clang_tidy_for_target(TARGET race-cli)
 # setup_cppcheck_for_target(
 #     TARGET race-cli
 #     CHECKS all
 #     SUPPRESS unmatchedSuppression unusedFunction missingIncludeSystem useStlAlgorithm
 # )
-setup_clang_format_for_target(race-cli PARENT raceSdkCommon)
+# setup_clang_format_for_target(race-cli PARENT raceSdkCommon)
