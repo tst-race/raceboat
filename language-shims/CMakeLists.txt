@@ -18,6 +18,5 @@
 add_subdirectory(source)
 
 if(NOT ANDROID)
-    # Temporarily disabled tests due to GTest::gmock not found
-    # add_subdirectory(tests EXCLUDE_FROM_ALL)
+    add_subdirectory(tests EXCLUDE_FROM_ALL)
 endif()
