@@ -356,7 +356,7 @@ jobs:
           python3 run_all_scenarios.py \
             --image-tag "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}" \
             --fail-fast \
-            --skip bootstrap-decomposed-decomposed-forced-final-c2l bootstrap-mixed-updown-l2c-c2l bootstrap-decomposed-decomposed bootstrap-decomposed-decomposed-multi-client bootstrap-decomposed-racebird bootstrap-racebird-decomposed-multi-client bootstrap-racebird-multi-client
+            --skip bootstrap-decomposed-decomposed-forced-final-c2l bootstrap-mixed-updown-l2c-c2l bootstrap-decomposed-decomposed bootstrap-decomposed-decomposed-multi-client bootstrap-decomposed-racebird bootstrap-racebird-decomposed-multi-client bootstrap-racebird-multi-client bootstrap-racebird-racebird-forced-l2c
 
       - name: Run standalone shared-address/timeout-zero tests
         working-directory: raceboat/test/integration
