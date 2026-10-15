@@ -1307,6 +1307,12 @@ int handle_server_bootstrap_connect(const CmdOptions &opts) {
   conn_opt.timeout_ms = opts.timeout_ms;
   
   printf("handle_server_bootstrap_connect\n");
+  printf("  init_recv_channel: %s\n", conn_opt.init_recv_channel.c_str());
+  printf("  init_send_channel: %s\n", conn_opt.init_send_channel.c_str());
+  printf("  final_recv_channel: %s\n", conn_opt.final_recv_channel.c_str());
+  printf("  final_send_channel: %s\n", conn_opt.final_send_channel.c_str());
+  printf("  init_recv_address: %s\n", conn_opt.init_recv_address.c_str());
+  printf("  init_send_address: %s\n", conn_opt.init_send_address.c_str());
   
   int local_port = 7777;
   check_for_local_port_override(opts, local_port);

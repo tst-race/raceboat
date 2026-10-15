@@ -313,7 +313,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
         helper::logDebug(logPrefix + " waiting on server to provide final-send link");
         // ctx.finalSendConnSMHandle = NULL_RACE_HANDLE;
       }
-    
+     
       // Handle finalial server->client aka final_recv
       create = ctx.isBidiChannel(ctx.opts.final_recv_channel)
                   ? false
@@ -329,7 +329,7 @@ struct StateBootstrapDialInitial : public BootstrapDialState {
             SocketRequest{ctx.opts.final_recv_channel, ctx.opts.final_recv_role,
                          "", ConnEstablishment::fromLegacy(create, sending, false)},
             "final");
-      
+       
         if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
           helper::logError(logPrefix + " starting connection state machine failed");
           return EventResult::NOT_SUPPORTED;

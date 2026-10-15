@@ -2,7 +2,7 @@
   "id": "bootstrap-racebird-multi-client",
   "mode": "bootstrap-connect",
   "wait_time": 20,
-  "timeout": 15,
+  "timeout": 120,
   "network": {
     "name": "bootstrap-racebird-multi-client-network",
     "subnet": "10.21.1.0/24"

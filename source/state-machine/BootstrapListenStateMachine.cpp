@@ -166,11 +166,14 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
       // to look bidi - the merge mechanism Step 3 migrated. Only one
       // connSM exists for both directions, so there's no ordering race to
       // avoid here.
-      helper::logInfo(logPrefix + "Creating init-send link on " + ctx.opts.init_send_channel + (ctx.opts.init_recv_address.empty() ? "" : " from address: " + ctx.opts.init_recv_address));
+      // For bootstrap, the listener's init_recv_address is the well-known
+      // address the dialer connects to. Use it for the bidi link.
+      const std::string& bidiAddress = ctx.opts.init_recv_address.empty() ? ctx.opts.init_send_address : ctx.opts.init_recv_address;
+      helper::logInfo(logPrefix + "Creating bidirectional init link on " + ctx.opts.init_send_channel + (bidiAddress.empty() ? "" : " from address: " + bidiAddress));
       ctx.initSendConnSMHandle = Socket::establish(
           ctx.manager, ctx.handle,
           SocketRequest{ctx.opts.init_send_channel, ctx.opts.init_send_role,
-                       ctx.opts.init_send_address,
+                       bidiAddress,
                        ConnEstablishment{resolveBidiRole(ModeRole::Listener), LinkDirectionality::Bidi}},
           "initial");
       if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {

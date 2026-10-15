@@ -307,11 +307,17 @@ def _process_node(
         # "split" when recv and send name different channel/composition gids -
         # vs. the common case of one shared bidi contribution filling both
         # directions. See NodeRequest.direction for why adapters need to know.
-        split = directions["recv"] != directions["send"]
+        # For bootstrap slots (initial/final), we ALWAYS split because the
+        # listener's recv (upstream) and send (downstream) need different
+        # deterministic hashtags even when using the same channel gid.
+        # TODO: potentially refactor to support scenarios specifying whether there should be two distinct links or a single one
+        is_bootstrap_slot = slot in ("initial", "final")
+        split = directions["recv"] != directions["send"] or is_bootstrap_slot
 
-        contribution_cache: Dict[str, NodeContribution] = {}
+        contribution_cache: Dict[Tuple[str, Optional[str]], NodeContribution] = {}
         for direction, channel_name in directions.items():
-            contribution = contribution_cache.get(channel_name)
+            cache_key = (channel_name, direction) if split else channel_name
+            contribution = contribution_cache.get(cache_key)
             if contribution is None:
                 info = channel_registry.get(channel_name)
                 if info is None:
@@ -343,7 +349,7 @@ def _process_node(
                 contribution.channel_name = channel_name
                 for plugin_name, kit_dir in info.plugin_dirs:
                     node.needed_kit_dirs[kit_dir.name] = (plugin_name, kit_dir)
-                contribution_cache[channel_name] = contribution
+                contribution_cache[cache_key] = contribution
                 if node.role == "listener" and contribution.address_output is not None:
                     context.setdefault((channel_name, slot), {})[node.id] = (
                         contribution.address_output
