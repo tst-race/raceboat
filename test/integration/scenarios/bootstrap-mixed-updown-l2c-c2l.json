@@ -8,12 +8,8 @@
     "subnet": "10.36.1.0/24"
   },
   "linkDirectionOverrides": {
-    "obfs4": {
-      "initial": "LD_LOADER_TO_CREATOR"
-    },
-    "twoSixIndirectComposition": {
-      "initial": "LD_CREATOR_TO_LOADER"
-    }
+    "obfs4": "LD_LOADER_TO_CREATOR",
+    "twoSixIndirectComposition": "LD_CREATOR_TO_LOADER"
   },
   "nodes": [
     {

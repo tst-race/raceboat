@@ -1,15 +1,13 @@
-# Best-effort default-convention spec (2 connectors, no linkDirectionOverrides).
-# For the initial slot, the bootstrap handshake merges bidi into a single
-# shared link: listener creates 1, each connector loads 1.
-# For the final slot, send and recv directions are separate physical links:
-# 2 per client, so listener creates 4 (2 per client * 2 clients), each
-# connector loads 2.
+# Link event spec for bootstrap-decomposed-decomposed-multi-client
+# With single bidirectional links on LD_BIDI channels:
+# - Initial slot: listener creates 1 bidi link, each connector loads 1
+# - Final slot: listener creates 1 bidi link PER CLIENT, each connector loads 1
 steps:
   1:
     - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
   2:
     - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
   3:
-    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 4}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 2}
   4:
-    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 2}
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}

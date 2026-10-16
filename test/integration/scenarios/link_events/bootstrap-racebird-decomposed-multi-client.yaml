@@ -1,13 +1,18 @@
-# Best-effort default-convention spec (2 connectors, no linkDirectionOverrides).
-# See bootstrap-racebird-decomposed.yaml for per-channel merge reasoning;
-# `listener` aggregates counts across both connectors (dialer/dialer2),
-# `connector` (role keyword) auto-expands to each independently.
+# Link event spec for bootstrap-racebird-decomposed-multi-client
+# initial=obfs4 (single shared bidi link): listener creates 1, all connectors load 1
+# final=twoSixIndirectComposition (single bidi link per client):
+#   listener creates 1 for dialer, dialer loads it,
+#   then listener creates 1 for dialer2, dialer2 loads it
 steps:
   1:
-    - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 2}
+    - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}
   2:
     - {node: connector, action: LOAD, channel: obfs4, slot: initial, count: 1}
   3:
-    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 4}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
   4:
-    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 2}
+    - {node: dialer, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}
+  5:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
+  6:
+    - {node: dialer2, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}
