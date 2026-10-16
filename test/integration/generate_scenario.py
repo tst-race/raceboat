@@ -88,9 +88,118 @@ SLOT_CHANNEL_FLAGS = {
 ADDRESS_FLAGS = {"send-address", "recv-address"}
 
 
+import copy
+
 def load_registry() -> Dict[str, Path]:
     registry = json.loads(REGISTRY_PATH.read_text())
     return {name: (INTEGRATION_DIR / rel_path).resolve() for name, rel_path in registry.items()}
+
+
+def _get_all_kit_dirs(scenario: dict) -> List[Path]:
+    """
+    Get all unique kit directories that will be used by this scenario.
+    Returns a list of Path objects pointing to kit directories (each containing manifest.json).
+    """
+    registry = load_registry()
+    adapters: dict = {}
+    kit_dirs: set = set()
+
+    # Build channel registry for both roles to get all kit directories
+    for role in ("listener", "connector"):
+        channel_registry = build_channel_registry(registry, adapters, role)
+        for info in channel_registry.values():
+            for _plugin_name, kit_dir in info.plugin_dirs:
+                kit_dirs.add(kit_dir)
+
+    return list(kit_dirs)
+
+
+def apply_link_direction_overrides_to_kits(scenario: dict) -> Dict[Path, dict]:
+    """
+    Apply linkDirectionOverrides from scenario to the original kit manifest.json files.
+    
+    Simple per-composition format (NOT per-slot):
+    "linkDirectionOverrides": {
+        "twoSixIndirectComposition": "LD_LOADER_TO_CREATOR",
+        "obfs4": "LD_CREATOR_TO_LOADER"
+    }
+    
+    Applies the same linkDirection to all slots using this channel/composition.
+    
+    Returns a dict mapping kit_dir -> original_manifest for restoration.
+    """
+    overrides = scenario.get("linkDirectionOverrides", {})
+    if not overrides:
+        return {}
+
+    # Validate link directions (simple format: channel -> linkDirection)
+    for channel_name, link_direction in overrides.items():
+        if link_direction not in LINK_DIRECTIONS:
+            raise ValueError(
+                f"linkDirectionOverrides: unknown linkDirection '{link_direction}' "
+                f"for channel/composition '{channel_name}' "
+                f"(expected one of {sorted(LINK_DIRECTIONS)})"
+            )
+
+    kit_dirs = _get_all_kit_dirs(scenario)
+    backups: Dict[Path, dict] = {}
+
+    for kit_dir in kit_dirs:
+        manifest_path = kit_dir / "manifest.json"
+        if not manifest_path.exists():
+            continue
+
+        # Read and backup original manifest (deep copy to avoid mutation issues)
+        original_manifest = json.loads(manifest_path.read_text())
+        backups[kit_dir] = copy.deepcopy(original_manifest)
+
+        # Apply overrides to this kit's manifest (work on a copy)
+        manifest = copy.deepcopy(original_manifest)
+        channel_props = manifest.get("channel_properties", {})
+        modified = False
+
+        for channel_name, link_direction in overrides.items():
+            # Check if this channel/composition exists in this kit's manifest
+            # It could be in channel_properties (for plain channels) or
+            # in plugins[].channels / compositions (for component definitions)
+            if channel_name in channel_props:
+                channel_props[channel_name]["linkDirection"] = link_direction
+                modified = True
+            else:
+                # Also check in plugins[].channels for unified channels
+                for plugin_def in manifest.get("plugins", []):
+                    if channel_name in plugin_def.get("channels", []):
+                        # Channel is defined in this plugin - add/update channel_properties
+                        if channel_name not in channel_props:
+                            channel_props[channel_name] = {}
+                        channel_props[channel_name]["linkDirection"] = link_direction
+                        modified = True
+                    # Check compositions
+                    for composition in plugin_def.get("compositions", []):
+                        if composition["id"] == channel_name:
+                            # Composition is defined in this plugin
+                            # The composition itself doesn't have linkDirection in manifest,
+                            # but its components do. The linkDirection for a composition
+                            # is determined by its transport component.
+                            # For simplicity, we'll also set it on the composition if it exists
+                            # in channel_properties (some manifests may have it there)
+                            if channel_name in channel_props:
+                                channel_props[channel_name]["linkDirection"] = link_direction
+                                modified = True
+
+        if modified:
+            manifest_path.write_text(json.dumps(manifest, indent=4))
+            print(f"  [linkDirectionOverrides] Patched {manifest_path}")
+
+    return backups
+
+
+def restore_link_direction_overrides(backups: Dict[Path, dict]) -> None:
+    """Restore original manifest.json files from backups."""
+    for kit_dir, original_manifest in backups.items():
+        manifest_path = kit_dir / "manifest.json"
+        manifest_path.write_text(json.dumps(original_manifest, indent=4))
+        print(f"  [linkDirectionOverrides] Restored {manifest_path}")
 
 
 def _get_effective_link_direction(
@@ -100,34 +209,16 @@ def _get_effective_link_direction(
     slot: str,
     kit_dir: Path,
 ) -> str:
-    """Compute effective link direction after applying linkDirectionOverrides."""
-    # Start with default from manifest
+    """Get effective link direction from manifest (which may have been patched by overrides)."""
+    # The manifest has already been patched by apply_link_direction_overrides_to_kits()
+    # before generate() is called, so just read the current value.
     manifest_path = kit_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
     props = manifest.get("channel_properties", {}).get(channel_name)
     if props is None:
         # Default to LD_BIDI if not found
-        default_direction = "LD_BIDI"
-    else:
-        default_direction = props.get("linkDirection", "LD_BIDI")
-
-    # Apply overrides
-    overrides = scenario.get("linkDirectionOverrides", {})
-    if not overrides:
-        return default_direction
-
-    # Detect format: per-node or global
-    # scenario["nodes"] is a list of dicts with "id" key
-    node_ids = {n["id"] for n in scenario.get("nodes", [])}
-    is_per_node = any(key in node_ids for key in overrides.keys())
-
-    if is_per_node:
-        node_overrides = overrides.get(node_id, {})
-        slot_overrides = node_overrides.get(channel_name, {})
-    else:
-        slot_overrides = overrides.get(channel_name, {})
-
-    return slot_overrides.get(slot, default_direction)
+        return "LD_BIDI"
+    return props.get("linkDirection", "LD_BIDI")
 
 
 def load_adapter(plugin_dir: Path):
@@ -446,102 +537,6 @@ def _merge_kits(node: Node, output_dir: Path) -> None:
         shutil.copytree(kit_dir, dest)
 
 
-def _apply_link_direction_overrides(scenario: dict, nodes: List[Node], output_dir: Path) -> None:
-    """Test-only hook: lets a scenario "pretend" a channel's manifest-declared
-    linkDirection is something other than its real value, so integration
-    tests can exercise the SDK's LD_CREATOR_TO_LOADER/LD_LOADER_TO_CREATOR
-    code paths (ApiContext::shouldCreateSender/shouldCreateReceiver) even
-    though every plugin currently available for testing (racebird,
-    decomposed-exemplars) is natively LD_BIDI. Patches only the manifest.json
-    already copied into this scenario's generated/<id>/kits/<node>/ - never
-    the plugin's own source/kit tree, so other scenarios/runs are unaffected.
-
-    Keyed per (channel/composition gid, slot) -
-    {"<channel_gid>": {"<slot>": "<linkDirection>"}} - rather than just per
-    channel, since the same channel/composition can be used for both the
-    "initial" and "final" slots (e.g. bootstrap-decomposed-decomposed) and
-    only one of those slots may be a sensible one to force: in particular,
-    init_send_channel (the dialer's first-contact channel to an
-    out-of-band-known address) can never realistically be
-    LD_CREATOR_TO_LOADER, since that would require the dialer to publish a
-    fresh address for a listener that doesn't yet know this dialer exists.
-    Also note channels whose sendType is ST_EPHEM_SYNC (a live, synchronous
-    socket - e.g. racebird's obfs4) can't meaningfully be forced into
-    LD_CREATOR_TO_LOADER/LD_LOADER_TO_CREATOR either, regardless of slot:
-    both peers still need to be simultaneously present to rendezvous, which
-    is only representative of real asymmetric-role channels when paired
-    with an ST_STORED_ASYNC-like (store-and-forward, e.g. whiteboard-based)
-    transport such as decomposed-exemplars' twoSixIndirect.
-    """
-    overrides = scenario.get("linkDirectionOverrides", {})
-    if not overrides:
-        return
-
-    # Detect format: if keys match node IDs, it's per-node format
-    node_ids = {node.id for node in nodes}
-    is_per_node = any(key in node_ids for key in overrides.keys())
-
-    # Validate link directions
-    if is_per_node:
-        for node_id, node_overrides in overrides.items():
-            if node_id not in node_ids:
-                continue
-            for channel_name, slot_overrides in node_overrides.items():
-                for slot, link_direction in slot_overrides.items():
-                    if link_direction not in LINK_DIRECTIONS:
-                        raise ValueError(
-                            f"linkDirectionOverrides: unknown linkDirection '{link_direction}' "
-                            f"for node '{node_id}' channel '{channel_name}' slot '{slot}' "
-                            f"(expected one of {sorted(LINK_DIRECTIONS)})"
-                        )
-    else:
-        for channel_name, slot_overrides in overrides.items():
-            for slot, link_direction in slot_overrides.items():
-                if link_direction not in LINK_DIRECTIONS:
-                    raise ValueError(
-                        f"linkDirectionOverrides: unknown linkDirection '{link_direction}' "
-                        f"for channel '{channel_name}' slot '{slot}' "
-                        f"(expected one of {sorted(LINK_DIRECTIONS)})"
-                    )
-
-    patched: set = set()
-    for node in nodes:
-        seen_contributions: set = set()
-        for (slot, _direction), contribution in node.contributions.items():
-            if id(contribution) in seen_contributions:
-                continue
-            seen_contributions.add(id(contribution))
-            channel_name = node.contribution_channels[(slot, _direction)]
-
-            # Get overrides for this node
-            if is_per_node:
-                node_overrides = overrides.get(node.id, {})
-                slot_overrides = node_overrides.get(channel_name, {})
-            else:
-                slot_overrides = overrides.get(channel_name, {})
-
-            if slot not in slot_overrides:
-                continue
-
-            link_direction = slot_overrides[slot]
-
-            manifest_path = output_dir / "kits" / node.id / contribution.kit_dir.name / "manifest.json"
-            manifest = json.loads(manifest_path.read_text())
-            props = manifest.get("channel_properties", {}).get(channel_name)
-            if props is None:
-                raise ValueError(
-                    f"linkDirectionOverrides: channel '{channel_name}' not found in "
-                    f"channel_properties of {manifest_path}"
-                )
-            props["linkDirection"] = link_direction
-            manifest_path.write_text(json.dumps(manifest, indent=4))
-            patched.add((node.id, slot, channel_name, link_direction))
-
-    for node_id, slot, channel_name, link_direction in sorted(patched):
-        print(f"  [linkDirectionOverrides] {node_id}: {channel_name} "
-              f"(slot={slot}) -> {link_direction}")
-
-
 def _render_compose(scenario: dict, nodes: List[Node], output_dir: Path, image_tag: str) -> str:
     network = scenario.get("network", {"name": "race-network", "subnet": "10.18.1.0/24"})
     lines = ["services:"]
@@ -647,7 +642,6 @@ def generate(scenario_id: str, image_tag: str) -> Path:
     for node in nodes:
         _merge_kits(node, output_dir)
         (output_dir / "logs" / node.id).mkdir(parents=True, exist_ok=True)
-    _apply_link_direction_overrides(scenario, nodes, output_dir)
 
     compose_text = _render_compose(scenario, nodes, output_dir, image_tag)
     compose_path = output_dir / "docker-compose.yml"

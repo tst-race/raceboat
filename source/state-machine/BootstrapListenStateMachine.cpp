@@ -237,55 +237,55 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
       // StateBootstrapListenWaitingForConnections.
     }
 
-    // // Handle final server->client aka final_send
-    // create = ctx.shouldCreateSender(ctx.opts.final_send_channel);
+    // Handle final server->client aka final_send
+    create = ctx.shouldCreateSender(ctx.opts.final_send_channel);
 
-    // // If we are NOT creating then we have to wait for the client to create and send us the address as a hello-response
-    // if (create) {
-    //   bool sending = true;
-    //   ctx.finalSendConnSMHandle = ctx.manager.
-    //     startConnStateMachine(ctx.handle,
-    //                           ctx.opts.final_send_channel,
-    //                           ctx.opts.final_send_role,
-    //                           "",
-    //                           create, // is true
-    //                           sending // is true
-    //                           );
-    //   if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
-    //     helper::logError(logPrefix + " starting connection state machine failed");
-    //     return EventResult::NOT_SUPPORTED;
-    //   }
-    //   ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
-    // }
+    // If we are NOT creating then we have to wait for the client to create and send us the address as a hello-response
+    if (create) {
+      bool sending = true;
+      ctx.finalSendConnSMHandle = ctx.manager.
+        startConnStateMachine(ctx.handle,
+                              ctx.opts.final_send_channel,
+                              ctx.opts.final_send_role,
+                              "",
+                              create, // is true
+                              sending // is true
+                              );
+      if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
+        helper::logError(logPrefix + " starting connection state machine failed");
+        return EventResult::NOT_SUPPORTED;
+      }
+      ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
+    }
   
-    // // Skip final recv channel if it is empty
-    // // This SHOULD indicate the final_send_channel is bidirectional, otherwise this is a mistake and should be caught earlier during input validation
-    // if (ctx.opts.final_recv_channel.empty()) {
-    //   // TODO handle opening a receiving connection in addition to the sending connection on the "send" link above
-    // }
-    // else {
-    //   // Handle finalial client->server aka final_recv
-    //   create = ctx.shouldCreateReceiver(ctx.opts.final_recv_channel);
+    // Skip final recv channel if it is empty
+    // This SHOULD indicate the final_send_channel is bidirectional, otherwise this is a mistake and should be caught earlier during input validation
+    if (ctx.opts.final_recv_channel.empty()) {
+      // TODO handle opening a receiving connection in addition to the sending connection on the "send" link above
+    }
+    else {
+      // Handle finalial client->server aka final_recv
+      create = ctx.shouldCreateReceiver(ctx.opts.final_recv_channel);
 
-    //   // If we are NOT creating then we are waiting for the client to create and send the address as a hello-response
-    //   if (create) {
-    //     bool sending = false;
-    //     ctx.finalRecvConnSMHandle = ctx.manager.
-    //       startConnStateMachine(ctx.handle,
-    //                             ctx.opts.final_recv_channel,
-    //                             ctx.opts.final_recv_role,
-    //                             "",
-    //                             create, // is true
-    //                             sending // is false
-    //                             );
+      // If we are NOT creating then we are waiting for the client to create and send the address as a hello-response
+      if (create) {
+        bool sending = false;
+        ctx.finalRecvConnSMHandle = ctx.manager.
+          startConnStateMachine(ctx.handle,
+                                ctx.opts.final_recv_channel,
+                                ctx.opts.final_recv_role,
+                                "",
+                                create, // is true
+                                sending // is false
+                                );
       
-    //     if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
-    //       helper::logError(logPrefix + " starting connection state machine failed");
-    //       return EventResult::NOT_SUPPORTED;
-    //     }
-    //     ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
-    //   }
-    // }
+        if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
+          helper::logError(logPrefix + " starting connection state machine failed");
+          return EventResult::NOT_SUPPORTED;
+        }
+        ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
+      }
+    }
     ctx.pendingEvents.push(EVENT_ALWAYS);
     return EventResult::SUCCESS;
   }
@@ -299,6 +299,12 @@ struct StateBootstrapListenWaitingForConnections : public BootstrapListenState {
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
+
+    helper::logDebug(logPrefix + "WaitingForConnections enter: initUsingSingleBidiConnection=" + std::to_string(ctx.initUsingSingleBidiConnection) +
+                     " initSendConnSMHandle=" + std::to_string(ctx.initSendConnSMHandle) +
+                     " initRecvConnId=" + ctx.initRecvConnId +
+                     " initSendLinkReady=" + std::to_string(ctx.initSendLinkReady) +
+                     " initSendConnId=" + ctx.initSendConnId);
 
     // Establish init-send only after init-recv's own link is ready, so the
     // two connSMs don't race through the same channel-activation event and
