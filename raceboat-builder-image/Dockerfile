@@ -167,6 +167,9 @@ RUN for ARCH in x86_64 arm64-v8a; do \
     rm /tmp/python-*.tar.gz
 
 # Cppcheck (Linux-only)
+# libpcre3 is required at runtime by the prebuilt cppcheck binary but is no longer installed by default on Ubuntu 24.04
+RUN apt-get install -y libpcre3
+
 ARG CPPCHECK_VERSION=2.4.1-1
 RUN case ${TARGETPLATFORM} in \
         "linux/amd64") LINUX_ARCH=x86_64    ;; \

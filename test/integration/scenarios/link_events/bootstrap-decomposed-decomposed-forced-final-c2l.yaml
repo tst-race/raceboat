@@ -1,0 +1,14 @@
+# Link event spec for scenarios/bootstrap-decomposed-decomposed-forced-final-c2l.json
+# The initial channel is bidirectional, so we expect just a single listener CREATE and connector LOAD
+# The final channel is overridden as CREATOR_TO_LOADER, so it should require each side to CREATE one and LOAD the created address
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
+  2:
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
+    - {node: connector, action: CREATE, channel: twoSixIndirectCompositionFile, slot: final, count: 1}
+  4:
+    - {node: listener, action: LOAD, channel: twoSixIndirectCompositionFile, slot: final, count: 1}
+    - {node: listener, action: CREATE, channel: twoSixIndirectCompositionFile, slot: final, count: 1}
+  5:
+    - {node: connector, action: LOAD, channel: twoSixIndirectCompositionFile, slot: final, count: 1}

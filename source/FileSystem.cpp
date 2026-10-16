@@ -16,6 +16,8 @@
 
 #include "FileSystem.h"
 
+#include <set>
+
 #include "helper.h"
 
 namespace Raceboat {
@@ -128,7 +130,7 @@ fs::path FileSystem::makePluginFilePath(const fs::path &filePath,
   fs::path path = pluginsInstallPath /
                   pluginId; // throws exception if pluginId empty
   if (!filePath.empty()) {  // would throw exception otherwise
-    path = path / filePath;
+    path = path / sanitizeFilePath(filePath);
   }
   return path;
 }
@@ -138,7 +140,7 @@ fs::path FileSystem::makePluginInstallPath(const fs::path &filePath,
   fs::path path = makePluginInstallBasePath() /
                   pluginId; // throws exception if pluginId empty
   if (!filePath.empty()) {  // would throw exception otherwise
-    path = path / filePath;
+    path = path / sanitizeFilePath(filePath);
   }
   return path;
 }
@@ -224,6 +226,24 @@ bool FileSystem::createDirectories(const fs::path &absPath) {
     return false;
   }
   return true;
+}
+
+fs::path FileSystem::sanitizeFilePath(const fs::path &filePath) {
+  // Characters invalid in GitHub Actions artifact paths (and some filesystems)
+  // that need to be replaced with underscores
+  const std::set<char> invalidChars = {'"', ':', '<', '>', '|', '*', '?', '\r', '\n'};
+
+  fs::path result;
+  for (const auto &component : filePath) {
+    std::string compStr = component.string();
+    for (char &c : compStr) {
+      if (invalidChars.count(c)) {
+        c = '_';
+      }
+    }
+    result /= compStr;
+  }
+  return result;
 }
 
 } // namespace Raceboat

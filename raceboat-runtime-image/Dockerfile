@@ -14,7 +14,7 @@
 # limitations under the License.
 # 
 
-FROM --platform=$TARGETPLATFORM ghcr.io/tst-race/raceboat/raceboat-plugin-builder:latest as base
+FROM --platform=$TARGETPLATFORM ghcr.io/tst-race/raceboat/raceboat-builder:main as base
 LABEL maintainer="Two Six Labs <race@twosixlabs.com>"
 
 ARG TARGETARCH
@@ -24,15 +24,21 @@ RUN echo "building for architecture $TARGETARCH"
 FROM base as amd64-linux
 COPY racesdk/package/LINUX_x86_64/app/race-cli /usr/local/bin/race-cli
 COPY racesdk/package/LINUX_x86_64/app/bridge-distro /usr/local/bin/bridge-distro
+COPY racesdk/package/LINUX_x86_64/lib /linux/x86_64/lib
 
 # arm64 linux
 FROM base as arm64-linux
 COPY racesdk/package/LINUX_arm64-v8a/app/race-cli /usr/local/bin/race-cli
 COPY racesdk/package/LINUX_arm64-v8a/app/bridge-distro /usr/local/bin/bridge-distro
+COPY racesdk/package/LINUX_arm64-v8a/lib /linux/arm64-v8a/lib
 
 # Installing PluginCommsTwoSixStubDecomposed and Destini dependencies at system level
 # TODO: refactor those plugins to bring their own dependencies with them
 FROM ${TARGETARCH}-linux
+# race-cli/bridge-distro are built on the host (possibly as root with a
+# restrictive umask) - force executable/readable for all regardless, since
+# integration-test containers run as an arbitrary non-root --user.
+RUN chmod a+rX /usr/local/bin/race-cli /usr/local/bin/bridge-distro
 RUN apt-get update && yes | apt-get install -y \
     libboost-system1.74.0 \
     libboost-filesystem1.74.0 \
@@ -40,7 +46,8 @@ RUN apt-get update && yes | apt-get install -y \
     libevent-2.1-7 \
     parallel \
     libjpeg62-dev \
-    libavdevice-dev
+    libavdevice-dev \
+    libcpprest2.10
     # ffmpeg \
 
 # COPY libflickcurl.so /usr/local/lib/libflickcurl.so

@@ -1,0 +1,24 @@
+# Link event spec for scenarios/bootstrap-decomposed-decomposed.json
+#
+# twoSixIndirectComposition is LD_BIDI + TT_MULTICAST (see
+# decomposed-exemplars/source/manifest.json). With the fix for single
+# bidirectional links on LD_BIDI channels, the bootstrap handshake uses
+# a single merged connection per slot:
+# - Initial: Listener creates initial-recv, Dialer loads initial-send
+# - Final: Listener creates final bidi link, Dialer loads final bidi link
+steps:
+  # The listener (listener) creates the "initial" phase's recv link first
+  1:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial}
+
+  # The connector (dialer) dials in: loads the initial send link
+  2:
+    - {node: dialer, action: LOAD, channel: twoSixIndirectComposition, slot: initial}
+
+  # The listener creates the single bidirectional final link
+  3:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final}
+
+  # The connector (dialer) loads the final bidirectional link
+  4:
+    - {node: dialer, action: LOAD, channel: twoSixIndirectComposition, slot: final}

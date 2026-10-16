@@ -2,6 +2,10 @@
 
 This directory contains generic infrastructure for testing raceboat plugins end-to-end using Docker Compose.
 
+> **Testing a newly developed plugin?** See [TESTING_NEW_PLUGINS.md](TESTING_NEW_PLUGINS.md)
+> for a step-by-step walkthrough, including plugins whose composition needs
+> components (e.g. an encoding) implemented by a different plugin.
+
 ## Quick Start
 
 **For most development workflows**, use the `build-test.py` orchestrator which handles rebuilds and testing:
@@ -81,9 +85,16 @@ Detailed sequence:
 
 Modern plugins - and every multi-node or `bootstrap-connect` test - are driven
 by a JSON scenario file under `scenarios/*.json` describing the network
-topology (node roles, IPs, and which plugin fills each "slot"). It's rendered
-into a docker-compose file by `generate_scenario.py` (which calls each
-participating plugin's `test/adapter.py`) and executed by `run_scenario.py`:
+topology (node roles, IPs, and which **channel or composition gid** fills
+each "slot", e.g. `"obfs4"`, `"twoSixIndirectComposition"`,
+`"skyhookBasicComposition"` - NOT a `plugin_registry.json` key). Which
+plugin(s) implement that gid is resolved automatically by scanning every
+plugin in `plugin_registry.json`'s built `manifest.json`
+(`generate_scenario.py`'s `build_channel_registry()` - see
+[TESTING_NEW_PLUGINS.md](TESTING_NEW_PLUGINS.md) for the full write-up,
+including compositions that span more than one plugin). The scenario is
+rendered into a docker-compose file by `generate_scenario.py` (which calls
+the owning plugin's `test/adapter.py`) and executed by `run_scenario.py`:
 
 ```bash
 python3 run_scenario.py --scenario-id <scenario-id> --image-tag <tag>
@@ -93,13 +104,51 @@ python3 run_scenario.py --scenario-id <scenario-id> --image-tag <tag>
 - `--image-tag` (default: `main`): the `raceboat-runtime` tag to test against
 - `--wait-time` (optional): overrides the scenario's own `wait_time` (RACE channel establishment delay)
 
+To run every scenario under `scenarios/*.json` in one command (each in its own
+subprocess, with a pass/fail summary printed at the end), use
+`run_all_scenarios.py`:
+
+```bash
+python3 run_all_scenarios.py --image-tag <tag>
+
+# Only run a subset, or exclude some
+python3 run_all_scenarios.py --image-tag <tag> --only racebird-client-connect bootstrap-racebird-racebird
+python3 run_all_scenarios.py --image-tag <tag> --skip bootstrap-decomposed-decomposed-final-c2l
+
+# Stop at the first failure
+python3 run_all_scenarios.py --image-tag <tag> --fail-fast
+```
+
 Currently available scenarios:
 - `racebird-client-connect`, `decomposed-client-connect`,
-  `decomposed-client-connect-multi-client` - single-plugin `client-connect`/`server-connect` mode
+  `decomposed-client-connect-multi-client` - single-channel `client-connect`/`server-connect` mode
+- `decomposed-client-connect-dual-composition` - plain `client-connect` mode,
+  but the "channel" slot uses TWO DIFFERENT compositions of the same plugin
+  (`twoSixIndirectComposition` for recv, `twoSixIndirectCompositionReactive`
+  for send) instead of one shared bidi channel - demonstrates upstream and
+  downstream using genuinely different channels/compositions; see
+  [TESTING_NEW_PLUGINS.md](TESTING_NEW_PLUGINS.md)
 - `bootstrap-decomposed-racebird`, `bootstrap-racebird-multi-client`,
   `bootstrap-racebird-racebird-multi-client`, `bootstrap-racebird-decomposed-multi-client`,
   `bootstrap-decomposed-decomposed-multi-client` - `bootstrap-connect` mode (one listener plus one
-  or more connector nodes, each with an "initial" and "final" plugin slot)
+  or more connector nodes, each with an "initial" and "final" channel/composition slot)
+- `decomposed-client-connect-multi-client-long` - same 2-connector/1-listener
+  topology as `decomposed-client-connect-multi-client` (both connectors
+  legitimately share the SAME listener-created link address), but exchanges
+  10 sequential messages per direction using the `tcp-stub-*-multimsg.py`
+  stubs (see optional scenario keys `messages`/`stub_client`/`stub_server`
+  below) instead of just one, to stress-test sustained multi-client traffic
+  sharing one address
+- `decomposed-client-connect-multi-client-forced-l2c` - same topology/stub
+  setup as the `-long` scenario above, but forces twoSixIndirect's "channel"
+  slot to `LD_LOADER_TO_CREATOR` via `linkDirectionOverrides`. twoSixIndirect
+  posts and fetches using a single `address.hashtag` per Link (see
+  `decomposed-exemplars/source/transport/Link.cpp`), so its native `LD_BIDI`
+  mode shares ONE hashtag for both directions; forcing this override makes
+  each direction create its own separate link/hashtag instead
+- `racebird-client-connect-timeout-zero` - single listener/connector,
+  `"timeout": 0`, used by `test-timeout-zero-teardown.py` (see below) to
+  verify race-cli's immediate-teardown-on-local-disconnect behavior
 
 Each run's generated compose file, merged plugin kits, and per-node
 `raceboat_*.log` files are written to `generated/<scenario-id>/`. Containers
@@ -115,25 +164,41 @@ For `bootstrap-connect` scenarios, `run_scenario.py` also prints a link-topology
 summary (see `link_topology.py`) verifying the listener creates, and each
 connector loads, the expected number of "final"-slot links.
 
+Any scenario can also have an optional, hand-written
+`scenarios/link_events/<scenario-id>.yaml` describing the expected order of
+link `CREATE`/`LOAD` events (which node, which channel, which slot) - see
+[LINK_EVENTS_FORMAT.md](LINK_EVENTS_FORMAT.md). Unlike `link_topology.py`,
+which hardcodes the "listener creates, connector loads" assumption in Python,
+this is a declarative, per-scenario spec, so it correctly describes
+role-reversed scenarios too (e.g. `linkDirectionOverrides`). If a matching
+spec file exists, `run_scenario.py` runs `link_events.py` against it
+automatically and folds a FAILED result into the overall exit code.
+
 ## Files
 
 ### Scripts
 - **`build-test.py`**: Rebuild-and-test orchestrator (raceboat SDK + plugin builds, then runs a scenario or legacy compose test) - see [BUILD_TEST_GUIDE.md](BUILD_TEST_GUIDE.md)
 - **`run_scenario.py`**: Generates a scenario's docker-compose.yml and runs it through `run-integration-test.py`
-- **`generate_scenario.py`**: Renders a `scenarios/*.json` topology into a docker-compose file by calling each plugin's `test/adapter.py`
-- **`link_topology.py`**: Parses debug logs to verify bootstrap-connect final-link creator/loader counts
-- **`run-integration-test.py`**: Generic test orchestrator (plugin-agnostic) that drives an already-generated docker-compose.yml
+- **`run_all_scenarios.py`**: Runs every (or a selected subset of) `scenarios/*.json` scenario via `run_scenario.py` and prints a pass/fail summary
+- **`generate_scenario.py`**: Renders a `scenarios/*.json` topology into a docker-compose file. Scans every plugin in `plugin_registry.json`'s built `manifest.json` to automatically resolve each slot's channel/composition gid to the plugin(s) that implement it (`build_channel_registry()`), then calls the owning plugin's `test/adapter.py`. Supports `--list-channels listener|connector` to print every resolvable channel/composition gid and which plugin(s) it needs, without generating a scenario
+- **`link_topology.py`**: Parses debug logs and prints observed link create/load counts per channel (informational only)
+- **`link_events.py`**: Checks debug logs against a developer-authored `scenarios/link_events/<id>.yaml` link-event ordering spec - see [LINK_EVENTS_FORMAT.md](LINK_EVENTS_FORMAT.md)
+- **`run-integration-test.py`**: Generic test orchestrator (plugin-agnostic) that drives an already-generated docker-compose.yml. Supports optional `--server-stub-path`/`--client-stub-path`/`--messages` args to swap in a different stub pair and/or run multiple sequential round-trip messages (all default to today's single-message behavior)
+- **`test-timeout-zero-teardown.py`**: Standalone test (not scenario-JSON-driven, since it must monitor container lifecycle rather than just message content) verifying that `--timeout 0` tears down the conduit and exits race-cli within 10s of the local application disconnecting
 - **`tcp-stub-server.py`**: Server-side test stub that listens on port 7777
 - **`tcp-stub-client.py`**: Client-side test stub that connects to port 9999
+- **`tcp-stub-server-multimsg.py`** / **`tcp-stub-client-multimsg.py`**: Like the above, but exchange N sequential round-trip messages (`msgI` indices, strict per-connection ordering/id checks) over one persistent connection - used by scenarios that set the `messages`/`stub_server`/`stub_client` keys (e.g. `decomposed-client-connect-multi-client-long`), and by `test-timeout-zero-teardown.py`
 - **`adapter_types.py`**: `NodeRequest`/`NodeContribution` dataclasses - the contract every `test/adapter.py` implements
-- **`plugin_registry.json`**: Maps plugin name -> plugin directory, so `generate_scenario.py` can find each plugin's `test/adapter.py`
+- **`plugin_registry.json`**: Maps plugin name -> plugin directory, so `generate_scenario.py` can scan each plugin's manifest.json and import its `test/adapter.py`. Scenario files reference channel/composition gids directly, not this registry's keys - see `generate_scenario.py --list-channels`
 - **`example-docker-compose.yml`**: Template for legacy (non-adapter) plugin compose files
 
 ### Data
-- **`scenarios/*.json`**: Declarative topology definitions (nodes, roles, plugin slots) consumed by `run_scenario.py`
+- **`scenarios/*.json`**: Declarative topology definitions (nodes, roles, channel/composition slots) consumed by `run_scenario.py`
+- **`scenarios/link_events/<scenario-id>.yaml`**: Optional per-scenario link-event ordering spec consumed by `link_events.py` - see [LINK_EVENTS_FORMAT.md](LINK_EVENTS_FORMAT.md)
 - **`generated/<scenario-id>/`**: Per-run output (compose file, merged kits, logs) - safe to delete between runs
 
 - **`README.md`**: This file
+- **`TESTING_NEW_PLUGINS.md`**: Step-by-step walkthrough for writing a scenario that tests a newly developed plugin, including cross-plugin compositions
 
 ## Usage
 
@@ -159,8 +224,8 @@ python3 run-integration-test.py \
 - `--compose-file <path>`: Path to docker-compose.yml (required)
 - `--wait-time <seconds>`: Time to wait for raceboat channel establishment (default: 10)
 - `--name <name>`: Test name for display (default: raceboat Integration Test)
-- `--server-container <name>`: Server container name (default: rbserver)
-- `--client-container <name>`: Client container name (default: rbclient)
+- `--server-container <name>`: Server container name (default: listener)
+- `--client-container <name>`: Client container name (default: dialer)
 - `--additional-clients <name1> <name2> ...`: Additional client containers for multi-client testing (optional)
 - `--clear-logs`: Clear log directories before running test
 - `--log-dirs <dir1> <dir2> ...`: Log directories to clear (relative to compose file directory)
@@ -193,8 +258,8 @@ To test multiple simultaneous client connections, use the `--additional-clients`
 ```bash
 python3 run-integration-test.py \
     --compose-file docker-compose.yml \
-    --client-container rbclient \
-    --additional-clients rbclient2 rbclient3
+    --client-container dialer \
+    --additional-clients dialer2 dialer3
 ```
 
 This will:
@@ -214,7 +279,7 @@ The test validates that:
 Your docker-compose.yml must have:
 
 ### 1. Container Names
-- Default: `rbserver` and `rbclient`
+- Default: `listener` and `dialer`
 - Or use `--server-container` and `--client-container` flags
 
 ### 2. raceboat Modes
@@ -248,19 +313,26 @@ a `test/adapter.py` module - no plugin-specific `docker-compose.yml`,
 ```python
 from adapter_types import NodeContribution, NodeRequest  # see plugin_registry.json for import path
 
+def kit_dir(role: str) -> Path:
+    return script_dir / ".." / "kit" / "artifacts" / "linux-x86_64-server" / "PluginYourPlugin"
+
 def generate_node_contribution(request: NodeRequest) -> NodeContribution:
     return NodeContribution(
         params={"YourPlugin.node-id": "..."},
         channel_name="yourChannelGid",
-        kit_dir=script_dir / ".." / "kit" / "artifacts" / "linux-x86_64-server" / "PluginYourPlugin",
+        kit_dir=kit_dir(request.role),
         address_output={"...": "..."} if request.role == "listener" else None,
         needs_peer_address=request.role == "connector",
     )
 ```
 
-`generate_node_contribution` is called once per active "slot"
-(`channel`/`initial`/`final`) for every node in the scenario; see
-`adapter_types.py` for the full field-by-field contract.
+`kit_dir(role)` is called up front (before any scenario-specific info is
+known) to scan this plugin's manifest.json and discover which channel/
+composition gid(s) it provides - see `generate_scenario.py`'s
+`build_channel_registry()`. `generate_node_contribution` is then called once
+per active "slot" (`channel`/`initial`/`final`) for every node in the
+scenario whose slot resolves to this plugin; see `adapter_types.py` for the
+full field-by-field contract.
 
 #### Step 2: Register the plugin
 
@@ -272,11 +344,27 @@ Add an entry to `plugin_registry.json`:
 }
 ```
 
+This is only used to discover plugins for manifest scanning - scenario files
+reference the channel/composition gid itself (e.g. `"yourChannelGid"`), not
+this registry key (see Step 3). If your plugin is a decomposed/composition
+plugin whose composition references a component (e.g. an encoding)
+implemented by a DIFFERENT already-registered plugin, that's resolved
+automatically too - no extra bookkeeping needed, as long as both plugins are
+listed here. Run `python3 generate_scenario.py --list-channels listener` (or
+`connector`) to see every channel/composition gid currently resolvable and
+which plugin(s) it needs - useful both when writing a new scenario and when
+reading an existing one that references a gid you don't recognize.
+
 #### Step 3: Add a scenario
 
 Add `scenarios/your-plugin-client-connect.json` describing a listener and one
-or more connector nodes with `"slots": {"channel": "your-plugin"}` (or
-`"initial"`/`"final"` for `bootstrap-connect` scenarios).
+or more connector nodes with `"slots": {"channel": "yourChannelGid"}` (or
+`"initial"`/`"final"` for `bootstrap-connect` scenarios) - using the
+channel/composition gid itself, not the plugin_registry.json key. A slot can
+also be `{"recv": "gidA", "send": "gidB"}` to use two different
+channels/compositions for the two directions (e.g. a plain client-connect
+test where upstream and downstream use different compositions of the same
+plugin, or entirely different plugins).
 
 #### Step 4: Run it
 
@@ -285,6 +373,11 @@ python3 build-test.py --plugin-dir ../../your-plugin --rebuild-plugin
 # or, once built:
 python3 run_scenario.py --scenario-id your-plugin-client-connect
 ```
+
+See [TESTING_NEW_PLUGINS.md](TESTING_NEW_PLUGINS.md) for a step-by-step,
+agent-oriented walkthrough of this process, including the case where your
+plugin's composition needs a component (e.g. an encoding) implemented by a
+different, already-registered plugin.
 
 ### Legacy: hand-written docker-compose.yml
 
@@ -298,7 +391,7 @@ Create a `docker-compose.yml` with your plugin's specific parameters:
 
 ```yaml
 services:
-  rbserver:
+  listener:
     image: ghcr.io/tst-race/raceboat/raceboat-runtime:latest
     command: >
       race-cli -m --server-connect --debug
@@ -306,7 +399,7 @@ services:
       --param YourPlugin.param1="value1"
       --param YourPlugin.param2="value2"
   
-  rbclient:
+  dialer:
     image: ghcr.io/tst-race/raceboat/raceboat-runtime:latest
     command: >
       race-cli -m --client-connect --debug
@@ -314,7 +407,7 @@ services:
       --send-address="YOUR_LINK_ADDRESS"
 ```
 
-This compose file will be invoked by the integration-test script to run the test. The rbclient and rbserver containers must exist and use the specified images (or images built on top of them), and the raceboat command must be invoked. However, the arguments to the race-cli command (e.g. the send address, the params, etc.) will be customized to the plugin being tested. Additionally, for channels reliant on additional self-hosted services (e.g. if testing a "localized" version of an email channel that relies on the existence of an email server) those can be added to the docker-compose file to support a fully automated test.
+This compose file will be invoked by the integration-test script to run the test. The dialer and listener containers must exist and use the specified images (or images built on top of them), and the raceboat command must be invoked. However, the arguments to the race-cli command (e.g. the send address, the params, etc.) will be customized to the plugin being tested. Additionally, for channels reliant on additional self-hosted services (e.g. if testing a "localized" version of an email channel that relies on the existence of an email server) those can be added to the docker-compose file to support a fully automated test.
 
 #### Step 2: Create setup script
 
@@ -414,7 +507,7 @@ If you encounter "Address family not supported" errors, it means your containers
 
 ### Test fails immediately
 - Check that containers started: `docker ps`
-- Check raceboat logs: `docker logs rbserver` and `docker logs rbclient`
+- Check raceboat logs: `docker logs listener` and `docker logs dialer`
 - Verify plugin kits are mounted correctly
 
 ### Client stub times out

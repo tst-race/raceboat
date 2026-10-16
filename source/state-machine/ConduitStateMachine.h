@@ -51,6 +51,11 @@ public:
   virtual void updateClose(RaceHandle handle,
                            std::function<void(ApiStatus)> cb) override;
 
+  // Detects a self-echoed package (see ApiContext::wasRecentlySent) by
+  // comparing against a bounded history of this conduit's own recent sends.
+  virtual bool wasRecentlySent(const std::vector<uint8_t> &fullWireBytes) override;
+  void rememberSent(std::vector<uint8_t> fullWireBytes);
+
 public:
   // list of packages to send out and the callback to call once we get
   // PACKAGE_SENT
@@ -94,6 +99,12 @@ public:
 
   std::string packageId;
   RaceHandle apiHandle;
+
+  // Bounded history of this conduit's own recently-sent raw wire bytes
+  // (packageId-prefixed), used to filter self-echoed packages on a
+  // shared/broadcast-style link.
+  static constexpr size_t maxRecentlySent = 32;
+  std::deque<std::vector<uint8_t>> recentlySent;
 };
 
 class ConduitStateEngine : public StateEngine {
