@@ -16,6 +16,8 @@
 
 #include "ConduitStateMachine.h"
 
+#include <algorithm>
+
 #include "Core.h"
 #include "Events.h"
 #include "PluginWrapper.h"
@@ -52,6 +54,18 @@ void ConduitContext::updateConduitectStateMachineStart(
 void ConduitContext::updateReceiveEncPkg(
     ConnectionID /* connId */, std::shared_ptr<std::vector<uint8_t>> data) {
   this->recvQueue.push(*data);
+}
+
+bool ConduitContext::wasRecentlySent(const std::vector<uint8_t> &fullWireBytes) {
+  return std::find(recentlySent.begin(), recentlySent.end(), fullWireBytes) !=
+         recentlySent.end();
+}
+
+void ConduitContext::rememberSent(std::vector<uint8_t> fullWireBytes) {
+  recentlySent.push_back(std::move(fullWireBytes));
+  while (recentlySent.size() > maxRecentlySent) {
+    recentlySent.pop_front();
+  }
 }
 
 void ConduitContext::updatePackageStatusChanged(RaceHandle pkgHandle,
@@ -128,29 +142,9 @@ struct StateConduitInitial : public ConduitState {
         ctx.manager.getCore().getChannelManager().getChannelProperties(
             channelId);
 
-    auto connId = ctx.recvConnId;
-    // If this is a bidirectional connection then just reuse the send connection ID since that
-    // connection will also be used for receiving.
-    helper::logDebug(logPrefix + " checking for bidirectional channel with send channel: " + ctx.sendChannel + " recv channel: " + ctx.recvChannel + " transmission type: " + std::to_string(props.transmissionType) + " link direction: " + std::to_string(props.linkDirection));  
-    if (ctx.sendChannel == ctx.recvChannel &&
-      props.transmissionType == TT_UNICAST &&
-      props.linkDirection == LD_BIDI) {
-      connId = ctx.sendConnId;
-      helper::logDebug(logPrefix + " using send connection ID for recvConnId since this is a bidirectional channel");
-      // TODO: should I just set recv to send? i.e.
-      // ctx.recvConnId = ctx.sendConnId;
-    }
-
-    // Map the context to the connection ID and package ID for properly routing received messages.
-    ctx.manager.registerPackageId(ctx, connId, ctx.packageId);
-
-    // auto connId = ctx.recvConnId;
-    // ChannelProperties properties = ctx.manager.getCore().getChannelManager().getChannelProperties(ctx.recvChannel);
-    // if (ctx.sendChannel == ctx.recvChannel && properties.transmissionType == TT_UNICAST && properties.linkDirection == LD_BIDI) {
-    //   connId = ctx.sendConnId;
-    // }
-  
-    // ctx.manager.registerPackageId(ctx, connId, ctx.packageId);
+    // Map the context to the connection that delivers received packages. A BIDI channel can
+    // still use distinct send and receive connections, as it does for multi-link transports.
+    ctx.manager.registerPackageId(ctx, ctx.recvConnId, ctx.packageId);
     std::vector<uint8_t> packageIdBytes{ctx.packageId.begin(),
                                         ctx.packageId.end()};
     helper::logDebug(logPrefix + "PackageId: " + json(packageIdBytes).dump());
@@ -197,6 +191,10 @@ struct StateConduitConnected : public ConduitState {
       } else {
         ctx.manager.registerHandle(ctx, pkgHandle);
         ctx.sentQueue[pkgHandle] = std::move(cb);
+        // Remember what we sent so a self-echo delivered back through our
+        // own receive path (e.g. a shared/broadcast link that redelivers a
+        // conduit's own posts) can be recognized and discarded.
+        ctx.rememberSent(prefixedBytes);
       }
 
       cb = {};

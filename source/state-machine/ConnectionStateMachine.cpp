@@ -19,6 +19,7 @@
 #include "../../include/race/Race.h"
 #include "Core.h"
 #include "Events.h"
+#include "LinkAddressValidation.h"
 #include "PluginContainer.h"
 #include "PluginWrapper.h"
 #include "States.h"
@@ -45,6 +46,7 @@ void ApiConnContext::updateConnStateMachineStart(RaceHandle _contextHandle,
   this->create = _creating;
   this->send = _sending;
   this->bidirectional = false;
+  this->establishment = ConnEstablishment::fromLegacy(_creating, _sending, false);
 }
 
 void ApiConnContext::updateConnStateMachineStartBidi(RaceHandle _contextHandle,
@@ -60,6 +62,7 @@ void ApiConnContext::updateConnStateMachineStartBidi(RaceHandle _contextHandle,
   this->create = _creating;
   this->send = true;  // bidirectional implies both send and recv
   this->bidirectional = true;
+  this->establishment = ConnEstablishment::fromLegacy(_creating, true, true);
 }
 
 void ApiConnContext::updateChannelStatusChanged(
@@ -155,7 +158,7 @@ struct StateConnActivated : public ConnState {
     PluginWrapper &plugin = getPlugin(ctx, ctx.channelId);
 
     SdkResponse response = SDK_INVALID;
-    if (ctx.create) {
+    if (ctx.establishment.isCreator()) {
       if (ctx.linkAddress.empty()) {
         response = plugin.createLink(linkHandle, ctx.channelId, 0);
       } else {
@@ -193,30 +196,28 @@ struct StateConnLinkEstablished : public ConnState {
     ctx.manager.registerId(ctx, ctx.linkId);
 
     // TODO I don't think this should be only for recv links
-    if (!ctx.send && !ctx.linkAddress.empty() &&
+    if (!ctx.establishment.isSend() && !ctx.linkAddress.empty() &&
         ctx.updatedLinkAddress != ctx.linkAddress) {
       nlohmann::json updatedJson =
           nlohmann::json::parse(ctx.updatedLinkAddress);
       nlohmann::json originalJson = nlohmann::json::parse(ctx.linkAddress);
-      if (updatedJson != originalJson) {
+      helper::logDebug(logPrefix + "Comparing addresses - requested: " +
+                       originalJson.dump() + " received: " + updatedJson.dump());
+      if (!detail::containsRequestedAddressFields(originalJson, updatedJson)) {
         helper::logError(logPrefix +
-                         "received link address does not match requested link "
-                         "address supplied "
-                         "by user. Requested: " +
+                         "received link address does not preserve requested "
+                         "fields supplied by user. Requested: " +
                          ctx.linkAddress + " got: " + ctx.updatedLinkAddress);
         return EventResult::NOT_SUPPORTED;
       }
     }
 
     // Determine link type based on whether this connection is bidirectional
-    LinkType linkType;
-    if (ctx.bidirectional) {
-      linkType = LT_BIDI;
+    LinkType linkType = ctx.establishment.toLinkType();
+    if (ctx.establishment.isBidi()) {
       helper::logDebug(logPrefix + "Opening bidirectional connection");
-    } else {
-      linkType = ctx.send ? LT_SEND : LT_RECV;
     }
-    
+
     SdkResponse response = plugin.openConnection(openConnHandle, linkType,
                                                  ctx.linkId, "{}", 0, 0, 0);
 

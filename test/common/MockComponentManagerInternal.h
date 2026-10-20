@@ -47,6 +47,8 @@ public:
 
         mockLink.producerId = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
         mockLink2.producerId = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+        mockLink.streamTag = {0, 1, 2, 3};
+        mockLink2.streamTag = {1, 2, 3, 4};
 
         ON_CALL(*this, teardown()).WillByDefault([this]() {
             LOG_EXPECT(this->logger, "teardown");
@@ -65,7 +67,7 @@ public:
         ON_CALL(*this, encodingComponentFromEncodingParams(_))
             .WillByDefault([this](const EncodingParameters &params) {
                 LOG_EXPECT(this->logger, "encodingComponentFromEncodingParams", params);
-                return &encoding;
+                return std::vector<Raceboat::EncodingComponentWrapper *>{&encoding};
             });
         ON_CALL(*this, getTransport()).WillByDefault([this]() {
             LOG_EXPECT(this->logger, "getTransport");
@@ -236,7 +238,7 @@ public:
     MOCK_METHOD(Raceboat::CMTypes::State, getState, (), (override));
     MOCK_METHOD(const std::string &, getCompositionId, (), (override));
 
-    MOCK_METHOD(Raceboat::EncodingComponentWrapper *, encodingComponentFromEncodingParams,
+    MOCK_METHOD(std::vector<Raceboat::EncodingComponentWrapper *>, encodingComponentFromEncodingParams,
                 (const EncodingParameters &params), (override));
     MOCK_METHOD(Raceboat::TransportComponentWrapper *, getTransport, (), (override));
     MOCK_METHOD(Raceboat::UserModelComponentWrapper *, getUserModel, (), (override));

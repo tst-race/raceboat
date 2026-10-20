@@ -208,14 +208,20 @@ public:
       const ConnectionID &recvConnId, const ChannelId &recvChannel,
       const ChannelId &sendChannel, const std::string &sendRole,
       const std::string &sendLinkAddress, const std::string &packageId,
-      std::vector<std::vector<uint8_t>> recvMessages);
+      std::vector<std::vector<uint8_t>> recvMessages,
+      // Non-null when the listener has a pre-established send link (see
+      // ReceiveOptions::send_address) to reuse instead of creating a new
+      // one from sendLinkAddress - avoids one duplicate link per client.
+      RaceHandle existingSendConnSMHandle = NULL_RACE_HANDLE,
+      const ConnectionID &existingSendConnId = "");
   virtual RaceHandle startBootstrapPreConduitStateMachine(
       RaceHandle contextHandle, 
       const ApiBootstrapListenContext &listenContext,
-      // const ConnectionID &initSendConnId, const ChannelId &initSendChannel, const std::string &initSendRole,
-      // const ConnectionID &initRecvConnId, const ChannelId &initRecvChannel, const std::string &initRecvRole,
-      // const ConnectionID &finalSendConnId, const ChannelId &finalSendChannel, const std::string &finalSendRole, const LinkAddress &finalSendAddress
-      // const ConnectionID &finalRecvConnId, const ChannelId &finalRecvChannel, const std::string &finalRecvRole, const LinkAddress &finalRecvAddress
+      // The specific connSM handle/connId that delivered this client's
+      // hello, so a merged single-bidi init link sends this client's
+      // response over its OWN connection rather than the listen context's
+      // first-ever (and possibly already reused/closed) init connection.
+      RaceHandle helloConnSMHandle, const ConnectionID &helloConnId,
       const std::string &packageId,
       std::vector<std::vector<uint8_t>> recvMessages);
   virtual bool

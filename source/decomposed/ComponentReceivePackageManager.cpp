@@ -149,7 +149,14 @@ CmInternalStatus ComponentReceivePackageManager::receiveFragmentSingleProducer(
     std::vector<std::string> &&connVec) {
   TRACE_METHOD(bytes.size(), connVec.size());
 
-  return receiveFragmentProducer("", 0, link, std::move(bytes),
+  // Each fragment is prefixed with the sending link's 4-byte streamTag so
+  // multiple remote senders sharing this link (e.g. an indirect/shared
+  // link) get demultiplexed into separate reassembly queues instead of
+  // colliding on fragment sequence numbers.
+  size_t offset = 0;
+  auto tag = readFromBuffer<std::array<uint8_t, 4>>(bytes, offset);
+  std::string streamTag(tag.begin(), tag.end());
+  return receiveFragmentProducer(streamTag, offset, link, std::move(bytes),
                                  std::move(connVec));
 }
 
@@ -167,6 +174,25 @@ ComponentReceivePackageManager::receiveFragmentMultipleProducer(
                                  std::move(connVec));
 }
 
+ConnectionID ComponentReceivePackageManager::bindConnIdToProducer(
+    Link *link, const std::string &producer) {
+  TRACE_METHOD(link->linkId);
+  std::unordered_set<ConnectionID> claimedConnIds;
+  for (const auto &[otherProducer, queue] : link->producerQueues) {
+    if (otherProducer != producer && !queue.boundConnId.empty()) {
+      claimedConnIds.insert(queue.boundConnId);
+    }
+  }
+  for (const auto &connId : link->connections) {
+    if (claimedConnIds.count(connId) == 0) {
+      helper::logDebug(logPrefix + "Binding producer to connection " + connId);
+      return connId;
+    }
+  }
+  helper::logWarning(logPrefix + "No unbound connection available to bind producer");
+  return "";
+}
+
 CmInternalStatus ComponentReceivePackageManager::receiveFragmentProducer(
     const std::string &producer, size_t offset, Link *link,
     std::vector<uint8_t> &&bytes, std::vector<std::string> &&connVec) {
@@ -177,6 +203,19 @@ CmInternalStatus ComponentReceivePackageManager::receiveFragmentProducer(
 
   auto fragmentQueue = &link->producerQueues[producer];
   fragmentQueue->lastActivity = std::chrono::steady_clock::now();
+
+  // Route this producer's completed packages to a single, specifically
+  // bound connection rather than every connection on the (possibly shared /
+  // multi-client) link - receiveEncPkg rejects more than one connId.
+  if (fragmentQueue->boundConnId.empty()) {
+    fragmentQueue->boundConnId = bindConnIdToProducer(link, producer);
+  }
+  std::vector<std::string> producerConnVec;
+  if (!fragmentQueue->boundConnId.empty()) {
+    producerConnVec.push_back(fragmentQueue->boundConnId);
+  } else {
+    producerConnVec = connVec;
+  }
 
   // Read all fragment data
   while (offset < bytes.size()) {
@@ -199,7 +238,7 @@ CmInternalStatus ComponentReceivePackageManager::receiveFragmentProducer(
                      std::to_string(fragmentQueue->storedFragments[fragmentId].size()));
   }
   // Process any complete sequences starting from lastFragmentReceived + 1
-  processCompleteSequences(fragmentQueue, connVec);
+  processCompleteSequences(fragmentQueue, producerConnVec);
   
   return OK;
 }
@@ -420,8 +459,17 @@ void ComponentReceivePackageManager::runCleanupOnAllQueues() {
         
         cleanupExpiredFragments(&queue);
         
-        // After cleanup, try to process any newly available sequences
-        std::vector<std::string> connVec(link->connections.begin(), link->connections.end());
+        // After cleanup, try to process any newly available sequences,
+        // routed to this producer's bound connection (see receiveFragmentProducer).
+        if (queue.boundConnId.empty()) {
+          queue.boundConnId = bindConnIdToProducer(link, producer);
+        }
+        std::vector<std::string> connVec;
+        if (!queue.boundConnId.empty()) {
+          connVec.push_back(queue.boundConnId);
+        } else {
+          connVec.assign(link->connections.begin(), link->connections.end());
+        }
         processCompleteSequences(&queue, connVec);
       }
     }

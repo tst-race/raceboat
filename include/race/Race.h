@@ -50,6 +50,11 @@ public:
   ChannelId send_channel;
   ChannelId alt_channel;
   LinkAddress recv_address;
+  // Pre-specified address for the listener's own reply link, loaded once
+  // and reused for every accepted conduit instead of creating a fresh,
+  // redundant link per client from whatever address each dial handshake
+  // happens to carry (see ListenStateMachine's presetSendConnSMHandle).
+  LinkAddress send_address;
   std::string send_role;
   std::string recv_role;
   int timeout_ms = 0;
@@ -62,6 +67,11 @@ public:
   ChannelId send_channel;
   ChannelId alt_channel;
   LinkAddress send_address;
+  // Pre-specified address for the dialer's own (non-merged) recv link, to be
+  // loaded instead of freshly created - e.g. so multiple dialers can share
+  // one pre-known reply address rather than each generating their own.
+  // Ignored when send_channel/recv_channel merge into a single bidi link.
+  LinkAddress recv_address;
   std::string send_role;
   std::string recv_role;
   int timeout_ms = 0;

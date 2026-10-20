@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -90,13 +91,13 @@ def main():
     )
     parser.add_argument(
         '--server-container',
-        default='rbserver',
-        help='Server container name (default: rbserver)'
+        default='listener',
+        help='Server container name (default: listener)'
     )
     parser.add_argument(
         '--client-container',
-        default='rbclient',
-        help='Client container name (default: rbclient)'
+        default='dialer',
+        help='Client container name (default: dialer)'
     )
     parser.add_argument(
         '--additional-clients',
@@ -114,6 +115,22 @@ def main():
         nargs='*',
         default=[],
         help='Log directories to clear (relative to compose file directory)'
+    )
+    parser.add_argument(
+        '--server-stub-path',
+        default=None,
+        help='Path to an alternate server stub script (default: tcp-stub-server.py)'
+    )
+    parser.add_argument(
+        '--client-stub-path',
+        default=None,
+        help='Path to an alternate client stub script (default: tcp-stub-client.py)'
+    )
+    parser.add_argument(
+        '--messages',
+        type=int,
+        default=None,
+        help='Number of sequential round-trip messages per client (passed through to stub scripts that support it)'
     )
 
     args = parser.parse_args()
@@ -228,8 +245,8 @@ def main():
             print(f"Testing with {num_clients} simultaneous clients...")
 
         # Copy stubs into containers
-        server_stub = script_dir / 'tcp-stub-server.py'
-        client_stub = script_dir / 'tcp-stub-client.py'
+        server_stub = Path(args.server_stub_path) if args.server_stub_path else script_dir / 'tcp-stub-server.py'
+        client_stub = Path(args.client_stub_path) if args.client_stub_path else script_dir / 'tcp-stub-client.py'
         
         subprocess.run(
             ['docker', 'cp', str(server_stub), f'{server_container}:/tmp/stub-server.py'],
@@ -244,23 +261,41 @@ def main():
 
         # Start server stub in background (with number of expected clients)
         print(f"Starting server stub (expecting {num_clients} clients)...")
+        server_stub_args = f'{num_clients}' if args.messages is None else f'{num_clients} {args.messages}'
         subprocess.run(
             ['docker', 'exec', '-d', server_container, 'bash', '-c',
-             f'python3 /tmp/stub-server.py {num_clients} >/tmp/stub-server.out 2>&1'],
+             f'python3 /tmp/stub-server.py {server_stub_args} >/tmp/stub-server.out 2>&1'],
             check=True
         )
         time.sleep(2)
 
-        # Run client stubs on all clients
+        # Run client stubs on all clients concurrently, so a slow-starting
+        # client isn't forced to wait out an earlier client's full retry
+        # budget before it even begins trying to connect. This matters for
+        # scenarios that assert genuinely simultaneous client connections.
         print(f"Starting {num_clients} client stub(s)...")
-        client_results = []
-        for idx, client in enumerate(all_clients):
-            result = subprocess.run(
-                ['docker', 'exec', client, 'python3', '/tmp/stub-client.py', client],
+        client_results = [None] * num_clients
+
+        def run_client_stub(idx, client):
+            client_stub_cmd = ['docker', 'exec', client, 'python3', '/tmp/stub-client.py', client]
+            if args.messages is not None:
+                client_stub_cmd.append(str(args.messages))
+            client_results[idx] = (client, subprocess.run(
+                client_stub_cmd,
                 capture_output=True,
                 text=True
-            )
-            client_results.append((client, result))
+            ))
+
+        client_threads = [
+            threading.Thread(target=run_client_stub, args=(idx, client))
+            for idx, client in enumerate(all_clients)
+        ]
+        for thread in client_threads:
+            thread.start()
+        for thread in client_threads:
+            thread.join()
+
+        for client, result in client_results:
             print(f"  {client} exited with code: {result.returncode}")
 
         # Write client outputs to temp files

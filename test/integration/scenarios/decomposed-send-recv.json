@@ -1,0 +1,29 @@
+{
+  "id": "decomposed-send-recv",
+  "mode": "send-recv",
+  "wait_time": 15,
+  "send_message": "Hello from decomposed-send-recv integration test",
+  "reply_message": "Reply from decomposed-send-recv integration test",
+  "network": {
+    "name": "decomposed-send-recv-network",
+    "subnet": "10.41.1.0/24"
+  },
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "listener",
+      "ip": "10.41.1.3",
+      "slots": {
+        "channel": "twoSixIndirectComposition"
+      }
+    },
+    {
+      "role": "connector",
+      "id": "dialer",
+      "ip": "10.41.1.2",
+      "slots": {
+        "channel": "twoSixIndirectComposition"
+      }
+    }
+  ]
+}

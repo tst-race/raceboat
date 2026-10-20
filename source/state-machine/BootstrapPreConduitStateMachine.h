@@ -34,10 +34,8 @@ public:
   virtual void updateBootstrapPreConduitStateMachineStart(
       RaceHandle contextHandle,
       const ApiBootstrapListenContext &parentContext,
-      // RaceHandle recvHandle,
-      // const ConnectionID &_recvConnId, const ChannelId &_recvChannel,
-      // const ChannelId &_sendChannel, const std::string &_sendRole,
-      // const std::string &_sendLinkAddress,
+      RaceHandle helloConnSMHandle,
+      const ConnectionID &helloConnId,
       const std::string &_packageId,
       std::vector<std::vector<uint8_t>> recvMessages) override;
   virtual void
@@ -47,6 +45,8 @@ public:
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
                                   std::string linkAddress, LinkID linkId) override;
+  virtual void updateConnStateMachineLinkEstablished(
+      RaceHandle contextHandle, LinkID linkId, std::string linkAddress) override;
   virtual void
   updateListenAccept(std::function<void(ApiStatus, RaceHandle, ConduitProperties)> cb) override;
 
@@ -74,8 +74,24 @@ public:
   LinkAddress finalRecvLinkAddress;
   ConnectionID finalRecvConnId;
 
+  // true when finalSendConnSMHandle/finalRecvConnSMHandle are aliased to the
+  // same merged bidirectional connection; a link we create for this case is
+  // a listening socket, so readiness for sending the hello response only
+  // requires the link's address, not an established peer connection.
+  bool finalUsingSingleBidiConnection = false;
+
+  // Whether THIS side created (vs loaded) each final link - only a created
+  // link's address needs to be reported in the hello response (a loaded
+  // link's address came from the dialer's hello in the first place, so the
+  // dialer already knows it) and only a created link's readiness gate can
+  // skip waiting for a real peer connection (see
+  // StateBootstrapPreConduitWaitingForConnections).
+  bool createdFinalSend = false;
+  bool createdFinalRecv = false;
+
   std::string packageId;
   RaceHandle apiHandle;
+  bool responseSent = false;
 };
 
 class BootstrapPreConduitStateEngine : public StateEngine {
