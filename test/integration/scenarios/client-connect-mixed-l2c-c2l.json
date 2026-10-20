@@ -8,12 +8,8 @@
     "subnet": "10.40.1.0/24"
   },
   "linkDirectionOverrides": {
-    "twoSixIndirectComposition": {
-      "channel": "LD_LOADER_TO_CREATOR"
-    },
-    "twoSixIndirectCompositionFile": {
-      "channel": "LD_CREATOR_TO_LOADER"
-    }
+    "twoSixIndirectComposition": "LD_LOADER_TO_CREATOR",
+    "twoSixIndirectCompositionFile": "LD_CREATOR_TO_LOADER"
   },
   "nodes": [
     {

@@ -6,9 +6,7 @@
   "stub_client": "tcp-stub-client-multimsg.py",
   "stub_server": "tcp-stub-server-multimsg.py",
   "linkDirectionOverrides": {
-    "twoSixIndirectComposition": {
-      "channel": "LD_LOADER_TO_CREATOR"
-    }
+    "twoSixIndirectComposition": "LD_LOADER_TO_CREATOR"
   },
   "network": {
     "name": "decomposed-forced-l2c-network",

@@ -109,10 +109,23 @@ def generate(image_tag: str) -> Path:
     ).kit_dir
     sidecars = dict(decomposed_adapter.SIDECAR_SERVICES)
 
+    # Force linkDirection to LD_LOADER_TO_CREATOR for twoSixIndirectComposition
+    # to test non-bidirectional link behavior with shared hashtags
+    def _patch_manifest_for_loader_to_creator(kit_path: Path) -> None:
+        manifest_path = kit_path / "manifest.json"
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text())
+            channel_props = manifest.get("channel_properties", {})
+            if "twoSixIndirectComposition" in channel_props:
+                channel_props["twoSixIndirectComposition"]["linkDirection"] = "LD_LOADER_TO_CREATOR"
+                manifest_path.write_text(json.dumps(manifest, indent=4))
+                print(f"  [linkDirectionOverride] Patched {manifest_path}: twoSixIndirectComposition -> LD_LOADER_TO_CREATOR")
+
     all_node_ids = [SERVER_ID] + CLIENT_IDS
     for node_id in all_node_ids:
         dest = GENERATED_DIR / "kits" / node_id / kit_dir.name
         shutil.copytree(kit_dir, dest)
+        _patch_manifest_for_loader_to_creator(dest)
         (GENERATED_DIR / "logs" / node_id).mkdir(parents=True, exist_ok=True)
 
     lines = ["services:"]

@@ -9,16 +9,7 @@
     "subnet": "10.43.2.0/24"
   },
   "linkDirectionOverrides": {
-    "listener": {
-      "twoSixIndirectComposition": {
-        "channel": "LD_CREATOR_TO_LOADER"
-      }
-    },
-    "dialer": {
-      "twoSixIndirectComposition": {
-        "channel": "LD_CREATOR_TO_LOADER"
-      }
-    }
+    "twoSixIndirectComposition": "LD_CREATOR_TO_LOADER"
   },
   "nodes": [
     {
