@@ -45,6 +45,16 @@ bool ApiContext::shouldCreateReceiver(const ChannelId &channelId) {
   return shouldCreate(channelId, true);
 }
 
+bool ApiContext::isValidInitSendChannelDirection(const ChannelId &channelId) {
+  ChannelProperties props = manager.getCore().getChannelManager().getChannelProperties(channelId);
+  return props.linkDirection != LD_CREATOR_TO_LOADER;
+}
+
+bool ApiContext::isBidiChannel(const ChannelId &channelId) {
+  ChannelProperties props = manager.getCore().getChannelManager().getChannelProperties(channelId);
+  return props.linkDirection == LD_BIDI;
+}
+
 bool ApiContext::shouldUseSingleBidiLink(const ChannelId &sendChannel, 
                                          const ChannelId &recvChannel) {
   // Can only use single bidirectional link if both channels are the same
@@ -63,16 +73,12 @@ bool ApiContext::shouldUseSingleBidiLink(const ChannelId &sendChannel,
     return false;
   }
   
-  // Currently only support unicast bidirectional (could be extended)
-  if (props.transmissionType != TT_UNICAST) {
-    helper::logDebug("shouldUseSingleBidiLink: Channel '" + sendChannel + 
-                     "' transmissionType is not TT_UNICAST - using separate connections");
-    return false;
-  }
+  // LD_BIDI channels can use single bidirectional link regardless of transmission type.
+  // For TT_MULTICAST, a single Redis connection can both subscribe and publish.
+  // For TT_UNICAST, a single TCP connection is naturally bidirectional.
   
   helper::logInfo("shouldUseSingleBidiLink: Using single bidirectional link for channel '" + sendChannel + "'");
   return true;
 }
-
 
 } // namespace Raceboat

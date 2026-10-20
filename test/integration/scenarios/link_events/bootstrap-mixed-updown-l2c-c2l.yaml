@@ -1,0 +1,19 @@
+# Link event spec for bootstrap-mixed-updown-l2c-c2l
+# Mixed channels per direction (no linkDirectionOverrides):
+# Initial: listener recv=obfs4 (CREATE), listener send=twoSixIndirectComposition (CREATE)
+#          dialer recv=twoSixIndirectComposition (LOAD), dialer send=obfs4 (LOAD)
+# Final:   listener recv=twoSixIndirectComposition (CREATE), listener send=obfs4 (CREATE)
+#          dialer recv=obfs4 (LOAD), dialer send=twoSixIndirectComposition (LOAD)
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
+  2:
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
+    - {node: connector, action: LOAD, channel: obfs4, slot: initial, count: 1}
+  3:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
+    - {node: listener, action: CREATE, channel: obfs4, slot: final, count: 1}
+  4:
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}
+    - {node: connector, action: LOAD, channel: obfs4, slot: final, count: 1}

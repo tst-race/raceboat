@@ -16,6 +16,8 @@
 
 #include "ConduitStateMachine.h"
 
+#include <algorithm>
+
 #include "Core.h"
 #include "Events.h"
 #include "PluginWrapper.h"
@@ -52,6 +54,18 @@ void ConduitContext::updateConduitectStateMachineStart(
 void ConduitContext::updateReceiveEncPkg(
     ConnectionID /* connId */, std::shared_ptr<std::vector<uint8_t>> data) {
   this->recvQueue.push(*data);
+}
+
+bool ConduitContext::wasRecentlySent(const std::vector<uint8_t> &fullWireBytes) {
+  return std::find(recentlySent.begin(), recentlySent.end(), fullWireBytes) !=
+         recentlySent.end();
+}
+
+void ConduitContext::rememberSent(std::vector<uint8_t> fullWireBytes) {
+  recentlySent.push_back(std::move(fullWireBytes));
+  while (recentlySent.size() > maxRecentlySent) {
+    recentlySent.pop_front();
+  }
 }
 
 void ConduitContext::updatePackageStatusChanged(RaceHandle pkgHandle,
@@ -177,6 +191,10 @@ struct StateConduitConnected : public ConduitState {
       } else {
         ctx.manager.registerHandle(ctx, pkgHandle);
         ctx.sentQueue[pkgHandle] = std::move(cb);
+        // Remember what we sent so a self-echo delivered back through our
+        // own receive path (e.g. a shared/broadcast link that redelivers a
+        // conduit's own posts) can be recognized and discarded.
+        ctx.rememberSent(prefixedBytes);
       }
 
       cb = {};

@@ -18,7 +18,9 @@
 
 #include "Core.h"
 #include "Events.h"
+#include "LinkEstablishment.h"
 #include "PluginWrapper.h"
+#include "Socket.h"
 #include "States.h"
 #include "base64.h"
 #include "race/common/EncPkg.h"
@@ -121,8 +123,10 @@ struct StateDialInitial : public DialState {
       // Create a single bidirectional connection state machine
       // For LD_BIDI channels, dialer should load (creating=false) not create
       // Only create if recvChannel is LD_LOADER_TO_CREATOR or sendChannel is LD_CREATOR_TO_LOADER
-      ctx.recvConnSMHandle = ctx.manager.startConnStateMachineBidi(
-          ctx.handle, recvChannelId, recvRole, ctx.opts.send_address, false);
+      ctx.recvConnSMHandle = Socket::establish(
+          ctx.manager, ctx.handle,
+          SocketRequest{recvChannelId, recvRole, ctx.opts.send_address,
+                       ConnEstablishment{resolveBidiRole(ModeRole::Dialer), LinkDirectionality::Bidi}});
       
       if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting bidirectional connection state machine failed");
@@ -133,9 +137,15 @@ struct StateDialInitial : public DialState {
       ctx.sendConnSMHandle = ctx.recvConnSMHandle;
       ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
     } else {
-      // Original behavior: separate receive connection
-      ctx.recvConnSMHandle = ctx.manager.startConnStateMachine(
-          ctx.handle, recvChannelId, recvRole, "", true, false);
+      // Original behavior: separate receive connection. If the caller
+      // pre-specified a recv_address (e.g. so multiple dialers can share one
+      // known reply address), load it instead of creating a fresh one.
+      bool loadingRecvAddress = not ctx.opts.recv_address.empty();
+      ctx.recvConnSMHandle = Socket::establish(
+          ctx.manager, ctx.handle,
+          SocketRequest{recvChannelId, recvRole, ctx.opts.recv_address,
+                       ConnEstablishment{loadingRecvAddress ? LinkRole::Loader : LinkRole::Creator,
+                                         LinkDirectionality::Recv}});
 
       if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting connection state machine failed");
@@ -216,8 +226,10 @@ struct StateDialWaitingForSendConnection : public DialState {
       return EventResult::NOT_SUPPORTED;
     }
 
-    ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
-                                                             ctx.handle, sendChannelId, sendRole, sendLinkAddress, false, true);
+    ctx.sendConnSMHandle = Socket::establish(
+        ctx.manager, ctx.handle,
+        SocketRequest{sendChannelId, sendRole, sendLinkAddress,
+                     ConnEstablishment{LinkRole::Loader, LinkDirectionality::Send}});
     if (ctx.sendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
       return EventResult::NOT_SUPPORTED;

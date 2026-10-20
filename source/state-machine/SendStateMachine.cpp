@@ -88,8 +88,14 @@ struct StateSendInitial : public SendState {
       return EventResult::NOT_SUPPORTED;
     }
 
+    // Respect channel's linkDirection: use shouldCreateSender to determine
+    // whether this side creates (and publishes) the link or loads the peer's address.
+    bool creating = ctx.shouldCreateSender(channelId);
+    helper::logDebug(logPrefix + "send: linkDirection for '" + channelId +
+                     "' -> creating=" + (creating ? "true" : "false"));
+
     RaceHandle connStateMachineHandle = ctx.manager.startConnStateMachine(
-                                                                          ctx.handle, channelId, role, linkAddress, false, true);
+                                                                          ctx.handle, channelId, role, linkAddress, creating, true);
 
     if (connStateMachineHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -108,11 +114,37 @@ struct StateSendConnectionOpen : public SendState {
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
+
+    // For decomposed channels, also establish the recv link upfront if
+    // a recv address was provided. This ensures both links exist before
+    // any packages arrive.
+    if (!ctx.opts.recv_address.empty() && ctx.opts.recv_channel == ctx.opts.send_channel) {
+      helper::logDebug(logPrefix + "Establishing recv link for decomposed channel: " +
+                       ctx.opts.recv_channel + " at " + ctx.opts.recv_address);
+      // Start a connection state machine for the recv link (creating=false, sending=false)
+      // since we're loading our own recv address (which was created by the peer)
+      RaceHandle recvConnHandle = ctx.manager.startConnStateMachine(
+          ctx.handle, ctx.opts.recv_channel, ctx.opts.recv_role, ctx.opts.recv_address,
+          false, false);
+      if (recvConnHandle != NULL_RACE_HANDLE) {
+        ctx.manager.registerHandle(ctx, recvConnHandle);
+      } else {
+        helper::logError(logPrefix + "Failed to start recv connection state machine");
+      }
+    }
+
     PluginWrapper &plugin = getPlugin(ctx, ctx.opts.send_channel);
     RaceHandle pkgHandle = ctx.manager.getCore().generateHandle();
 
-    EncPkg pkg(0, 0, std::move(ctx.data));
+    // For simple send mode (non-conduit), prepend a 16-byte PackageID=0
+    // so the receiver can properly match it. This mirrors conduit behavior.
+    // FIX_V2: Added PackageID=0 prepending
+    std::vector<uint8_t> pkgData;
+    pkgData.insert(pkgData.end(), 16, 0);  // PackageID = 16 zero bytes
+    pkgData.insert(pkgData.end(), ctx.data.begin(), ctx.data.end());
     ctx.data.clear();
+
+    EncPkg pkg(0, 0, std::move(pkgData));
 
     SdkResponse response = plugin.sendPackage(pkgHandle, ctx.connId, pkg, 0, 0);
 

@@ -30,7 +30,7 @@ add_executable(testStandaloneLibrary
     CoreTest.cpp
     main.cpp
     ExternalApiTest.cpp
-    # FileSystemTest.cpp
+    FileSystemTest.cpp
     HandlerTest.cpp
     IntegrationTest.cpp
     PluginLoadingTest.cpp

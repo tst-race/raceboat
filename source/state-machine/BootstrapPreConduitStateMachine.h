@@ -80,6 +80,15 @@ public:
   // requires the link's address, not an established peer connection.
   bool finalUsingSingleBidiConnection = false;
 
+  // Whether THIS side created (vs loaded) each final link - only a created
+  // link's address needs to be reported in the hello response (a loaded
+  // link's address came from the dialer's hello in the first place, so the
+  // dialer already knows it) and only a created link's readiness gate can
+  // skip waiting for a real peer connection (see
+  // StateBootstrapPreConduitWaitingForConnections).
+  bool createdFinalSend = false;
+  bool createdFinalRecv = false;
+
   std::string packageId;
   RaceHandle apiHandle;
   bool responseSent = false;

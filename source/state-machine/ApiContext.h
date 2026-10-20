@@ -49,6 +49,21 @@ public:
                     bool useForRecv);
   bool shouldCreateSender(const ChannelId &channelId);
   bool shouldCreateReceiver(const ChannelId &channelId);
+
+  // The bootstrap "init send" (upstream) channel is how the dialer makes
+  // first contact with a listener address it already knows out-of-band -
+  // the listener must always be the one able to create/publish that
+  // address, so LD_CREATOR_TO_LOADER (which would require the dialer/sender
+  // to create it instead) is never valid here, regardless of merge status.
+  bool isValidInitSendChannelDirection(const ChannelId &channelId);
+
+  // True only for a channel whose manifest-declared linkDirection is
+  // exactly LD_BIDI, for which shouldCreateSender/shouldCreateReceiver are
+  // role-blind (same answer regardless of which side asks) and therefore
+  // unreliable - callers should fall back to a hardcoded role-based
+  // convention in that case, and only trust shouldCreateSender/Receiver for
+  // genuinely asymmetric (LD_CREATOR_TO_LOADER/LD_LOADER_TO_CREATOR) channels.
+  bool isBidiChannel(const ChannelId &channelId);
   
   // Detects if a single bidirectional link should be used for both send and receive
   bool shouldUseSingleBidiLink(const ChannelId &sendChannel, 
@@ -109,6 +124,17 @@ public:
   virtual void updatePackageStatusChanged(RaceHandle /* pkgHandle */,
                                           PackageStatus /* status */){};
 
+  // Returns true if fullWireBytes (the raw, still packageId-prefixed bytes
+  // as delivered by the plugin) match something this context itself sent
+  // recently. On a shared/broadcast-style link (e.g. multiple long-lived
+  // conduits multiplexed over one physical link), a conduit's own posted
+  // message can legitimately be delivered back to its own receive path;
+  // this lets receiveEncPkg filter out that self-echo instead of queuing
+  // it as if it were new data from the peer.
+  virtual bool wasRecentlySent(const std::vector<uint8_t> & /* fullWireBytes */) {
+    return false;
+  }
+
   virtual void updateStateMachineFailed(RaceHandle /* contextHandle */){};
   virtual void updateStateMachineFinished(RaceHandle /* contextHandle */){};
   virtual void updateDependent(RaceHandle /* contextHandle */){};
@@ -142,7 +168,9 @@ public:
       const ChannelId & /* _sendChannel */, const std::string & /* _sendRole */,
       const std::string & /* _sendLinkAddress */,
       const std::string & /* _packageId */,
-      std::vector<std::vector<uint8_t>> /* recvMessages */){};
+      std::vector<std::vector<uint8_t>> /* recvMessages */,
+      RaceHandle /* _existingSendConnSMHandle */ = NULL_RACE_HANDLE,
+      const ConnectionID & /* _existingSendConnId */ = ""){};
 
   virtual void updateBootstrapPreConduitStateMachineStart(
       RaceHandle /* contextHandle */,

@@ -1,0 +1,24 @@
+# Link event spec for scenarios/bootstrap-decomposed-decomposed-final-l2c.json
+#
+# L2C should mean no bidirectionality is used, thus there will be 4 separate links:
+# Initial Dialer-to-Listener
+# Initial Listener-to-Dialer
+# Final Dialer-to-Listener
+# Final Listener-to-Dialer
+# Listener creates its initial receive (upstream)
+# Dialer sets up its initial receive (upstream) and final receive (upstream) and loads the initial send (downstream) and sends hello
+# Listener loads the initial send (downstream) and the final send (downstream) in the hello, and creates its final receive, then responds on the initial send
+# Dialer loads the final send (upstream)
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
+  2:
+    - {node: dialer, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
+    - {node: dialer, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
+    - {node: dialer, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
+  3:
+    - {node: listener, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
+    - {node: listener, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
+  4:
+    - {node: dialer, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}
