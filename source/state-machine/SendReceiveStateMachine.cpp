@@ -46,12 +46,17 @@ void ApiSendReceiveContext::updateConnStateMachineLinkEstablished(
   }
 };
 void ApiSendReceiveContext::updateConnStateMachineConnected(
-    RaceHandle contextHandle, ConnectionID connId, std::string linkAddress) {
+    RaceHandle contextHandle, ConnectionID connId, std::string linkAddress, LinkID /* linkId */) {
   if (this->recvConnSMHandle == contextHandle) {
     this->recvConnId = connId;
     this->recvLinkAddress = linkAddress;
+    this->manager.registerId(*this, connId);
+    // Register PackageID=0 for simple send-recv mode
+    std::vector<uint8_t> zeroPackageId(16, 0);
+    this->manager.registerPackageId(*this, connId, std::string(zeroPackageId.begin(), zeroPackageId.end()));
   } else if (this->sendConnSMHandle == contextHandle) {
     this->sendConnId = connId;
+    this->manager.registerId(*this, connId);
   }
 };
 void ApiSendReceiveContext::updateReceiveEncPkg(
@@ -81,7 +86,7 @@ struct StateSendReceiveInitial : public SendReceiveState {
       ctx.callback(ApiStatus::INVALID_ARGUMENT, {});
       ctx.callback = {};
       return EventResult::NOT_SUPPORTED;
-    } 
+    }
     PluginContainer *recvContainer =
         ctx.manager.getCore().getChannel(recvChannelId);
     if (recvContainer == nullptr) {
@@ -92,9 +97,13 @@ struct StateSendReceiveInitial : public SendReceiveState {
       return EventResult::NOT_SUPPORTED;
     }
 
+    // Respect channel's linkDirection for recv side
+    bool recvCreating = ctx.shouldCreateReceiver(recvChannelId);
+    helper::logDebug(logPrefix + "sendReceive: recv linkDirection for '" + recvChannelId +
+                     "' -> creating=" + (recvCreating ? "true" : "false"));
 
     ctx.recvConnSMHandle = ctx.manager.startConnStateMachine(
-                                                             ctx.handle, recvChannelId, recvRole, "", true, false);
+                                                             ctx.handle, recvChannelId, recvRole, ctx.opts.recv_address, recvCreating, false);
 
     if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -161,8 +170,13 @@ struct StateSendReceiveWaitingForSendConnection : public SendReceiveState {
       return EventResult::NOT_SUPPORTED;
     }
 
+    // Respect channel's linkDirection for send side
+    bool sendCreating = ctx.shouldCreateSender(sendChannelId);
+    helper::logDebug(logPrefix + "sendReceive: send linkDirection for '" + sendChannelId +
+                     "' -> creating=" + (sendCreating ? "true" : "false"));
+
     ctx.sendConnSMHandle = ctx.manager.startConnStateMachine(
-                                                             ctx.handle, sendChannelId, sendRole, sendLinkAddress, false, true);
+                                                             ctx.handle, sendChannelId, sendRole, sendLinkAddress, sendCreating, true);
     if (ctx.sendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
       return EventResult::NOT_SUPPORTED;

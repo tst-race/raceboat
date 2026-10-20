@@ -27,6 +27,9 @@ ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/x86_64/lib"
 COPY racesdk/package/LINUX_x86_64/include /linux/x86_64/include/
 COPY racesdk/package/LINUX_x86_64/go /usr/local/go
 RUN cp /usr/local/go/src/shims/comm/* /usr/local/go/src/shims/
+# Same non-root-readability concern as race-cmake-modules below - these are
+# also built/installed as root on the host and consumed by --user builds.
+RUN chmod -R a+rX /linux/x86_64 /usr/local/go
 
 # arm64 linux
 FROM base AS arm64-linux
@@ -35,9 +38,13 @@ ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/linux/arm64-v8a/lib"
 COPY racesdk/package/LINUX_arm64-v8a/include /linux/arm64-v8a/include/
 COPY racesdk/package/LINUX_arm64-v8a/go /usr/local/go
 RUN cp /usr/local/go/src/shims/comm/* /usr/local/go/src/shims/
+RUN chmod -R a+rX /linux/arm64-v8a /usr/local/go
 
 FROM ${TARGETARCH}-linux
 COPY race-cmake-modules /opt/race/race-cmake-modules
+# Force world-readable/traversable regardless of host checkout permissions -
+# containers run as a non-root --user and need to read these at build time.
+RUN chmod -R a+rX /opt/race/race-cmake-modules
 
 # Installing PluginCommsTwoSixStubDecomposed and Destini dependencies at system level
 # TODO: refactor those plugins to bring their own dependencies with them
@@ -56,16 +63,16 @@ RUN apt-get update && yes | apt-get install -y \
 
 
 # Installing older ffmpeg version directly from the RACE external build to avoid _potential_ versioning issues in Destini video encoding
-ARG FFMPEG_VERSION=4.2.2-1
-ARG TARGETPLATFORM="linux/amd64"
-RUN case ${TARGETPLATFORM} in \
-        "linux/amd64") LINUX_ARCH=x86_64    ;; \
-        "linux/arm64") LINUX_ARCH=arm64-v8a ;; \
-    esac && \
-    wget \
-        --output-document=/tmp/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
-        https://github.com/tst-race/ext-ffmpeg/releases/download/${FFMPEG_VERSION}/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz && \
-    tar --extract \
-        --file=/tmp/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
-        --directory=/usr/local && \
-    rm /tmp/ffmpeg-*.tar.gz
+# ARG FFMPEG_VERSION=4.2.2-1
+# ARG TARGETPLATFORM="linux/amd64"
+# RUN case ${TARGETPLATFORM} in \
+#         "linux/amd64") LINUX_ARCH=x86_64    ;; \
+#         "linux/arm64") LINUX_ARCH=arm64-v8a ;; \
+#     esac && \
+#     wget \
+#         --output-document=/tmp/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
+#         https://github.com/tst-race/ext-ffmpeg/releases/download/${FFMPEG_VERSION}/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz && \
+#     tar --extract \
+#         --file=/tmp/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
+#         --directory=/usr/local && \
+#     rm /tmp/ffmpeg-*.tar.gz

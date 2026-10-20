@@ -88,6 +88,13 @@ protected:
                           CMTypes::Link *link, std::vector<uint8_t> &&bytes,
                           std::vector<std::string> &&connVec);
 
+  // Claims a connection ID (from the link's connection set) for a producer
+  // that doesn't have one bound yet, so each producer's packages are routed
+  // to exactly one connection instead of every connection on the link.
+  // Returns an empty string if no unbound connection is available.
+  ConnectionID bindConnIdToProducer(CMTypes::Link *link,
+                                    const std::string &producer);
+
   std::vector<uint8_t> readFragment(const std::vector<uint8_t> &buffer,
                                     size_t &offset);
 

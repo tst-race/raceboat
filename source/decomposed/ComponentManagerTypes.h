@@ -268,6 +268,11 @@ struct ProducerQueue {
   std::map<uint32_t, std::vector<StoredFragment>> storedFragments;
   std::chrono::steady_clock::time_point lastActivity = std::chrono::steady_clock::now();
 
+  // Connection ID from the link's connection set that has been claimed for
+  // this producer, so completed packages are delivered to the one connection
+  // this producer's traffic belongs to, rather than every connection on the
+  // (potentially multi-client) link. Empty until bindConnIdToProducer succeeds.
+  ConnectionID boundConnId;
 };
 
 // This struct is owned by the ComponentLinkManager
@@ -287,6 +292,13 @@ struct Link {
   LinkProperties props;
   std::vector<uint8_t> producerId;
   uint32_t fragmentCount = 1;
+
+  // Small random tag (independent of producerId/encoding-producer concept)
+  // identifying this link *instance*, so multiple remote senders sharing one
+  // link (e.g. an indirect/shared-whiteboard receive link) don't collide
+  // fragment sequence numbers with each other. Included on the wire for
+  // FRAGMENT_SINGLE_PRODUCER mode.
+  std::vector<uint8_t> streamTag;
 
   std::unordered_map<std::string, ProducerQueue> producerQueues;
 };

@@ -1,0 +1,26 @@
+# Link event spec for scenarios/decomposed-send-recv-both-c2l.json
+#
+# Both nodes override to LD_CREATOR_TO_LOADER.
+# twoSixIndirectComposition is LD_BIDI + TT_MULTICAST (see
+# decomposed-exemplars/source/manifest.json), so each side opens two
+# separate physical links (one send, one recv) rather than merging them
+# into one bidi link.
+#
+# With LD_CREATOR_TO_LOADER on both sides for send-recv mode:
+# - Listener recv (upstream): LOADs from dialer's send address
+# - Listener send (downstream): CREATEs its own address
+# - Dialer send (upstream): CREATEs its own address
+# - Dialer recv (downstream): LOADs from listener's send address
+#
+# Since this is send-recv mode (not bootstrap-connect), there's only
+# one phase - the "channel" slot.
+#
+# All links use pre-specified static addresses. The order of CREATE/LOAD
+# events is non-deterministic since both nodes can create/load immediately
+# on startup. Put all events in one step to allow any order.
+steps:
+  1:
+    - {node: listener, action: LOAD,   channel: twoSixIndirectComposition, slot: channel}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: channel}
+    - {node: dialer,   action: LOAD,   channel: twoSixIndirectComposition, slot: channel}
+    - {node: dialer,   action: CREATE, channel: twoSixIndirectComposition, slot: channel}

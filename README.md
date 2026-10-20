@@ -27,7 +27,7 @@ docker run -it --rm --name=build-pt \
        -e MAKEFLAGS="-j" \
        -v $(pwd)/:/code/ \
        -w /code \
-       raceboat-builder:latest \
+       ghcr.io/tst-race/raceboat/raceboat-builder:latest \
        ./build.sh && \
 pushd raceboat-plugin-builder-image && \
 ./build_image.sh -n ghcr.io/tst-race/raceboat --platform-x86_64 && \

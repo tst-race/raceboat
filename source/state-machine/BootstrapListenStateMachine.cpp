@@ -19,8 +19,11 @@
 #include "../../include/race/Race.h"
 #include "Core.h"
 #include "Events.h"
+#include "LinkEstablishment.h"
 #include "PluginContainer.h"
 #include "PluginWrapper.h"
+#include "RoundTrip.h"
+#include "Socket.h"
 #include "States.h"
 #include "api-managers/ApiManager.h"
 #include "base64.h"
@@ -48,17 +51,37 @@ void ApiBootstrapListenContext::updateClose(RaceHandle /* handle */,
 }
 
 void ApiBootstrapListenContext::updateReceiveEncPkg(
-    ConnectionID /* _connId */, std::shared_ptr<std::vector<uint8_t>> _data) {
-  this->data.push(std::move(_data));
+    ConnectionID _connId, std::shared_ptr<std::vector<uint8_t>> _data) {
+  this->data.push({_connId, std::move(_data)});
 };
 
   // TODO Code Reuse
 void ApiBootstrapListenContext::updateConnStateMachineConnected(
     RaceHandle contextHandle, ConnectionID connId,
-    std::string linkAddress) {
-  if (this->initRecvConnSMHandle == contextHandle) {
-    this->initRecvConnId = connId;
-    this->initRecvLinkAddress = linkAddress;
+    std::string linkAddress, LinkID linkId) {
+  if (this->initRecvConnSMHandles.count(contextHandle) > 0) {
+    // Store the LinkID from the first connection - additional connections
+    // (for additional concurrent bootstrapping clients) reuse this LinkID.
+    if (this->firstInitRecvLinkId.empty() && !linkId.empty()) {
+      this->firstInitRecvLinkId = linkId;
+    }
+    if (this->initRecvConnId.empty()) {
+      this->initRecvConnId = connId;
+      this->initRecvLinkAddress = linkAddress;
+    }
+    this->initRecvConnIdToHandle[connId] = contextHandle;
+    // For a single bidirectional init link, initSendConnSMHandle is aliased
+    // to the same handle - update both sides so neither is left permanently
+    // empty (see StateBootstrapListenWaitingForConnections).
+    if (this->initSendConnSMHandle == contextHandle && this->initSendConnId.empty()) {
+      this->initSendConnId = connId;
+      this->initSendLinkAddress = linkAddress;
+    }
+    // Register the all-zero packageId for EVERY init-recv connection, not
+    // just the first, so hello messages from additional concurrent
+    // bootstrapping clients get routed to this listen context.
+    std::string packageId(packageIdLen, '\0');
+    manager.registerPackageId(*this, connId, packageId);
   } else if (this->initSendConnSMHandle == contextHandle) {
     this->initSendConnId = connId;
     this->initSendLinkAddress = linkAddress;
@@ -70,6 +93,30 @@ void ApiBootstrapListenContext::updateConnStateMachineConnected(
     this->finalSendLinkAddress = linkAddress;
   }
 };
+
+void ApiBootstrapListenContext::updateConnStateMachineLinkEstablished(
+  RaceHandle contextHandle, LinkID /* linkId */, std::string linkAddress) {
+  if (this->initRecvConnSMHandle == contextHandle) {
+    this->initRecvLinkReady = true;
+    this->initRecvLinkAddress = linkAddress;
+    // For a single bidirectional init link, initSendConnSMHandle is aliased
+    // to the same handle - update both sides so neither is left
+    // permanently blocked (see StateBootstrapListenWaitingForConnections).
+    if (this->initSendConnSMHandle == contextHandle) {
+      this->initSendLinkReady = true;
+      this->initSendLinkAddress = linkAddress;
+    }
+  } else if (this->initSendConnSMHandle == contextHandle) {
+    this->initSendLinkReady = true;
+    this->initSendLinkAddress = linkAddress;
+  } else if (this->finalRecvConnSMHandle == contextHandle) {
+    this->finalRecvLinkReady = true;
+    this->finalRecvLinkAddress = linkAddress;
+  } else if (this->finalSendConnSMHandle == contextHandle) {
+    this->finalSendLinkReady = true;
+    this->finalSendLinkAddress = linkAddress;
+  }
+}
 
 
 
@@ -87,71 +134,83 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
-    // *** INIT SEND ***
-    // Handle initial server->client aka init_send
-    bool create = ctx.shouldCreateSender(ctx.opts.init_send_channel);
-
-    // We are going to need to create this link and then transmit the address out-of-band to the dialer before they run dial
-    if (create) {
-      helper::logInfo(logPrefix + "Creating init-send link on " + ctx.opts.init_send_channel + (ctx.opts.init_recv_address.empty() ? "" : " from address: " + ctx.opts.init_recv_address));
-      bool sending = true;
-      ctx.initSendConnSMHandle = ctx.manager.
-        startConnStateMachine(ctx.handle,
-                              ctx.opts.init_send_channel,
-                              ctx.opts.init_send_role,
-                              ctx.opts.init_send_address,
-                              create, // is true
-                              sending // is true
-                              );
-    if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
-      helper::logError(logPrefix + " starting connection state machine failed");
+    // init_recv_channel carries the same upstream (dialer -> listener)
+    // traffic the dialer calls its own init_send_channel - validate from
+    // this (listener) side too, since either side could be misconfigured.
+    if (!ctx.isValidInitSendChannelDirection(ctx.opts.init_recv_channel)) {
+      helper::logError(logPrefix + "init_recv_channel '" + ctx.opts.init_recv_channel +
+                       "' is declared LD_CREATOR_TO_LOADER, which is never valid for the "
+                       "bootstrap first-contact (upstream) channel (the listener must be "
+                       "able to create/publish this address, not the dialer)");
+      ctx.listenCb(ApiStatus::CHANNEL_INVALID, "", {});
+      ctx.listenCb = {};
       return EventResult::NOT_SUPPORTED;
     }
-    ctx.manager.registerHandle(ctx, ctx.initSendConnSMHandle);
-    } else if (!ctx.opts.init_send_address.empty()) {
-      helper::logInfo(logPrefix + "Loading init-send link on " + ctx.opts.init_send_channel + " with address: " + ctx.opts.init_send_address);
-      bool sending = true;
-      ctx.initSendConnSMHandle = ctx.manager.
-        startConnStateMachine(ctx.handle,
-                              ctx.opts.init_send_channel,
-                              ctx.opts.init_send_role,
-                              ctx.opts.init_send_address,
-                              create, // is false
-                              sending // is true
-                              );
-    if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
-      helper::logError(logPrefix + " starting connection state machine failed");
-      return EventResult::NOT_SUPPORTED;
-    }
-    ctx.manager.registerHandle(ctx, ctx.initSendConnSMHandle);
-    } 
 
-    // *** INIT RECV ***
-    // Skip initial recv channel if it is empty
-    // This SHOULD indicate the init_send_channel is bidirectional, otherwise this is a mistake and should be caught earlier during input validation
-    if (ctx.opts.init_recv_channel.empty()) {
+    // *** INIT SEND / INIT RECV ***
+    // shouldCreateSender()/shouldCreateReceiver() only consult the channel's
+    // static manifest properties, so for a channel that supports a single
+    // merged bidirectional link (e.g. racebird's obfs4) they return the same
+    // answer on both listener and dialer - neither role is distinguished, so
+    // both sides would independently decide to create their own separate,
+    // unreachable init-recv link instead of reusing the one connection that
+    // actually gets dialed into (permanent bootstrap-dial hang). Mirror the
+    // already-working final-link convention instead: listener always creates.
+    const bool initUsesSingleBidiLink =
+        ctx.opts.init_recv_channel.empty() ||
+        ctx.shouldUseSingleBidiLink(ctx.opts.init_send_channel,
+                                    ctx.opts.init_recv_channel);
+
+    // Declare 'create' at function scope so it can be used for both init and final links
+    bool create = false;
+
+    if (initUsesSingleBidiLink) {
+      // Genuinely bidirectional connSM instead of a directional one aliased
+      // to look bidi - the merge mechanism Step 3 migrated. Only one
+      // connSM exists for both directions, so there's no ordering race to
+      // avoid here.
+      // For bootstrap, the listener's init_recv_address is the well-known
+      // address the dialer connects to. Use it for the bidi link.
+      const std::string& bidiAddress = ctx.opts.init_recv_address.empty() ? ctx.opts.init_send_address : ctx.opts.init_recv_address;
+      helper::logInfo(logPrefix + "Creating bidirectional init link on " + ctx.opts.init_send_channel + (bidiAddress.empty() ? "" : " from address: " + bidiAddress));
+      ctx.initSendConnSMHandle = Socket::establish(
+          ctx.manager, ctx.handle,
+          SocketRequest{ctx.opts.init_send_channel, ctx.opts.init_send_role,
+                       bidiAddress,
+                       ConnEstablishment{resolveBidiRole(ModeRole::Listener), LinkDirectionality::Bidi}},
+          "initial");
+      if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
+        helper::logError(logPrefix + " starting connection state machine failed");
+        return EventResult::NOT_SUPPORTED;
+      }
+      ctx.manager.registerHandle(ctx, ctx.initSendConnSMHandle);
+
       // Use bidirectional init_send connection for receiving as well
       helper::logInfo(logPrefix + "Using bidirectional init_send connection for receiving");
       ctx.initUsingSingleBidiConnection = true;
       ctx.initRecvConnSMHandle = ctx.initSendConnSMHandle;
       ctx.initRecvConnId = ctx.initSendConnId;
-    }
-    else {
-      // Handle initial client->server aka init_recv
+      ctx.initRecvConnSMHandles.insert(ctx.initRecvConnSMHandle);
+    } else {
+      // Establish init-recv FIRST and defer init-send to
+      // StateBootstrapListenWaitingForConnections (gated on
+      // ctx.initRecvLinkReady) so the two connSMs don't race through the
+      // same channel-activation event and get their LinkIDs assigned in a
+      // nondeterministic order - mirrors the dialer's
+      // StateDialWaitingForSendConnection pattern and the equivalent fix
+      // applied to the non-bootstrap ListenStateMachine. init-recv is thus
+      // guaranteed to always win LinkID_0.
       create = ctx.shouldCreateReceiver(ctx.opts.init_recv_channel);
       if (create) {
         helper::logInfo(logPrefix + "Creating init-recv link on " + ctx.opts.init_recv_channel + " with address: " + ctx.opts.init_recv_address);
-      bool sending = false;
-      ctx.initRecvConnSMHandle = ctx.manager.
-        startConnStateMachine(ctx.handle,
-                              ctx.opts.init_recv_channel,
-                              ctx.opts.init_recv_role,
-                              ctx.opts.init_recv_address,
-                              create, // is true
-                              sending // is false
-                              );
-      }
-      else if (ctx.opts.init_recv_address.empty()) {
+        bool sending = false;
+        ctx.initRecvConnSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{ctx.opts.init_recv_channel, ctx.opts.init_recv_role,
+                         ctx.opts.init_recv_address,
+                         ConnEstablishment::fromLegacy(create, sending, false)},
+            "initial");
+      } else if (ctx.opts.init_recv_address.empty()) {
         // Need an address to load
         helper::logError(logPrefix +
                          "Invalid options: initial recv address is required");
@@ -160,17 +219,14 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
         return EventResult::NOT_SUPPORTED;
       } else {
         helper::logInfo(logPrefix + "Loading init-recv link on " + ctx.opts.init_recv_channel + " with address: " + ctx.opts.init_recv_address);
-      // If we are loading we should have a recv_address, if we are creating we will send the address in the hello message
-      bool sending = false;
-      ctx.initRecvConnSMHandle = ctx.manager.
-        startConnStateMachine(ctx.handle,
-                              ctx.opts.init_recv_channel,
-                              ctx.opts.init_recv_role,
-                              ctx.opts.init_recv_address,
-                              create, // is false
-                              sending // is false
-                              );
-
+        // If we are loading we should have a recv_address, if we are creating we will send the address in the hello message
+        bool sending = false;
+        ctx.initRecvConnSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{ctx.opts.init_recv_channel, ctx.opts.init_recv_role,
+                         ctx.opts.init_recv_address,
+                         ConnEstablishment::fromLegacy(create, sending, false)},
+            "initial");
       }
       if (ctx.initRecvConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting connection state machine failed");
@@ -178,57 +234,61 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
       }
 
       ctx.manager.registerHandle(ctx, ctx.initRecvConnSMHandle);
+      ctx.initRecvConnSMHandles.insert(ctx.initRecvConnSMHandle);
+
+      // init-send establishment intentionally deferred - see
+      // StateBootstrapListenWaitingForConnections.
     }
 
-    // // Handle final server->client aka final_send
-    // create = ctx.shouldCreateSender(ctx.opts.final_send_channel);
+    // Handle final server->client aka final_send
+    create = ctx.shouldCreateSender(ctx.opts.final_send_channel);
 
-    // // If we are NOT creating then we have to wait for the client to create and send us the address as a hello-response
-    // if (create) {
-    //   bool sending = true;
-    //   ctx.finalSendConnSMHandle = ctx.manager.
-    //     startConnStateMachine(ctx.handle,
-    //                           ctx.opts.final_send_channel,
-    //                           ctx.opts.final_send_role,
-    //                           "",
-    //                           create, // is true
-    //                           sending // is true
-    //                           );
-    //   if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
-    //     helper::logError(logPrefix + " starting connection state machine failed");
-    //     return EventResult::NOT_SUPPORTED;
-    //   }
-    //   ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
-    // }
+    // If we are NOT creating then we have to wait for the client to create and send us the address as a hello-response
+    if (create) {
+      bool sending = true;
+      ctx.finalSendConnSMHandle = ctx.manager.
+        startConnStateMachine(ctx.handle,
+                              ctx.opts.final_send_channel,
+                              ctx.opts.final_send_role,
+                              "",
+                              create, // is true
+                              sending // is true
+                              );
+      if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
+        helper::logError(logPrefix + " starting connection state machine failed");
+        return EventResult::NOT_SUPPORTED;
+      }
+      ctx.manager.registerHandle(ctx, ctx.finalSendConnSMHandle);
+    }
   
-    // // Skip final recv channel if it is empty
-    // // This SHOULD indicate the final_send_channel is bidirectional, otherwise this is a mistake and should be caught earlier during input validation
-    // if (ctx.opts.final_recv_channel.empty()) {
-    //   // TODO handle opening a receiving connection in addition to the sending connection on the "send" link above
-    // }
-    // else {
-    //   // Handle finalial client->server aka final_recv
-    //   create = ctx.shouldCreateReceiver(ctx.opts.final_recv_channel);
+    // Skip final recv channel if it is empty
+    // This SHOULD indicate the final_send_channel is bidirectional, otherwise this is a mistake and should be caught earlier during input validation
+    if (ctx.opts.final_recv_channel.empty()) {
+      // TODO handle opening a receiving connection in addition to the sending connection on the "send" link above
+    }
+    else {
+      // Handle finalial client->server aka final_recv
+      create = ctx.shouldCreateReceiver(ctx.opts.final_recv_channel);
 
-    //   // If we are NOT creating then we are waiting for the client to create and send the address as a hello-response
-    //   if (create) {
-    //     bool sending = false;
-    //     ctx.finalRecvConnSMHandle = ctx.manager.
-    //       startConnStateMachine(ctx.handle,
-    //                             ctx.opts.final_recv_channel,
-    //                             ctx.opts.final_recv_role,
-    //                             "",
-    //                             create, // is true
-    //                             sending // is false
-    //                             );
+      // If we are NOT creating then we are waiting for the client to create and send the address as a hello-response
+      if (create) {
+        bool sending = false;
+        ctx.finalRecvConnSMHandle = ctx.manager.
+          startConnStateMachine(ctx.handle,
+                                ctx.opts.final_recv_channel,
+                                ctx.opts.final_recv_role,
+                                "",
+                                create, // is true
+                                sending // is false
+                                );
       
-    //     if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
-    //       helper::logError(logPrefix + " starting connection state machine failed");
-    //       return EventResult::NOT_SUPPORTED;
-    //     }
-    //     ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
-    //   }
-    // }
+        if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
+          helper::logError(logPrefix + " starting connection state machine failed");
+          return EventResult::NOT_SUPPORTED;
+        }
+        ctx.manager.registerHandle(ctx, ctx.finalRecvConnSMHandle);
+      }
+    }
     ctx.pendingEvents.push(EVENT_ALWAYS);
     return EventResult::SUCCESS;
   }
@@ -242,17 +302,84 @@ struct StateBootstrapListenWaitingForConnections : public BootstrapListenState {
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
+
+    helper::logDebug(logPrefix + "WaitingForConnections enter: initUsingSingleBidiConnection=" + std::to_string(ctx.initUsingSingleBidiConnection) +
+                     " initSendConnSMHandle=" + std::to_string(ctx.initSendConnSMHandle) +
+                     " initRecvConnId=" + ctx.initRecvConnId +
+                     " initSendLinkReady=" + std::to_string(ctx.initSendLinkReady) +
+                     " initSendConnId=" + ctx.initSendConnId);
+
+    // Establish init-send only after init-recv's own link is ready, so the
+    // two connSMs don't race through the same channel-activation event and
+    // get their LinkIDs assigned in a nondeterministic order (mirrors the
+    // dialer's StateDialWaitingForSendConnection pattern and the equivalent
+    // fix applied to the non-bootstrap ListenStateMachine). Skipped for a
+    // merged single-bidi init link, which has only one connSM already
+    // established in StateBootstrapListenInitial.
+    if (!ctx.initUsingSingleBidiConnection &&
+        ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
+      if (!ctx.initRecvLinkReady) {
+        // init-recv isn't established yet; nothing to do until its
+        // EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED re-enters this state.
+        return EventResult::SUCCESS;
+      }
+      bool create = ctx.shouldCreateSender(ctx.opts.init_send_channel);
+      if (create) {
+        helper::logInfo(logPrefix + "Creating init-send link on " + ctx.opts.init_send_channel + (ctx.opts.init_recv_address.empty() ? "" : " from address: " + ctx.opts.init_recv_address));
+        bool sending = true;
+        ctx.initSendConnSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{ctx.opts.init_send_channel, ctx.opts.init_send_role,
+                         ctx.opts.init_send_address,
+                         ConnEstablishment::fromLegacy(create, sending, false)},
+            "initial");
+        if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
+          helper::logError(logPrefix + " starting connection state machine failed");
+          return EventResult::NOT_SUPPORTED;
+        }
+        ctx.manager.registerHandle(ctx, ctx.initSendConnSMHandle);
+      } else if (!ctx.opts.init_send_address.empty()) {
+        helper::logInfo(logPrefix + "Loading init-send link on " + ctx.opts.init_send_channel + " with address: " + ctx.opts.init_send_address);
+        bool sending = true;
+        ctx.initSendConnSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{ctx.opts.init_send_channel, ctx.opts.init_send_role,
+                         ctx.opts.init_send_address,
+                         ConnEstablishment::fromLegacy(create, sending, false)},
+            "initial");
+        if (ctx.initSendConnSMHandle == NULL_RACE_HANDLE) {
+          helper::logError(logPrefix + " starting connection state machine failed");
+          return EventResult::NOT_SUPPORTED;
+        }
+        ctx.manager.registerHandle(ctx, ctx.initSendConnSMHandle);
+      }
+      // else: neither creating nor loading - we'll learn init-send's
+      // address from the dialer's hello message instead (handle stays
+      // NULL_RACE_HANDLE, same as the original unified-enter() behavior).
+    }
     // For each potential awaited connection, check if the handle is non-null (meaning we ARE expecting it) AND the connection ID is not set (meaning it has not finished opening yet)
-    if (ctx.initRecvConnSMHandle != NULL_RACE_HANDLE and ctx.initRecvConnId.empty()) {
+    // init-send is a link WE created/loaded whose address alone is enough -
+    // it only gets embedded in the listenCb address JSON below for
+    // out-of-band publishing, nothing is actually sent over it yet - so
+    // waiting for a real peer connection here is a chicken-and-egg deadlock
+    // for a link the peer can't reach until that same address is
+    // published. init-recv, by contrast, has its ConnId registered as a
+    // real package route a few lines down (registerPackageId), so it
+    // genuinely needs a real ConnId, not just a known address - no
+    // LinkReady bypass for it.
+    if (ctx.initRecvConnSMHandle != NULL_RACE_HANDLE && ctx.initRecvConnId.empty()) {
       return EventResult::SUCCESS;
     }
-    if (ctx.initSendConnSMHandle != NULL_RACE_HANDLE and ctx.initSendConnId.empty()) {
+    if (ctx.initSendConnSMHandle != NULL_RACE_HANDLE &&
+        !ctx.initSendLinkReady && ctx.initSendConnId.empty()) {
       return EventResult::SUCCESS;
     }
-    if (ctx.finalRecvConnSMHandle != NULL_RACE_HANDLE and ctx.finalRecvConnId.empty()) {
+    if (ctx.finalRecvConnSMHandle != NULL_RACE_HANDLE &&
+        !ctx.finalRecvLinkReady && ctx.finalRecvConnId.empty()) {
       return EventResult::SUCCESS;
     }
-    if (ctx.finalSendConnSMHandle != NULL_RACE_HANDLE and ctx.finalSendConnId.empty()) {
+    if (ctx.finalSendConnSMHandle != NULL_RACE_HANDLE &&
+        !ctx.finalSendLinkReady && ctx.finalSendConnId.empty()) {
       return EventResult::SUCCESS;
     }
 
@@ -291,13 +418,61 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
     TRACE_METHOD();
     auto &ctx = getContext(context);
 
+    // Ensure every pending accept() has its own init-recv connection ready to
+    // receive a hello. The first accept() reuses the connection opened in
+    // StateBootstrapListenInitial; each additional accept() opens a new
+    // connection on that same (already established) link so that multiple
+    // clients can bootstrap concurrently against this listener, mirroring
+    // ApiListenContext's handling of multiple simultaneous accept()s.
+    while (!ctx.acceptCb.empty()) {
+      auto cb = std::move(ctx.acceptCb.front());
+      ctx.acceptCb.pop_front();
+
+      RaceHandle connSMHandle = NULL_RACE_HANDLE;
+      if (ctx.initRecvConnSMHandle != NULL_RACE_HANDLE && !ctx.initialInitRecvConnSMUsed) {
+        connSMHandle = ctx.initRecvConnSMHandle;
+        ctx.initialInitRecvConnSMUsed = true;
+      } else if (!ctx.firstInitRecvLinkId.empty()) {
+        ChannelId channelId = ctx.initUsingSingleBidiConnection
+                                  ? ctx.opts.init_send_channel
+                                  : ctx.opts.init_recv_channel;
+        std::string role = ctx.initUsingSingleBidiConnection
+                                ? ctx.opts.init_send_role
+                                : ctx.opts.init_recv_role;
+        connSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{channelId, role, ctx.initRecvLinkAddress,
+                         ConnEstablishment{LinkRole::Loader, LinkDirectionality::Recv},  // reuse existing link, receive-side
+                         ctx.firstInitRecvLinkId},
+            "initial");
+        if (connSMHandle == NULL_RACE_HANDLE) {
+          helper::logError(logPrefix + "Failed to start additional init-recv connection state machine");
+          cb(ApiStatus::INTERNAL_ERROR, {}, {});
+          continue;
+        }
+        ctx.manager.registerHandle(ctx, connSMHandle);
+        ctx.initRecvConnSMHandles.insert(connSMHandle);
+      } else {
+        // Init-recv link isn't established yet; put the callback back and
+        // wait for EVENT_CONN_STATE_MACHINE_CONNECTED to re-trigger us.
+        ctx.acceptCb.push_front(std::move(cb));
+        break;
+      }
+
+      ctx.connSMToAcceptCallback[connSMHandle] = std::move(cb);
+      ctx.pendingConnSMHandles.push(connSMHandle);
+    }
+
     while (!ctx.data.empty()) {
-      auto data = std::move(ctx.data.front());
+      auto [helloConnId, data] = std::move(ctx.data.front());
       ctx.data.pop();
 
       try {
-        std::string str{data->begin(), data->end()};
-        nlohmann::json json = nlohmann::json::parse(str);
+        nlohmann::json json;
+        if (!RoundTrip::parseMessage(*data, json)) {
+          helper::logError(logPrefix + "Failed to parse hello message");
+          continue;
+        }
 
         ChannelId initSendChannel = "";
         // LinkAddress initSendLinkAddress = "";
@@ -324,30 +499,31 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
 
         // TODO: validate the channel statements align with the args of the listen run unless we intend to do it dynamically based on client request
 
-        std::string packageId = json.at("packageId");
-        std::string messageB64 = json.at("message");
-        std::vector<uint8_t> packageIdBytes = base64::decode(packageId);
-
-        if (packageIdBytes.size() != packageIdLen) {
-          helper::logError(logPrefix + "Invalid package id len: " +
-                           std::to_string(packageIdBytes.size()));
+        std::string replyPackageId;
+        if (!RoundTrip::decodePackageIdField(json, packageIdLen, replyPackageId)) {
+          helper::logError(logPrefix + "Invalid or missing package id in hello message");
           continue;
         }
 
-        std::string replyPackageId =
-            std::string(packageIdBytes.begin(), packageIdBytes.end());
+        std::vector<uint8_t> dialMessage = RoundTrip::extractPayload(json);
 
-        std::vector<uint8_t> dialMessage = base64::decode(messageB64);
+        // Pair this hello with the specific connSM/connId it arrived on
+        // (not just the parent's first-ever init connection) - required so
+        // a merged single-bidi init link routes each client's hello response
+        // over its OWN connection instead of one shared/already-closed one.
+        RaceHandle helloConnSMHandle = ctx.initRecvConnSMHandle;
+        auto handleIt = ctx.initRecvConnIdToHandle.find(helloConnId);
+        if (handleIt != ctx.initRecvConnIdToHandle.end()) {
+          helloConnSMHandle = handleIt->second;
+        }
 
-        // RaceHandle preBootstrapConnSMHandle = ctx.manager.startBootstrapPreConduitStateMachine(
-        //     ctx.handle, ctx.recvConnSMHandle, ctx.recvConnId,
-        //     ctx.opts.recv_channel, ctx.opts.send_channel, ctx.opts.send_role,
-        //     linkAddress, replyPackageId, {std::move(dialMessage)});
         helper::logInfo(logPrefix +
                          " startBootstrapPreConduitStateMachine being called");
         RaceHandle preBootstrapConnSMHandle = ctx.manager.startBootstrapPreConduitStateMachine(
             ctx.handle,
             ctx,
+            helloConnSMHandle,
+            helloConnId,
             replyPackageId, {std::move(dialMessage)});
 
 
@@ -359,18 +535,32 @@ struct StateBootstrapListenWaitingForHellos : public BootstrapListenState {
 
         ctx.preBootstrapConduitSM.push(preBootstrapConnSMHandle);
 
-        break;
+        // Continue processing remaining hello messages - a single fetch from
+        // a shared/indirect init-recv channel can deliver multiple clients'
+        // hellos in one batch (only one EVENT_RECEIVE_PACKAGE may follow),
+        // so don't stop after the first (mirrors ListenStateMachine).
       } catch (std::exception &e) {
         helper::logError(logPrefix +
                          "Failed to process received message: " + e.what());
       }
     }
 
-    while (!ctx.acceptCb.empty() && !ctx.preBootstrapConduitSM.empty()) {
-      auto cb = std::move(ctx.acceptCb.front());
-      ctx.acceptCb.pop_front();
-      RaceHandle preBootstrapConnSMHandle = std::move(ctx.preBootstrapConduitSM.front());
+    // Pair hello-derived pre-conduit state machines with the accept()
+    // callback whose init-recv connection is meant to service it, so
+    // multiple concurrent clients each get routed to their own accept().
+    while (!ctx.pendingConnSMHandles.empty() && !ctx.preBootstrapConduitSM.empty()) {
+      RaceHandle connSMHandle = ctx.pendingConnSMHandles.front();
+      ctx.pendingConnSMHandles.pop();
+      RaceHandle preBootstrapConnSMHandle = ctx.preBootstrapConduitSM.front();
       ctx.preBootstrapConduitSM.pop();
+
+      auto it = ctx.connSMToAcceptCallback.find(connSMHandle);
+      if (it == ctx.connSMToAcceptCallback.end()) {
+        helper::logError(logPrefix + "No accept callback found for connection SM");
+        continue;
+      }
+      auto cb = std::move(it->second);
+      ctx.connSMToAcceptCallback.erase(it);
       if (!ctx.manager.onBootstrapListenAccept(preBootstrapConnSMHandle, cb)) {
         helper::logError(logPrefix + "bootstrap listen accept failed");
         cb(ApiStatus::INTERNAL_ERROR, {}, {});
@@ -453,6 +643,7 @@ BootstrapListenStateEngine::BootstrapListenStateEngine() {
   // clang-format off
     declareStateTransition(STATE_BOOTSTRAP_LISTEN_INITIAL,                       EVENT_ALWAYS,                       STATE_BOOTSTRAP_LISTEN_WAITING_FOR_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_LISTEN_WAITING_FOR_CONNECTIONS,       EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_BOOTSTRAP_LISTEN_WAITING_FOR_CONNECTIONS);
+    declareStateTransition(STATE_BOOTSTRAP_LISTEN_WAITING_FOR_CONNECTIONS,       EVENT_CONN_STATE_MACHINE_LINK_ESTABLISHED, STATE_BOOTSTRAP_LISTEN_WAITING_FOR_CONNECTIONS);
     declareStateTransition(STATE_BOOTSTRAP_LISTEN_WAITING_FOR_CONNECTIONS,       EVENT_SATISFIED,                    STATE_BOOTSTRAP_LISTEN_WAITING_FOR_HELLOS);
     declareStateTransition(STATE_BOOTSTRAP_LISTEN_WAITING_FOR_HELLOS,            EVENT_RECEIVE_PACKAGE,              STATE_BOOTSTRAP_LISTEN_WAITING_FOR_HELLOS);
     declareStateTransition(STATE_BOOTSTRAP_LISTEN_WAITING_FOR_HELLOS,            EVENT_ACCEPT,                       STATE_BOOTSTRAP_LISTEN_WAITING_FOR_HELLOS);

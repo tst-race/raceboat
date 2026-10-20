@@ -53,7 +53,7 @@ void ApiRecvContext::updateReceiveEncPkg(
 };
 void ApiRecvContext::updateConnStateMachineConnected(
     RaceHandle /* _contextHandle */, ConnectionID _connId,
-    std::string _linkAddress) {
+    std::string _linkAddress, LinkID /* _linkId */) {
   this->connId = _connId;
   this->linkAddress = _linkAddress;
 };
@@ -94,8 +94,14 @@ struct StateRecvInitial : public RecvState {
       return EventResult::NOT_SUPPORTED;
     }
 
+    // Respect channel's linkDirection: use shouldCreateReceiver to determine
+    // whether this side creates (and publishes) the link or loads the peer's address.
+    bool creating = ctx.shouldCreateReceiver(channelId);
+    helper::logDebug(logPrefix + "recv: linkDirection for '" + channelId +
+                     "' -> creating=" + (creating ? "true" : "false"));
+
     RaceHandle connStateMachineHandle = ctx.manager.startConnStateMachine(
-                                                                          ctx.handle, channelId, role, linkAddress, true, false);
+                                                                          ctx.handle, channelId, role, linkAddress, creating, false);
 
     if (connStateMachineHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -121,6 +127,33 @@ struct StateRecvConnectionOpen : public RecvState {
 
     ctx.manager.registerHandle(ctx, receiverHandle);
     ctx.manager.registerId(ctx, ctx.connId);
+
+    // For simple receive mode (non-conduit), register PackageID=0 (16 zero bytes)
+    // so that packages sent with PackageID=0 are properly matched.
+    // This mirrors the sender side which prepends PackageID=0.
+    std::string packageIdZero(16, '\0');
+    ctx.manager.registerPackageId(ctx, ctx.connId, packageIdZero);
+    helper::logDebug(logPrefix + "Registered PackageID=0 for simple receive mode");
+
+    // For decomposed channels, also establish the send link upfront if
+    // a send address was provided. This ensures both links exist before
+    // any packages arrive.
+    if (!ctx.opts.send_address.empty() && ctx.opts.send_channel == ctx.opts.recv_channel) {
+      helper::logDebug(logPrefix + "Establishing send link for decomposed channel: " +
+                       ctx.opts.send_channel + " at " + ctx.opts.send_address);
+      // Respect channel's linkDirection for send side
+      bool sendCreating = ctx.shouldCreateSender(ctx.opts.send_channel);
+      helper::logDebug(logPrefix + "recv: send linkDirection for '" + ctx.opts.send_channel +
+                       "' -> creating=" + (sendCreating ? "true" : "false"));
+      RaceHandle sendConnHandle = ctx.manager.startConnStateMachine(
+          ctx.handle, ctx.opts.send_channel, ctx.opts.send_role, ctx.opts.send_address,
+          sendCreating, true);
+      if (sendConnHandle != NULL_RACE_HANDLE) {
+        ctx.manager.registerHandle(ctx, sendConnHandle);
+      } else {
+        helper::logError(logPrefix + "Failed to start send connection state machine");
+      }
+    }
 
     ctx.pendingEvents.push(EVENT_ALWAYS);
 
@@ -167,6 +200,7 @@ struct StateRecvReceived : public RecvState {
     auto data = std::move(ctx.data.front());
     ctx.data.pop();
 
+    helper::logDebug(logPrefix + "StateRecvReceived: delivering " + std::to_string(data->size()) + " bytes: " + std::string(data->begin(), data->end()));
     ctx.receiveCb(ApiStatus::OK, *data);
     ctx.receiveCb = {};
 

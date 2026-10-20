@@ -25,11 +25,12 @@ add_executable(testStandaloneLibrary
     ComponentManagerTest.cpp
     ComponentPackageManagerTest.cpp
     ComponentReceivePackageManagerTest.cpp
+    ConnectionStateMachineTest.cpp
     # ConfigTest.cpp
     CoreTest.cpp
     main.cpp
     ExternalApiTest.cpp
-    # FileSystemTest.cpp
+    FileSystemTest.cpp
     HandlerTest.cpp
     IntegrationTest.cpp
     PluginLoadingTest.cpp

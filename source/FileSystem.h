@@ -167,6 +167,22 @@ struct FileSystem {
 
   virtual fs::path makePluginInstallBasePath();
 
+  /**
+   * @brief Sanitize a file path by replacing invalid filesystem characters.
+   *
+   * GitHub Actions artifact uploads reject paths containing characters like
+   * colon (:), double quote ("), less than (<), greater than (>), vertical bar
+   * (|), asterisk (*), question mark (?), carriage return (\r), and line feed
+   * (\n). Plugins may legitimately include such characters in filenames they
+   * pass to readFile/writeFile. This function replaces those invalid characters
+   * with underscores (_) to ensure files can be written to disk and uploaded as
+   * artifacts without error. Each path component is sanitized individually.
+   *
+   * @param filePath The path to sanitize
+   * @return fs::path The sanitized path
+   */
+  static fs::path sanitizeFilePath(const fs::path &filePath);
+
 protected:
   virtual const char *getHostArch();
   virtual const char *getHostOsType();

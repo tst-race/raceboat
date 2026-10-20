@@ -140,7 +140,8 @@ public:
   virtual void connStateMachineConnected(RaceHandle contextHandle,
                                          ConnectionID connId,
                                          std::string linkAddress,
-                                         std::string channelId);
+                                         std::string channelId,
+                                         LinkID linkId);
 
   virtual void onStateMachineFailed(uint64_t postId, RaceHandle contextHandle);
   virtual void onStateMachineFinished(uint64_t postId,
@@ -154,7 +155,8 @@ public:
                                            RaceHandle contextHandle,
                                            ConnectionID connId,
                                            std::string linkAddress,
-                                           std::string channelId);
+                                           std::string channelId,
+                                           LinkID linkId);
 
   virtual void onChannelStatusChangedForContext(
       uint64_t postId, RaceHandle contextHandle, RaceHandle callHandle,
@@ -162,7 +164,8 @@ public:
       const ChannelProperties &properties);
   virtual void onConnStateMachineConnectedForContext(
       uint64_t postId, RaceHandle contextHandle, RaceHandle callHandle,
-      RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress);
+      RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress,
+      LinkID linkId);
   // Plugin callbacks
   virtual void onChannelStatusChanged(uint64_t postId, RaceHandle handle,
                                       const ChannelId &channelGid,
@@ -186,12 +189,14 @@ public:
                                            std::string role,
                                            std::string linkAddress,
                                            bool creating,
-                                           bool sending);
+                                           bool sending,
+                                           LinkID existingLinkId = "");
   virtual RaceHandle startConnStateMachineBidi(RaceHandle contextHandle,
                                                ChannelId channelId,
                                                std::string role,
                                                 std::string linkAddress,
-                                                bool creating);
+                                                bool creating,
+                                                LinkID existingLinkId = "");
   virtual RaceHandle startConduitectStateMachine(
       RaceHandle contextHandle, RaceHandle recvHandle,
       const ConnectionID &recvConnId, RaceHandle sendHandle,
@@ -203,14 +208,20 @@ public:
       const ConnectionID &recvConnId, const ChannelId &recvChannel,
       const ChannelId &sendChannel, const std::string &sendRole,
       const std::string &sendLinkAddress, const std::string &packageId,
-      std::vector<std::vector<uint8_t>> recvMessages);
+      std::vector<std::vector<uint8_t>> recvMessages,
+      // Non-null when the listener has a pre-established send link (see
+      // ReceiveOptions::send_address) to reuse instead of creating a new
+      // one from sendLinkAddress - avoids one duplicate link per client.
+      RaceHandle existingSendConnSMHandle = NULL_RACE_HANDLE,
+      const ConnectionID &existingSendConnId = "");
   virtual RaceHandle startBootstrapPreConduitStateMachine(
       RaceHandle contextHandle, 
       const ApiBootstrapListenContext &listenContext,
-      // const ConnectionID &initSendConnId, const ChannelId &initSendChannel, const std::string &initSendRole,
-      // const ConnectionID &initRecvConnId, const ChannelId &initRecvChannel, const std::string &initRecvRole,
-      // const ConnectionID &finalSendConnId, const ChannelId &finalSendChannel, const std::string &finalSendRole, const LinkAddress &finalSendAddress
-      // const ConnectionID &finalRecvConnId, const ChannelId &finalRecvChannel, const std::string &finalRecvRole, const LinkAddress &finalRecvAddress
+      // The specific connSM handle/connId that delivered this client's
+      // hello, so a merged single-bidi init link sends this client's
+      // response over its OWN connection rather than the listen context's
+      // first-ever (and possibly already reused/closed) init connection.
+      RaceHandle helloConnSMHandle, const ConnectionID &helloConnId,
       const std::string &packageId,
       std::vector<std::vector<uint8_t>> recvMessages);
   virtual bool
@@ -351,7 +362,8 @@ public:
   virtual SdkResponse onConnStateMachineConnected(RaceHandle contextHandle,
                                                   ConnectionID connId,
                                                   std::string linkAddress,
-                                                  std::string channelId);
+                                                  std::string channelId,
+                                                  LinkID linkId);
   virtual SdkResponse onChannelStatusChangedForContext(
       RaceHandle contextHandle, RaceHandle callHandle,
       const ChannelId &channelGid, ChannelStatus status,
@@ -360,7 +372,8 @@ public:
   virtual SdkResponse onConnStateMachineConnectedForContext(
       RaceHandle contextHandle,
       RaceHandle callHandle,
-      RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress);
+      RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress,
+      LinkID linkId);
 
 
   // Plugin callbacks

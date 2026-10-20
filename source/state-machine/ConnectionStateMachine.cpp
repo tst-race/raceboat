@@ -19,6 +19,7 @@
 #include "../../include/race/Race.h"
 #include "Core.h"
 #include "Events.h"
+#include "LinkAddressValidation.h"
 #include "PluginContainer.h"
 #include "PluginWrapper.h"
 #include "States.h"
@@ -45,6 +46,7 @@ void ApiConnContext::updateConnStateMachineStart(RaceHandle _contextHandle,
   this->create = _creating;
   this->send = _sending;
   this->bidirectional = false;
+  this->establishment = ConnEstablishment::fromLegacy(_creating, _sending, false);
 }
 
 void ApiConnContext::updateConnStateMachineStartBidi(RaceHandle _contextHandle,
@@ -60,6 +62,7 @@ void ApiConnContext::updateConnStateMachineStartBidi(RaceHandle _contextHandle,
   this->create = _creating;
   this->send = true;  // bidirectional implies both send and recv
   this->bidirectional = true;
+  this->establishment = ConnEstablishment::fromLegacy(_creating, true, true);
 }
 
 void ApiConnContext::updateChannelStatusChanged(
@@ -138,11 +141,24 @@ struct StateConnActivated : public ConnState {
   virtual EventResult enter(Context &context) {
     TRACE_METHOD();
     auto &ctx = getContext(context);
+    
+    // If an existing link ID was provided, reuse it instead of creating/loading
+    if (!ctx.existingLinkId.empty()) {
+      helper::logDebug(logPrefix + "Reusing existing LinkID: " + ctx.existingLinkId);
+      ctx.linkId = ctx.existingLinkId;
+      ctx.updatedLinkAddress = ctx.linkAddress;  // Use the provided address
+      // Skip link creation/loading and proceed directly to opening connection
+      // Trigger the event to transition to the next state
+      ctx.pendingEvents.push(EVENT_LINK_ESTABLISHED);
+      return EventResult::SUCCESS;
+    }
+    
+    // Normal flow: create or load a new link
     RaceHandle linkHandle = ctx.manager.getCore().generateHandle();
     PluginWrapper &plugin = getPlugin(ctx, ctx.channelId);
 
     SdkResponse response = SDK_INVALID;
-    if (ctx.create) {
+    if (ctx.establishment.isCreator()) {
       if (ctx.linkAddress.empty()) {
         response = plugin.createLink(linkHandle, ctx.channelId, 0);
       } else {
@@ -180,30 +196,28 @@ struct StateConnLinkEstablished : public ConnState {
     ctx.manager.registerId(ctx, ctx.linkId);
 
     // TODO I don't think this should be only for recv links
-    if (!ctx.send && !ctx.linkAddress.empty() &&
+    if (!ctx.establishment.isSend() && !ctx.linkAddress.empty() &&
         ctx.updatedLinkAddress != ctx.linkAddress) {
       nlohmann::json updatedJson =
           nlohmann::json::parse(ctx.updatedLinkAddress);
       nlohmann::json originalJson = nlohmann::json::parse(ctx.linkAddress);
-      if (updatedJson != originalJson) {
+      helper::logDebug(logPrefix + "Comparing addresses - requested: " +
+                       originalJson.dump() + " received: " + updatedJson.dump());
+      if (!detail::containsRequestedAddressFields(originalJson, updatedJson)) {
         helper::logError(logPrefix +
-                         "received link address does not match requested link "
-                         "address supplied "
-                         "by user. Requested: " +
+                         "received link address does not preserve requested "
+                         "fields supplied by user. Requested: " +
                          ctx.linkAddress + " got: " + ctx.updatedLinkAddress);
         return EventResult::NOT_SUPPORTED;
       }
     }
 
     // Determine link type based on whether this connection is bidirectional
-    LinkType linkType;
-    if (ctx.bidirectional) {
-      linkType = LT_BIDI;
+    LinkType linkType = ctx.establishment.toLinkType();
+    if (ctx.establishment.isBidi()) {
       helper::logDebug(logPrefix + "Opening bidirectional connection");
-    } else {
-      linkType = ctx.send ? LT_SEND : LT_RECV;
     }
-    
+
     SdkResponse response = plugin.openConnection(openConnHandle, linkType,
                                                  ctx.linkId, "{}", 0, 0, 0);
 
@@ -230,7 +244,8 @@ struct StateConnConnectionOpen : public ConnState {
     ctx.manager.registerId(ctx, ctx.connId);
     ctx.manager.connStateMachineConnected(ctx.handle, ctx.connId,
                                           ctx.updatedLinkAddress,
-                                          ctx.channelId);
+                                          ctx.channelId,
+                                          ctx.linkId);
 
     ctx.pendingEvents.push(EVENT_ALWAYS);
 

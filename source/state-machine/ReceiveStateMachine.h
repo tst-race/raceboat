@@ -37,7 +37,7 @@ public:
                       std::shared_ptr<std::vector<uint8_t>> data) override;
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
-                                  std::string linkAddress) override;
+                                  std::string linkAddress, LinkID linkId) override;
 
 public:
   ReceiveOptions opts;

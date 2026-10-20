@@ -14,7 +14,7 @@
 # limitations under the License.
 # 
 
-FROM --platform=$TARGETPLATFORM ghcr.io/tst-race/raceboat/raceboat-plugin-builder:latest as base
+FROM --platform=$TARGETPLATFORM ghcr.io/tst-race/raceboat/raceboat-builder:main as base
 LABEL maintainer="Two Six Labs <race@twosixlabs.com>"
 
 ARG TARGETARCH
@@ -24,21 +24,21 @@ RUN echo "building for architecture $TARGETARCH"
 FROM base as amd64-linux
 COPY racesdk/package/LINUX_x86_64/app/race-cli /usr/local/bin/race-cli
 COPY racesdk/package/LINUX_x86_64/app/bridge-distro /usr/local/bin/bridge-distro
+COPY racesdk/package/LINUX_x86_64/lib /linux/x86_64/lib
 
 # arm64 linux
 FROM base as arm64-linux
 COPY racesdk/package/LINUX_arm64-v8a/app/race-cli /usr/local/bin/race-cli
 COPY racesdk/package/LINUX_arm64-v8a/app/bridge-distro /usr/local/bin/bridge-distro
-
-FROM ${TARGETARCH}-linux
-
-# Installing ncat for testing purposes
-FROM ${TARGETARCH}-linux
-RUN apt-get update && yes | apt-get install ncat # for example / test / debug
+COPY racesdk/package/LINUX_arm64-v8a/lib /linux/arm64-v8a/lib
 
 # Installing PluginCommsTwoSixStubDecomposed and Destini dependencies at system level
 # TODO: refactor those plugins to bring their own dependencies with them
-
+FROM ${TARGETARCH}-linux
+# race-cli/bridge-distro are built on the host (possibly as root with a
+# restrictive umask) - force executable/readable for all regardless, since
+# integration-test containers run as an arbitrary non-root --user.
+RUN chmod a+rX /usr/local/bin/race-cli /usr/local/bin/bridge-distro
 RUN apt-get update && yes | apt-get install -y \
     libboost-system1.74.0 \
     libboost-filesystem1.74.0 \
@@ -46,24 +46,26 @@ RUN apt-get update && yes | apt-get install -y \
     libevent-2.1-7 \
     parallel \
     libjpeg62-dev \
-    libavdevice-dev
+    libavdevice-dev \
+    libcpprest2.10
     # ffmpeg \
 
-COPY destini-deps/libflickcurl.so /usr/local/lib/libflickcurl.so
-RUN ln -s /usr/local/lib/libflickcurl.so /usr/local/lib/libflickcurl.so.0
-RUN pip install pillow psutil
+# COPY libflickcurl.so /usr/local/lib/libflickcurl.so
+# RUN apt-get update && yes | apt-get install ncat # for example / test / debug
 
-# Installing older ffmpeg version directly from the RACE external build to avoid _potential_ versioning issues in Destini video encoding
-ARG FFMPEG_VERSION=4.2.2-1
-ARG TARGETPLATFORM="linux/amd64"
-RUN case ${TARGETPLATFORM} in \
-        "linux/amd64") LINUX_ARCH=x86_64    ;; \
-        "linux/arm64") LINUX_ARCH=arm64-v8a ;; \
-    esac && \
-    wget \
-        --output-document=/tmp/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
-        https://github.com/tst-race/ext-ffmpeg/releases/download/${FFMPEG_VERSION}/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz && \
-    tar --extract \
-        --file=/tmp/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
-        --directory=/usr/local && \
-    rm /tmp/ffmpeg-*.tar.gz
+# RUN pip install pillow psutil
+
+# # Installing older ffmpeg version directly from the RACE external build to avoid _potential_ versioning issues in Destini video encoding
+# ARG FFMPEG_VERSION=4.2.2-1
+# ARG TARGETPLATFORM="linux/amd64"
+# RUN case ${TARGETPLATFORM} in \
+#         "linux/amd64") LINUX_ARCH=x86_64    ;; \
+#         "linux/arm64") LINUX_ARCH=arm64-v8a ;; \
+#     esac && \
+#     wget \
+#         --output-document=/tmp/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
+#         https://github.com/tst-race/ext-ffmpeg/releases/download/${FFMPEG_VERSION}/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz && \
+#     tar --extract \
+#         --file=/tmp/ffmpeg-${FFMPEG_VERSION}-linux-${LINUX_ARCH}.tar.gz \
+#         --directory=/usr/local && \
+#     rm /tmp/ffmpeg-*.tar.gz

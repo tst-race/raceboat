@@ -19,6 +19,7 @@
 #include <unordered_set>
 
 #include "ApiContext.h"
+#include "LinkEstablishment.h"
 
 namespace Raceboat {
 
@@ -63,11 +64,16 @@ public:
   bool create = false;
   bool send = false;
   bool bidirectional = false;  // true if this connection serves both send and recv
+  // Derived from create/send/bidirectional above; kept in sync by the
+  // updateConnStateMachineStart(Bidi) setters. This is the primitive that
+  // state logic in ConnectionStateMachine.cpp should consult going forward.
+  ConnEstablishment establishment;
   ChannelId channelId;
   std::string channelRole;
   std::string linkAddress;
   std::string updatedLinkAddress;
   LinkID linkId;
+  LinkID existingLinkId;  // If set, reuse this existing link instead of creating/loading
   ConnectionID connId;
   bool connected = false;
 };

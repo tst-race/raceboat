@@ -33,7 +33,7 @@ public:
                                   std::string linkAddress) override;
   virtual void
   updateConnStateMachineConnected(RaceHandle contextHandle, ConnectionID connId,
-                                  std::string linkAddress) override;
+                                  std::string linkAddress, LinkID linkId) override;
  virtual void
   updateReceiveEncPkg(ConnectionID connId,
                       std::shared_ptr<std::vector<uint8_t>> data) override;

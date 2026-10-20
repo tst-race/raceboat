@@ -313,10 +313,11 @@ SdkResponse ApiManager::onConnStateMachineLinkEstablished(RaceHandle contextHand
 SdkResponse ApiManager::onConnStateMachineConnected(RaceHandle contextHandle,
                                                     ConnectionID connId,
                                                     std::string linkAddress,
-                                                    std::string channelId) {
+                                                    std::string channelId,
+                                                    LinkID linkId) {
   TRACE_METHOD();
   return post(logPrefix, &ApiManagerInternal::onConnStateMachineConnected,
-              contextHandle, connId, linkAddress, channelId);
+              contextHandle, connId, linkAddress, channelId, linkId);
 }
 
 SdkResponse ApiManager::onChannelStatusChangedForContext(
@@ -330,10 +331,11 @@ SdkResponse ApiManager::onChannelStatusChangedForContext(
 
 SdkResponse ApiManager::onConnStateMachineConnectedForContext(
                                                             RaceHandle contextHandle, RaceHandle callHandle,
-                                                            RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress) {
+                                                            RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress,
+                                                            LinkID linkId) {
   TRACE_METHOD();
   return post(logPrefix, &ApiManagerInternal::onConnStateMachineConnectedForContext,
-              contextHandle, callHandle, connContextHandle, connId, linkAddress);
+              contextHandle, callHandle, connContextHandle, connId, linkAddress, linkId);
 }
 
 // Plugin callbacks
@@ -710,9 +712,10 @@ void ApiManagerInternal::connStateMachineLinkEstablished(RaceHandle contextHandl
 void ApiManagerInternal::connStateMachineConnected(RaceHandle contextHandle,
                                                    ConnectionID connId,
                                                    std::string linkAddress,
-                                                   std::string channelId) {
-  TRACE_METHOD(contextHandle, connId, linkAddress, channelId);
-  manager.onConnStateMachineConnected(contextHandle, connId, linkAddress, channelId);
+                                                   std::string channelId,
+                                                   LinkID linkId) {
+  TRACE_METHOD(contextHandle, connId, linkAddress, channelId, linkId);
+  manager.onConnStateMachineConnected(contextHandle, connId, linkAddress, channelId, linkId);
 }
 
 void ApiManagerInternal::onStateMachineFailed(uint64_t postId,
@@ -772,23 +775,41 @@ void ApiManagerInternal::onConnStateMachineConnected(uint64_t postId,
                                                      RaceHandle contextHandle,
                                                      ConnectionID connId,
                                                      std::string linkAddress,
-                                                     std::string channelId) {
-  TRACE_METHOD(postId, contextHandle, connId, linkAddress, channelId);
+                                                     std::string channelId,
+                                                     LinkID linkId) {
+  TRACE_METHOD(postId, contextHandle, connId, linkAddress, channelId, linkId);
 
-  // Map for when additional SMs want to re-use this link/connection
+  // Get the connection context to check if this is client-side (create=true) or server-side (create=false)
+  auto contextIt = activeContexts.find(contextHandle);
+  bool isClientSide = false;
+  if (contextIt != activeContexts.end()) {
+    auto connContext = dynamic_cast<ApiConnContext*>(contextIt->second.get());
+    if (connContext) {
+      isClientSide = connContext->create;
+    }
+  }
+
+  // Map for CLIENT-SIDE connection reuse only
+  // When a client dials to the same destination multiple times, reuse the existing connection
   // Note: this logic means we expect the channel to _always_ return a
   // _unique_ link when we ask for a link without providing an address.
-  if (linkAddress != "") {
+  // IMPORTANT: Do NOT insert SERVER-SIDE accepts into this map!
+  // - Server-side accepts all have the same linkAddress (server's own address)
+  // - Multiple clients need separate connections, not reuse
+  // - Inserting server accepts would cause key collisions and interfere with client-side lookups
+  if (linkAddress != "" && isClientSide) {
     std::string normalized_address = nlohmann::json::parse(linkAddress).dump();
     helper::logDebug(logPrefix + " compare normalized: " + linkAddress + " vs " + normalized_address);
-    helper::logDebug(logPrefix + "Inserting $" + channelId + "$ + $" + normalized_address + "$ into the linkConnMap with connID " + connId);
+    helper::logDebug(logPrefix + "Inserting CLIENT-SIDE: $" + channelId + "$ + $" + normalized_address + "$ into the linkConnMap with connID " + connId);
     linkConnMap.insert({channelId+normalized_address, {contextHandle, connId}});
+  } else if (!isClientSide) {
+    helper::logDebug(logPrefix + "Skipping linkConnMap insertion for SERVER-SIDE accept (connID " + connId + ")");
   }
   
   auto contexts = getContexts(contextHandle);
   for (auto context : contexts) {
     context->updateConnStateMachineConnected(contextHandle, connId,
-                                             linkAddress);
+                                             linkAddress, linkId);
     triggerEvent(*context, EVENT_CONN_STATE_MACHINE_CONNECTED);
   }
 }
@@ -823,8 +844,9 @@ void ApiManagerInternal::onChannelStatusChangedForContext(
   // the channelId+linkAddress is already ready
 void ApiManagerInternal::onConnStateMachineConnectedForContext(
     uint64_t postId, RaceHandle contextHandle, RaceHandle callHandle,
-    RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress) {
-  TRACE_METHOD(postId, contextHandle, callHandle, connContextHandle, connId, linkAddress);
+    RaceHandle connContextHandle, ConnectionID connId, std::string linkAddress,
+    LinkID linkId) {
+  TRACE_METHOD(postId, contextHandle, callHandle, connContextHandle, connId, linkAddress, linkId);
 
   auto contextIt = activeContexts.find(contextHandle);
   if (contextIt == activeContexts.end()) {
@@ -840,7 +862,8 @@ void ApiManagerInternal::onConnStateMachineConnectedForContext(
 
   contextIt->second->updateConnStateMachineConnected(connContextHandle,
                                                      connId,
-                                                     linkAddress);
+                                                     linkAddress,
+                                                     linkId);
   connContextIt->second->updateDependent(contextHandle);
   triggerEvent(*contextIt->second, EVENT_CONN_STATE_MACHINE_CONNECTED);
 }
@@ -933,6 +956,9 @@ void ApiManagerInternal::receiveEncPkg(
 
   std::shared_ptr<std::vector<uint8_t>> contents =
       std::make_shared<std::vector<uint8_t>>(pkg.getCipherText());
+  // Snapshot of the full, still packageId-prefixed bytes as delivered,
+  // before any stripping - used below to detect self-echoed packages.
+  const std::vector<uint8_t> fullWireBytes = *contents;
 
   const ConnectionID &connId = connIDs.front();
   Contexts contexts;
@@ -951,6 +977,23 @@ void ApiManagerInternal::receiveEncPkg(
                                        contents->end());
       helper::logDebug(logPrefix + " found package id");
 
+    } else if (Contexts packageIdOnlyContexts = getContextsByPackageId(packageId);
+               !packageIdOnlyContexts.empty()) {
+      // The exact (packageId, connId) pair was never registered, but this
+      // packageId IS bound to an existing conduit under a different connId.
+      // packageId is a random, globally-unique per-conduit tag baked into
+      // the wire format for exactly this purpose (see RoundTrip/ConduitContext),
+      // so it's authoritative even when a plugin delivers a long-lived
+      // conduit's later messages on a different connId than the one first
+      // observed at setup (e.g. multiple clients multiplexed on one shared
+      // link, where "the" connId isn't necessarily stable for a conduit's
+      // whole lifetime). Deliver it, and self-heal by also registering this
+      // connId so future packages on it take the fast exact-match path.
+      contexts = packageIdOnlyContexts;
+      *contents = std::vector<uint8_t>(contents->begin() + packageIdLen,
+                                       contents->end());
+      packageIdContextMap[packageId + connId] = contexts;
+      helper::logDebug(logPrefix + " found package id via packageId-only fallback (new connId)");
     } else {
       // buffer messages that might be for conduits/packageIds we have
       // not _yet_ resumed
@@ -970,6 +1013,14 @@ void ApiManagerInternal::receiveEncPkg(
   }
 
   for (auto context : contexts) {
+    if (context->wasRecentlySent(fullWireBytes)) {
+      // Self-echo: a shared/broadcast-style link delivered this conduit's
+      // own recently-sent package back to its own receive path. Discard
+      // instead of queuing it as if it were new data from the peer.
+      helper::logDebug(logPrefix + " discarding self-echoed package for context handle=" +
+                       std::to_string(context->handle));
+      continue;
+    }
     context->updateReceiveEncPkg(connId, contents);
     triggerEvent(*context, EVENT_RECEIVE_PACKAGE);
   }
@@ -1005,15 +1056,19 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
                                                      std::string role,
                                                      std::string linkAddress,
                                                      bool creating,
-                                                     bool sending) {
+                                                     bool sending,
+                                                     LinkID existingLinkId) {
   TRACE_METHOD(contextHandle);
 
   // We already made this link/connection
   // Note: this is _only_ valid when we are specifying the link address
   // Otherwise the address is being dynamically generated and will be unique
-  if (linkAddress != "") {
+  // IMPORTANT: Skip this check for server-side accept (creating=false with address)
+  // For accept, we WANT multiple connection SMs using the same link address
+  if (linkAddress != "" && creating) {
     std::string normalized_address = nlohmann::json::parse(linkAddress).dump();
     helper::logDebug(logPrefix + " compare normalized: " + linkAddress + " vs " + normalized_address);
+    helper::logDebug(logPrefix + "CLIENT-SIDE connection reuse check for linkConnMap");
     auto connContextIt = linkConnMap.find(channelId + normalized_address);
     if (connContextIt != linkConnMap.end()) {
       helper::logDebug(logPrefix + "got existing entry for $" + channelId + "$ $" + normalized_address + "$ in the linkConnMap with ConnID=" + connContextIt->second.second);
@@ -1022,7 +1077,8 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
                                                   callHandle,
                                                   connContextIt->second.first,
                                                   connContextIt->second.second,
-                                                  linkAddress);
+                                                  linkAddress,
+                                                  "");  // Empty LinkID for reuse case
     return connContextIt->second.first;
     }
   }
@@ -1033,6 +1089,7 @@ RaceHandle ApiManagerInternal::startConnStateMachine(RaceHandle contextHandle,
   auto context = newConnContext();
   context->updateConnStateMachineStart(contextHandle, channelId, role,
                                        linkAddress, creating, sending);
+  context->existingLinkId = existingLinkId;  // Store existing link ID if provided
 
   EventResult result = connEngine.start(*context);
   if (result != EventResult::SUCCESS) {
@@ -1046,11 +1103,13 @@ RaceHandle ApiManagerInternal::startConnStateMachineBidi(RaceHandle contextHandl
                                                          ChannelId channelId,
                                                          std::string role,
                                                          std::string linkAddress,
-                                                         bool creating) {
+                                                         bool creating,
+                                                         LinkID existingLinkId) {
   TRACE_METHOD(contextHandle);
 
   // For bidirectional connections, check if we already made this connection
-  if (linkAddress != "") {
+  // Skip this check when creating=false (server-side accept) to allow multiple connection SMs
+  if (linkAddress != "" && creating) {
     std::string normalized_address = nlohmann::json::parse(linkAddress).dump();
     helper::logDebug(logPrefix + " compare normalized (bidi): " + linkAddress + " vs " + normalized_address);
     auto connContextIt = linkConnMap.find(channelId + normalized_address);
@@ -1061,7 +1120,8 @@ RaceHandle ApiManagerInternal::startConnStateMachineBidi(RaceHandle contextHandl
                                                     callHandle,
                                                     connContextIt->second.first,
                                                     connContextIt->second.second,
-                                                    linkAddress);
+                                                    linkAddress,
+                                                    "");  // Empty LinkID for reuse case
       return connContextIt->second.first;
     }
   }
@@ -1070,6 +1130,7 @@ RaceHandle ApiManagerInternal::startConnStateMachineBidi(RaceHandle contextHandl
   auto context = newConnContext();
   context->updateConnStateMachineStartBidi(contextHandle, channelId, role,
                                            linkAddress, creating);
+  context->existingLinkId = existingLinkId;  // Store existing link ID if provided
 
   EventResult result = connEngine.start(*context);
   if (result != EventResult::SUCCESS) {
@@ -1129,14 +1190,16 @@ RaceHandle ApiManagerInternal::startPreConduitStateMachine(
     const ConnectionID &recvConnId, const ChannelId &recvChannel,
     const ChannelId &sendChannel, const std::string &sendRole,
     const std::string &sendLinkAddress, const std::string &packageId,
-    std::vector<std::vector<uint8_t>> recvMessages) {
+    std::vector<std::vector<uint8_t>> recvMessages,
+    RaceHandle existingSendConnSMHandle, const ConnectionID &existingSendConnId) {
         helper::logInfo(
                          " START PRECONN OBJECT being called");
   // create a connection context and copy information from the send/recv context
   auto context = newPreConduitContext();
   context->updatePreConduitStateMachineStart(
       contextHandle, recvHandle, recvConnId, recvChannel, sendChannel, sendRole,
-      sendLinkAddress, packageId, recvMessages);
+      sendLinkAddress, packageId, recvMessages,
+      existingSendConnSMHandle, existingSendConnId);
 
   EventResult result = preConduitEngine.start(*context);
   if (result != EventResult::SUCCESS) {
@@ -1151,12 +1214,25 @@ RaceHandle ApiManagerInternal::startPreConduitStateMachine(
   recvContextIt->second->updateDependent(context->handle);
   triggerEvent(*recvContextIt->second, EVENT_ADD_DEPENDENT);
 
+  // Also register as a dependent of the reused preset send connSM (if any),
+  // so its later detachConnSM call is a correctly-tracked ref-count
+  // decrement instead of detaching a connection we never registered with.
+  if (existingSendConnSMHandle != NULL_RACE_HANDLE) {
+    auto sendContextIt = activeContexts.find(existingSendConnSMHandle);
+    if (sendContextIt != activeContexts.end()) {
+      sendContextIt->second->updateDependent(context->handle);
+      triggerEvent(*sendContextIt->second, EVENT_ADD_DEPENDENT);
+    }
+  }
+
   return context->handle;
 }
 
 RaceHandle ApiManagerInternal::startBootstrapPreConduitStateMachine(
                                                 RaceHandle contextHandle,
                                                 const ApiBootstrapListenContext &listenContext,
+                                                RaceHandle helloConnSMHandle,
+                                                const ConnectionID &helloConnId,
                                                 const std::string &packageId,
                                                 std::vector<std::vector<uint8_t>> recvMessages) {
         helper::logInfo(
@@ -1165,14 +1241,22 @@ RaceHandle ApiManagerInternal::startBootstrapPreConduitStateMachine(
   auto context = newBootstrapPreConduitContext();
   context->updateBootstrapPreConduitStateMachineStart(contextHandle,
                                                       listenContext,
+                                                      helloConnSMHandle,
+                                                      helloConnId,
                                                       packageId, recvMessages);
   EventResult result = bootstrapPreConduitEngine.start(*context);
   if (result != EventResult::SUCCESS) {
     return NULL_RACE_HANDLE;
   }
 
-  addDependent(listenContext.initSendConnSMHandle, context->handle);
-  addDependent(listenContext.initRecvConnSMHandle, context->handle);
+  // Mirror the send-handle resolution in updateBootstrapPreConduitStateMachineStart:
+  // for a merged single-bidi init link, this client's own connSM handles both
+  // send and recv; otherwise fall back to the listener's shared init-send handle.
+  RaceHandle initSendConnSMHandle = listenContext.initUsingSingleBidiConnection
+                                        ? helloConnSMHandle
+                                        : listenContext.initSendConnSMHandle;
+  addDependent(initSendConnSMHandle, context->handle);
+  addDependent(helloConnSMHandle, context->handle);
   return context->handle;
 }
 
@@ -1255,7 +1339,8 @@ void ApiManagerInternal::registerPackageId(ApiContext &context,
   packageIdContextMap[id + connId].insert(&context);
 
   // Check for buffered received messages that came before this packageId was registered
-  auto packageListIt = unassociatedPackages.find(packageId);
+  // Use 'id' (raw bytes) not 'packageId' (JSON string) to match receiveEncPkg buffering
+  auto packageListIt = unassociatedPackages.find(id);
   if (packageListIt != unassociatedPackages.end()) {
     helper::logDebug(logPrefix + "Found " + std::to_string(packageListIt->second.size()) + " packages waiting for this packageId");
     for (auto packageIt : packageListIt->second) {
@@ -1398,12 +1483,17 @@ ApiManagerInternal::getContexts(const std::string &id) {
 
 ApiManagerInternal::Contexts
 ApiManagerInternal::getContextsByPackageId(const std::string &packageId) {
+  // packageIdContextMap is keyed by "packageId + connId" (packageId is
+  // always exactly packageIdLen bytes), so an exact-match lookup on
+  // packageId alone would never hit. Scan for any key with this packageId
+  // as its prefix, regardless of which connId it's currently paired with.
   Contexts contexts;
-  auto it = packageIdContextMap.find(packageId);
-  if (it != packageIdContextMap.end()) {
-    return it->second;
+  for (auto &[key, ctxSet] : packageIdContextMap) {
+    if (key.compare(0, packageId.size(), packageId) == 0) {
+      contexts.insert(ctxSet.begin(), ctxSet.end());
+    }
   }
-  return {};
+  return contexts;
 }
 
 ApiManagerInternal::Contexts
