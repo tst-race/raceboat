@@ -161,6 +161,9 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
         ctx.shouldUseSingleBidiLink(ctx.opts.init_send_channel,
                                     ctx.opts.init_recv_channel);
 
+    // Declare 'create' at function scope so it can be used for both init and final links
+    bool create = false;
+
     if (initUsesSingleBidiLink) {
       // Genuinely bidirectional connSM instead of a directional one aliased
       // to look bidi - the merge mechanism Step 3 migrated. Only one
@@ -197,7 +200,7 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
       // StateDialWaitingForSendConnection pattern and the equivalent fix
       // applied to the non-bootstrap ListenStateMachine. init-recv is thus
       // guaranteed to always win LinkID_0.
-      bool create = ctx.shouldCreateReceiver(ctx.opts.init_recv_channel);
+      create = ctx.shouldCreateReceiver(ctx.opts.init_recv_channel);
       if (create) {
         helper::logInfo(logPrefix + "Creating init-recv link on " + ctx.opts.init_recv_channel + " with address: " + ctx.opts.init_recv_address);
         bool sending = false;
