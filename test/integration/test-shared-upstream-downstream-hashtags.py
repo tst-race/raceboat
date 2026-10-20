@@ -33,7 +33,7 @@ import uuid
 from pathlib import Path
 
 INTEGRATION_DIR = Path(__file__).resolve().parent
-DECOMPOSED_TEST_DIR = INTEGRATION_DIR.parents[2] / "decomposed-exemplars" / "test"
+DECOMPOSED_TEST_DIR = INTEGRATION_DIR.parents[2] / "plugins" / "decomposed-exemplars" / "test"
 sys.path.insert(0, str(INTEGRATION_DIR))
 sys.path.insert(0, str(DECOMPOSED_TEST_DIR))
 from adapter_types import NodeRequest  # noqa: E402

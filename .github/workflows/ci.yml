@@ -350,26 +350,26 @@ jobs:
       - name: Install Python test dependencies
         run: pip install --quiet pyyaml
 
-      - name: Run scenario integration test suite
-        working-directory: raceboat/test/integration
-        run: |
-          python3 run_all_scenarios.py \
-            --image-tag "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}" \
-            --fail-fast \
-            --skip \ 
-              bootstrap-mixed-updown-l2c-c2l \
-              bootstrap-decomposed-decomposed \
-              bootstrap-decomposed-decomposed-multi-client \
-              bootstrap-decomposed-racebird \
-              bootstrap-racebird-decomposed-multi-client \
-              client-connect-mixed-l2c-c2l
-
       - name: Run standalone shared-address/timeout-zero tests
         working-directory: raceboat/test/integration
         run: |
           IMAGE_TAG="${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}"
           python3 test-shared-upstream-downstream-hashtags.py --image-tag "$IMAGE_TAG"
           python3 test-timeout-zero-teardown.py --image-tag "$IMAGE_TAG"
+
+      - name: Run scenario integration test suite
+        working-directory: raceboat/test/integration
+        run: |
+          python3 run_all_scenarios.py \
+            --image-tag "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}" \
+            --fail-fast \
+            --skip \
+              bootstrap-mixed-updown-l2c-c2l \
+              bootstrap-decomposed-decomposed \
+              bootstrap-decomposed-decomposed-multi-client \
+              bootstrap-decomposed-racebird \
+              bootstrap-racebird-decomposed-multi-client \
+              client-connect-mixed-l2c-c2l
 
       - name: Upload logs on failure
         if: failure()
