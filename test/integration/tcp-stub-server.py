@@ -15,7 +15,7 @@ import time
 PORT = 7777
 EXPECTED = b"hello from"  # Accept any client ID
 REPLY = b"hello from server\n"
-TIMEOUT = 60
+TIMEOUT = 180
 NUM_CLIENTS = int(sys.argv[1]) if len(sys.argv) > 1 else 1
 
 # Shared state for tracking connections

@@ -169,10 +169,15 @@ struct StateListenInitial : public ListenState {
 
     // Create the FIRST connection state machine for the initial listener
     // This creates LinkID_0 and waits for the first client to connect
+    // Determine role based on channel properties (linkDirection)
+    bool recvCreating = ctx.shouldCreateReceiver(channelId);
+    LinkRole recvRole_ = recvCreating ? LinkRole::Creator : LinkRole::Loader;
+    helper::logDebug(logPrefix + "listen: recv linkDirection for '" + channelId +
+                     "' -> creating=" + (recvCreating ? "true" : "false"));
     ctx.recvConnSMHandle = Socket::establish(
         ctx.manager, ctx.handle,
         SocketRequest{channelId, role, linkAddress,
-                     ConnEstablishment{resolveBidiRole(ModeRole::Listener), recvDirectionality}});
+                     ConnEstablishment{recvRole_, recvDirectionality}});
 
     if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -229,10 +234,17 @@ struct StateListenWaitingForSendConnection : public ListenState {
       return EventResult::SUCCESS;
     }
 
+    // Determine correct LinkRole for preset send connection based on channel properties
+    // For CT_INDIRECT + LD_CREATOR_TO_LOADER, the listener should be Creator (creates its own send repo)
+    bool sendCreating = ctx.shouldCreateSender(ctx.opts.send_channel);
+    LinkRole sendRole_ = sendCreating ? LinkRole::Creator : LinkRole::Loader;
+    helper::logDebug(logPrefix + "listen: preset send linkDirection for '" + ctx.opts.send_channel +
+                     "' -> creating=" + (sendCreating ? "true" : "false"));
+
     ctx.presetSendConnSMHandle = Socket::establish(
         ctx.manager, ctx.handle,
         SocketRequest{ctx.opts.send_channel, ctx.opts.send_role, ctx.opts.send_address,
-                     ConnEstablishment{LinkRole::Loader, LinkDirectionality::Send}});
+                     ConnEstablishment{sendRole_, LinkDirectionality::Send}});
 
     if (ctx.presetSendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting preset send connection state machine failed");

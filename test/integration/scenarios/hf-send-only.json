@@ -1,0 +1,36 @@
+{
+  "id": "hf-send-only",
+  "mode": "send",
+  "wait_time": 60,
+  "timeout": 120,
+  "network": {
+    "name": "hf-send-only-network",
+    "subnet": "10.20.1.0/24"
+  },
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "hf-send-only-listener",
+      "ip": "10.20.1.3",
+      "slots": {
+        "channel": {
+          "recv": "hfTransportComposition",
+          "send": "hfTransportComposition"
+        }
+      }
+    },
+    {
+      "role": "connector",
+      "id": "hf-send-only-connector",
+      "ip": "10.20.1.2",
+      "slots": {
+        "channel": {
+          "recv": "hfTransportComposition",
+          "send": "hfTransportComposition"
+        }
+      }
+    }
+  ],
+  "send_message": "HF transport send-only test",
+  "description": "Listener creates repo and sends data, connector receives. Verifies POST action and HF upload. REQUIRES real HF credentials: set HF_USERNAME and HF_TOKEN env vars with a write-scope PAT."
+}
