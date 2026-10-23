@@ -949,9 +949,6 @@ void ApiManagerInternal::receiveEncPkg(
   if (connIDs.empty()) {
     helper::logError(logPrefix + " no connection IDs");
     return;
-  } else if (connIDs.size() > 1) {
-    helper::logError(logPrefix + " too many connection IDs");
-    return;
   }
 
   std::shared_ptr<std::vector<uint8_t>> contents =
@@ -960,19 +957,48 @@ void ApiManagerInternal::receiveEncPkg(
   // before any stripping - used below to detect self-echoed packages.
   const std::vector<uint8_t> fullWireBytes = *contents;
 
-  const ConnectionID &connId = connIDs.front();
+  // A shared link can deliver one package with several candidate connIds
+  // (e.g. a new remote producer that is not yet bound to a connection). The
+  // packageId is the authoritative routing key, so use connIDs only to
+  // pick the best connId for the matched conduit rather than dropping the
+  // package.
+  ConnectionID connId = connIDs.front();
   Contexts contexts;
   if (contents->size() < packageIdLen) {
-    contexts = getContexts(connId);
+    for (const auto &candidate : connIDs) {
+      auto candidateContexts = getContexts(candidate);
+      contexts.insert(candidateContexts.begin(), candidateContexts.end());
+    }
   } else {
     std::vector<int> packageIdBytes{contents->begin(),
                                     contents->begin() + packageIdLen};
     helper::logDebug(logPrefix + "PackageId: " + json(packageIdBytes).dump());
     std::string packageId{contents->begin(), contents->begin() + packageIdLen};
-    helper::logDebug(logPrefix + "PackageId+ConnId: " + json(packageIdBytes).dump() + connId);
-    auto it = packageIdContextMap.find(packageId + connId);
-    if (it != packageIdContextMap.end()) {
-      contexts = it->second;
+    helper::logDebug(logPrefix + "PackageId+ConnId: " + json(packageIdBytes).dump() +
+                     json(connIDs).dump());
+
+    // Exact (packageId, connId) match; when several candidate connIds
+    // match (e.g. the all-zero bootstrap packageId is registered on every
+    // connection), prefer one that does not already host a conduit.
+    std::vector<ConnectionID> exactMatches;
+    for (const auto &candidate : connIDs) {
+      if (packageIdContextMap.find(packageId + candidate) !=
+          packageIdContextMap.end()) {
+        exactMatches.push_back(candidate);
+      }
+    }
+
+    if (!exactMatches.empty()) {
+      connId = exactMatches.front();
+      if (exactMatches.size() > 1) {
+        for (const auto &candidate : exactMatches) {
+          if (!connectionHostsConduit(candidate)) {
+            connId = candidate;
+            break;
+          }
+        }
+      }
+      contexts = packageIdContextMap.find(packageId + connId)->second;
       *contents = std::vector<uint8_t>(contents->begin() + packageIdLen,
                                        contents->end());
       helper::logDebug(logPrefix + " found package id");
@@ -1003,7 +1029,10 @@ void ApiManagerInternal::receiveEncPkg(
       } else{
         unassociatedPackages.insert({packageId, {pkg}});
       }
-      contexts = getContexts(connId);
+      for (const auto &candidate : connIDs) {
+        auto candidateContexts = getContexts(candidate);
+        contexts.insert(candidateContexts.begin(), candidateContexts.end());
+      }
       helper::logDebug(logPrefix + " did not find package id in an existing conduit");
     }
   }
@@ -1494,6 +1523,20 @@ ApiManagerInternal::getContextsByPackageId(const std::string &packageId) {
     }
   }
   return contexts;
+}
+
+bool ApiManagerInternal::connectionHostsConduit(const ConnectionID &connId) {
+  // A connection hosts a conduit when a non-bootstrap (non-zero) packageId
+  // is registered against it.
+  const std::string zeroPackageId(packageIdLen, '\0');
+  for (const auto &[key, ctxSet] : packageIdContextMap) {
+    if (key.size() > static_cast<size_t>(packageIdLen) &&
+        key.compare(packageIdLen, std::string::npos, connId) == 0 &&
+        key.compare(0, packageIdLen, zeroPackageId) != 0 && !ctxSet.empty()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 ApiManagerInternal::Contexts
