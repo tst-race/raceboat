@@ -265,6 +265,7 @@ protected:
   virtual Contexts getContexts(RaceHandle handle);
   virtual Contexts getContexts(const std::string &id);
   virtual Contexts getContextsByPackageId(const std::string &packageId);
+  virtual bool connectionHostsConduit(const ConnectionID &connId);
   virtual Contexts getContexts(RaceHandle handle, const std::string &id);
 
   virtual void removeContext(ApiContext &context);
