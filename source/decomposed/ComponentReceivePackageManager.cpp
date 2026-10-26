@@ -189,7 +189,10 @@ ConnectionID ComponentReceivePackageManager::bindConnIdToProducer(
       return connId;
     }
   }
-  helper::logWarning(logPrefix + "No unbound connection available to bind producer");
+  // Not an error: the producer stays unbound and every connection is passed
+  // along, so ApiManager routes by packageId. Binding is retried on the
+  // producer's next fragment, once the listener has opened another connection.
+  helper::logDebug(logPrefix + "No unbound connection available to bind producer yet");
   return "";
 }
 
@@ -204,9 +207,10 @@ CmInternalStatus ComponentReceivePackageManager::receiveFragmentProducer(
   auto fragmentQueue = &link->producerQueues[producer];
   fragmentQueue->lastActivity = std::chrono::steady_clock::now();
 
-  // Route this producer's completed packages to a single, specifically
-  // bound connection rather than every connection on the (possibly shared /
-  // multi-client) link - receiveEncPkg rejects more than one connId.
+  // Prefer routing this producer's completed packages to a single bound
+  // connection on the (possibly shared / multi-client) link. If none is free
+  // yet, fall back to all connections; ApiManager::receiveEncPkg resolves the
+  // target conduit by packageId, so the package is never dropped.
   if (fragmentQueue->boundConnId.empty()) {
     fragmentQueue->boundConnId = bindConnIdToProducer(link, producer);
   }
