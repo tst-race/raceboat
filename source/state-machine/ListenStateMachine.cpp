@@ -485,6 +485,12 @@ struct StateListenFinished : public ListenState {
     }
     ctx.acceptCb = {};
 
+    // Release dials that were received but never accepted
+    while (!ctx.preConduitSM.empty()) {
+      ctx.manager.stateMachineFinished(ctx.preConduitSM.front());
+      ctx.preConduitSM.pop();
+    }
+
     ctx.manager.stateMachineFinished(ctx);
 
     ctx.closeCb(ApiStatus::OK);
@@ -553,6 +559,11 @@ ListenStateEngine::ListenStateEngine() {
     declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_RECEIVE_PACKAGE,              STATE_LISTEN_WAITING);
     declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_ACCEPT,                       STATE_LISTEN_WAITING);
     declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_CLOSE,                        STATE_LISTEN_FINISHED);
+
+    // The recv/preset-send connections failing while still setting up fails the listen. Once
+    // listening, a failed accept-time connection does not take down the listener.
+    declareStateTransition(STATE_LISTEN_INITIAL,                       EVENT_STATE_MACHINE_FAILED,         STATE_LISTEN_FAILED);
+    declareStateTransition(STATE_LISTEN_WAITING_FOR_SEND_CONNECTION,   EVENT_STATE_MACHINE_FAILED,         STATE_LISTEN_FAILED);
   // clang-format on
 }
 

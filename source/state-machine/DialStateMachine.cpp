@@ -386,6 +386,13 @@ DialStateEngine::DialStateEngine() {
     declareStateTransition(STATE_DIAL_SEND_OPEN, EVENT_PACKAGE_SENT, STATE_DIAL_PACKAGE_SENT);
     declareStateTransition(STATE_DIAL_PACKAGE_SENT,                  EVENT_CONN_STATE_MACHINE_CONNECTED,              STATE_DIAL_PACKAGE_SENT);
     declareStateTransition(STATE_DIAL_PACKAGE_SENT,              EVENT_SATISFIED,                 STATE_DIAL_FINISHED);
+
+    // A failing connection state machine, or a failed initial package, fails the dial
+    declareStateTransition(STATE_DIAL_INITIAL,                   EVENT_STATE_MACHINE_FAILED,      STATE_DIAL_FAILED);
+    declareStateTransition(STATE_DIAL_WAITING_FOR_SEND_CONNECTION, EVENT_STATE_MACHINE_FAILED,    STATE_DIAL_FAILED);
+    declareStateTransition(STATE_DIAL_SEND_OPEN,                 EVENT_STATE_MACHINE_FAILED,      STATE_DIAL_FAILED);
+    declareStateTransition(STATE_DIAL_PACKAGE_SENT,              EVENT_STATE_MACHINE_FAILED,      STATE_DIAL_FAILED);
+    declareStateTransition(STATE_DIAL_SEND_OPEN,                 EVENT_PACKAGE_FAILED,            STATE_DIAL_FAILED);
   // clang-format on
 }
 

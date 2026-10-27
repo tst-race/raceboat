@@ -39,12 +39,14 @@ add_executable(testStandaloneLibrary
     SdkWrapperTest.cpp
     UserInputTest.cpp
     # StateMachineTest.cpp
-    # ApiManager/DialTest.cpp
-    # ApiManager/ListenTest.cpp
-    # ApiManager/ReceiveRespondTest.cpp
-    # ApiManager/RecvTest.cpp
-    # ApiManager/SendTest.cpp
-    # ApiManager/SendReceiveTest.cpp
+    ApiManager/DialTest.cpp
+    ApiManager/ListenTest.cpp
+    ApiManager/ReceiveRespondTest.cpp
+    ApiManager/RecvTest.cpp
+    ApiManager/SendTest.cpp
+    ApiManager/SendReceiveTest.cpp
+    # TODO: BootstrapListenTest.cpp does not compile (it uses bootstrap options that
+    # have since been removed from ReceiveOptions) and needs porting.
     # ApiManager/BootstrapListenTest.cpp
 )
 

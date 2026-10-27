@@ -33,7 +33,7 @@ public:
   ApiManagerRecvTestFixture()
       : params(), core(std::make_shared<MockCore>()), manager(*core) {
     recvOptions.recv_channel = "recvChannel";
-    recvOptions.recv_address = "recvAddress";
+    recvOptions.recv_address = "{\"hashtag\":\"recvAddress\"}";
     recvOptions.recv_role = "recvRole";
     recvOptions.timeout_ms = 0;
 
@@ -52,20 +52,16 @@ public:
     channelProps.linkDirection = LD_LOADER_TO_CREATOR;
     channelProps.maxLoadersPerCreator = 1;
 
-    // 0 and 1 are context handles created by the manager
-    chanHandle = core->handle + 2;
-    createLinkHandle = core->handle + 3;
-    openConnHandle = core->handle + 4;
-    pkgHandle = core->handle + 5;
-    closeConnHandle = core->handle + 6;
-    destroyLinkHandle = core->handle + 7;
+    // Plugin handles are captured from the calls the manager makes.
+    chanHandle = createLinkHandle = openConnHandle = pkgHandle = 0;
+    closeConnHandle = destroyLinkHandle = 0;
 
     bytes.reserve(0x100);
     for (uint16_t byte = 0; byte < 0x100; ++byte) {
       bytes.push_back(byte);
     }
 
-    linkProps.linkAddress = "recvAddress";
+    linkProps.linkAddress = "{\"hashtag\":\"recvAddress\"}";
     linkProps.linkType = LT_RECV;
 
     getReceiverCallback = [this](ApiStatus _status, LinkAddress _address,
@@ -146,38 +142,56 @@ public:
 
 void ApiManagerRecvTestFixture::expectActivateChannel() {
   EXPECT_CALL(core->mockChannelManager,
-              activateChannel(chanHandle, recvOptions.recv_channel,
+              activateChannel(_, recvOptions.recv_channel,
                               recvOptions.recv_role))
-      .WillOnce(Return(ActivateChannelStatusCode::OK));
+      .WillOnce([this](RaceHandle _handle, auto, auto) {
+        chanHandle = _handle;
+        return ActivateChannelStatusCode::OK;
+      });
 }
 
 void ApiManagerRecvTestFixture::expectCreateLinkFromAddress() {
   EXPECT_CALL(*core->plugin,
-              createLinkFromAddress(createLinkHandle, recvOptions.recv_channel,
+              createLinkFromAddress(_, recvOptions.recv_channel,
                                     recvOptions.recv_address, _))
-      .WillOnce(Return(SdkResponse(SDK_OK)));
+      .WillOnce([this](RaceHandle _handle, auto, auto, auto) {
+        createLinkHandle = _handle;
+        return SdkResponse(SDK_OK);
+      });
 }
 
 void ApiManagerRecvTestFixture::expectCreateLink() {
-  EXPECT_CALL(*core->plugin,
-              createLink(createLinkHandle, recvOptions.recv_channel, _))
-      .WillOnce(Return(SdkResponse(SDK_OK)));
+  EXPECT_CALL(*core->plugin, createLink(_, recvOptions.recv_channel, _))
+      .WillOnce([this](RaceHandle _handle, auto, auto) {
+        createLinkHandle = _handle;
+        return SdkResponse(SDK_OK);
+      });
 }
 
 void ApiManagerRecvTestFixture::expectOpenConnection() {
-  EXPECT_CALL(*core->plugin, openConnection(openConnHandle, linkProps.linkType,
-                                            linkId, "{}", 0, 0, _))
-      .WillOnce(Return(SdkResponse(SDK_OK)));
+  EXPECT_CALL(*core->plugin,
+              openConnection(_, linkProps.linkType, linkId, "{}", 0, 0, _))
+      .WillOnce(
+          [this](RaceHandle _handle, auto, auto, auto, auto, auto, auto) {
+            openConnHandle = _handle;
+            return SdkResponse(SDK_OK);
+          });
 }
 
 void ApiManagerRecvTestFixture::expectCloseConnection() {
-  EXPECT_CALL(*core->plugin, closeConnection(closeConnHandle, connId, _))
-      .WillOnce(Return(SdkResponse(SDK_OK)));
+  EXPECT_CALL(*core->plugin, closeConnection(_, connId, _))
+      .WillOnce([this](RaceHandle _handle, auto, auto) {
+        closeConnHandle = _handle;
+        return SdkResponse(SDK_OK);
+      });
 }
 
 void ApiManagerRecvTestFixture::expectDestroyLink() {
-  EXPECT_CALL(*core->plugin, destroyLink(destroyLinkHandle, linkId, _))
-      .WillOnce(Return(SdkResponse(SDK_OK)));
+  EXPECT_CALL(*core->plugin, destroyLink(_, linkId, _))
+      .WillOnce([this](RaceHandle _handle, auto, auto) {
+        destroyLinkHandle = _handle;
+        return SdkResponse(SDK_OK);
+      });
 }
 
 void ApiManagerRecvTestFixture::expectAll() {
@@ -239,7 +253,10 @@ void ApiManagerRecvTestFixture::closeCall(
 }
 
 void ApiManagerRecvTestFixture::receiveEncPkgCall() {
-  EncPkg pkg(0, 0, bytes);
+  // Receive objects are addressed with an all-zero package id prefix.
+  std::vector<uint8_t> prefixed(packageIdLen, 0);
+  prefixed.insert(prefixed.end(), bytes.begin(), bytes.end());
+  EncPkg pkg(0, 0, prefixed);
   manager.receiveEncPkg(*core->container, pkg, {connId});
   manager.waitForCallbacks();
 }
@@ -365,26 +382,6 @@ TEST_F(ApiManagerRecvTestFixture, multiple_packages_order_5_no_errors) {
   expectedStatus();
 }
 
-TEST_F(ApiManagerRecvTestFixture, multiple_receive_calls_error) {
-  expectActivateChannel();
-  expectCreateLinkFromAddress();
-  expectOpenConnection();
-
-  openAll();
-  receiveCall(receiverHandle, receiveCallback);
-  receiveCall(receiverHandle, receiveCallback);
-
-  EXPECT_EQ(status, ApiStatus::OK);
-  EXPECT_EQ(address, linkProps.linkAddress);
-
-  // This shouldn't really be internal error, but that's what it manifests as
-  // currently
-  EXPECT_EQ(status2, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
-}
-
 TEST_F(ApiManagerRecvTestFixture, no_packages_no_errors) {
   expectAll();
 
@@ -431,7 +428,7 @@ TEST_F(ApiManagerRecvTestFixture, receiveEncPkg_no_receive_no_errors) {
 
 TEST_F(ApiManagerRecvTestFixture, activateChannel_error) {
   EXPECT_CALL(core->mockChannelManager,
-              activateChannel(chanHandle, recvOptions.recv_channel,
+              activateChannel(_, recvOptions.recv_channel,
                               recvOptions.recv_role))
       .WillOnce(Return(ActivateChannelStatusCode::CHANNEL_DOES_NOT_EXIST));
   getReceiverCall(getReceiverCallback);
@@ -445,7 +442,7 @@ TEST_F(ApiManagerRecvTestFixture, activateChannel_error) {
 TEST_F(ApiManagerRecvTestFixture, createLinkFromAddress_error) {
   expectActivateChannel();
   EXPECT_CALL(*core->plugin,
-              createLinkFromAddress(createLinkHandle, recvOptions.recv_channel,
+              createLinkFromAddress(_, recvOptions.recv_channel,
                                     recvOptions.recv_address, _))
       .WillOnce(Return(SdkResponse(SDK_INVALID_ARGUMENT)));
   getReceiverCall(getReceiverCallback);
@@ -462,7 +459,7 @@ TEST_F(ApiManagerRecvTestFixture, createLink_error) {
   recvOptions.recv_address = "";
   expectActivateChannel();
   EXPECT_CALL(*core->plugin,
-              createLink(createLinkHandle, recvOptions.recv_channel, _))
+              createLink(_, recvOptions.recv_channel, _))
       .WillOnce(Return(SdkResponse(SDK_INVALID_ARGUMENT)));
   getReceiverCall(getReceiverCallback);
   EXPECT_EQ(manager.impl.activeContexts.size(), 2);
@@ -477,8 +474,8 @@ TEST_F(ApiManagerRecvTestFixture, createLink_error) {
 TEST_F(ApiManagerRecvTestFixture, openConnection_error) {
   expectActivateChannel();
   expectCreateLinkFromAddress();
-  EXPECT_CALL(*core->plugin, openConnection(openConnHandle, linkProps.linkType,
-                                            linkId, "{}", 0, 0, _))
+  EXPECT_CALL(*core->plugin, openConnection(_, linkProps.linkType, linkId,
+                                            "{}", 0, 0, _))
       .WillOnce(Return(SdkResponse(SDK_INVALID_ARGUMENT)));
 
   getReceiverCall(getReceiverCallback);
@@ -498,7 +495,7 @@ TEST_F(ApiManagerRecvTestFixture, DISABLED_closeConnection_error) {
   expectActivateChannel();
   expectCreateLinkFromAddress();
   expectOpenConnection();
-  EXPECT_CALL(*core->plugin, closeConnection(closeConnHandle, connId, _))
+  EXPECT_CALL(*core->plugin, closeConnection(_, connId, _))
       .WillOnce(Return(SdkResponse(SDK_INVALID_ARGUMENT)));
 
   openAll();
@@ -657,27 +654,37 @@ TEST_F(ApiManagerRecvTestFixture, receive_invalid_handle_error) {
   EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
 }
 
+// Duplicate plugin callbacks are tolerated: they must not fail the receiver.
 TEST_F(ApiManagerRecvTestFixture, multiple_onChannelStatusChanged_calls) {
   expectActivateChannel();
   expectCreateLinkFromAddress();
+  expectOpenConnection();
+  expectCloseConnection();
+  expectDestroyLink();
 
   getReceiverCall(getReceiverCallback);
   EXPECT_EQ(manager.impl.activeContexts.size(), 2);
 
   onChannelStatusChangedCall();
   onChannelStatusChangedCall();
+  onLinkStatusChangedCall();
+  onConnectionStatusChangedCall();
+  EXPECT_EQ(status, ApiStatus::OK);
 
-  EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(address, "");
+  closeAll();
+  EXPECT_EQ(status3, ApiStatus::OK);
   EXPECT_EQ(manager.impl.activeContexts.size(), 0);
   EXPECT_EQ(manager.impl.idContextMap.size(), 0);
   EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
 }
 
+// Duplicate plugin callbacks are tolerated: they must not fail the receiver.
 TEST_F(ApiManagerRecvTestFixture, multiple_onLinkStatusChanged_calls) {
   expectActivateChannel();
   expectCreateLinkFromAddress();
   expectOpenConnection();
+  expectCloseConnection();
+  expectDestroyLink();
 
   getReceiverCall(getReceiverCallback);
   EXPECT_EQ(manager.impl.activeContexts.size(), 2);
@@ -685,48 +692,64 @@ TEST_F(ApiManagerRecvTestFixture, multiple_onLinkStatusChanged_calls) {
   onChannelStatusChangedCall();
   onLinkStatusChangedCall();
   onLinkStatusChangedCall();
+  onConnectionStatusChangedCall();
+  EXPECT_EQ(status, ApiStatus::OK);
 
-  EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(address, "");
+  closeAll();
+  EXPECT_EQ(status3, ApiStatus::OK);
   EXPECT_EQ(manager.impl.activeContexts.size(), 0);
   EXPECT_EQ(manager.impl.idContextMap.size(), 0);
   EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
 }
 
+// Duplicate plugin callbacks are tolerated: they must not fail the receiver.
 TEST_F(ApiManagerRecvTestFixture, multiple_onConnectionStatusChanged_calls) {
   expectActivateChannel();
   expectCreateLinkFromAddress();
   expectOpenConnection();
+  expectCloseConnection();
+  expectDestroyLink();
 
   openAll();
   onConnectionStatusChangedCall();
   receiveCall(receiverHandle, receiveCallback);
+  receiveEncPkgCall();
 
   EXPECT_EQ(status, ApiStatus::OK);
   EXPECT_EQ(address, linkProps.linkAddress);
-  EXPECT_EQ(status2, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(bytes2.empty(), true);
+  EXPECT_EQ(status2, ApiStatus::OK);
+  EXPECT_EQ(bytes2, bytes);
+
+  closeAll();
+  EXPECT_EQ(status3, ApiStatus::OK);
   EXPECT_EQ(manager.impl.activeContexts.size(), 0);
   EXPECT_EQ(manager.impl.idContextMap.size(), 0);
   EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
 }
 
+// A second receive() while one is pending is rejected, and does not disturb
+// the pending one.
 TEST_F(ApiManagerRecvTestFixture, multiple_receive_calls) {
-  expectActivateChannel();
-  expectCreateLinkFromAddress();
-  expectOpenConnection();
+  expectAll();
 
   openAll();
   receiveCall(receiverHandle, receiveCallback);
-  receiveCall(receiverHandle, receiveCallback);
+  EXPECT_EQ(status2, ApiStatus::INVALID);
 
-  EXPECT_EQ(status, ApiStatus::OK);
-  EXPECT_EQ(address, linkProps.linkAddress);
+  ApiStatus secondStatus = ApiStatus::INVALID;
+  receiveCall(receiverHandle, [&secondStatus](ApiStatus _status,
+                                              std::vector<uint8_t>) {
+    secondStatus = _status;
+  });
+  EXPECT_EQ(secondStatus, ApiStatus::INVALID_ARGUMENT);
+  EXPECT_EQ(status2, ApiStatus::INVALID); // first receive still pending
 
-  // TODO: this shouldn't really be internal error, as it's triggered by the
-  // user.
-  EXPECT_EQ(status2, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(bytes2.empty(), true);
+  receiveEncPkgCall();
+  EXPECT_EQ(status2, ApiStatus::OK);
+  EXPECT_EQ(bytes2, bytes);
+
+  closeAll();
+  EXPECT_EQ(status3, ApiStatus::OK);
   EXPECT_EQ(manager.impl.activeContexts.size(), 0);
   EXPECT_EQ(manager.impl.idContextMap.size(), 0);
   EXPECT_EQ(manager.impl.handleContextMap.size(), 0);

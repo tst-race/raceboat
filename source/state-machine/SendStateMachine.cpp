@@ -211,6 +211,11 @@ SendStateEngine::SendStateEngine() {
   // clang-format off
     declareStateTransition(STATE_SEND_INITIAL,         EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_SEND_CONNECTION_OPEN);
     declareStateTransition(STATE_SEND_CONNECTION_OPEN, EVENT_PACKAGE_SENT,                 STATE_SEND_FINISHED);
+
+    // The connection state machine failing, or the package failing to send, fails the send
+    declareStateTransition(STATE_SEND_INITIAL,         EVENT_STATE_MACHINE_FAILED,         STATE_SEND_FAILED);
+    declareStateTransition(STATE_SEND_CONNECTION_OPEN, EVENT_STATE_MACHINE_FAILED,         STATE_SEND_FAILED);
+    declareStateTransition(STATE_SEND_CONNECTION_OPEN, EVENT_PACKAGE_FAILED,               STATE_SEND_FAILED);
   // clang-format on
 }
 

@@ -133,6 +133,9 @@ public:
                                                     std::string role);
   virtual void stateMachineFailed(ApiContext &context);
   virtual void stateMachineFinished(ApiContext &context);
+  // Finish another context by handle (e.g. a listener releasing pre-conduits
+  // that were never accepted).
+  virtual void stateMachineFinished(RaceHandle contextHandle);
   virtual void connStateMachineLinkEstablished(RaceHandle contextHandle,
                                          LinkID linkId,
                                          std::string linkAddress,

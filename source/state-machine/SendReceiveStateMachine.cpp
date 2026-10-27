@@ -97,6 +97,25 @@ struct StateSendReceiveInitial : public SendReceiveState {
       return EventResult::NOT_SUPPORTED;
     }
 
+    // The send side is not established until the recv link exists, but its
+    // options are always required, so reject bad ones before starting anything.
+    if (ctx.opts.send_channel.empty()) {
+      helper::logError(logPrefix + "Invalid send channel id passed to sendReceive");
+      ctx.callback(ApiStatus::CHANNEL_INVALID, {});
+      ctx.callback = {};
+      return EventResult::NOT_SUPPORTED;
+    } else if (ctx.opts.send_role.empty()) {
+      helper::logError(logPrefix + "Invalid send role passed to sendReceive");
+      ctx.callback(ApiStatus::INVALID_ARGUMENT, {});
+      ctx.callback = {};
+      return EventResult::NOT_SUPPORTED;
+    } else if (ctx.opts.send_address.empty()) {
+      helper::logError(logPrefix + "Invalid send address passed to sendReceive");
+      ctx.callback(ApiStatus::INVALID_ARGUMENT, {});
+      ctx.callback = {};
+      return EventResult::NOT_SUPPORTED;
+    }
+
     // Respect channel's linkDirection for recv side
     bool recvCreating = ctx.shouldCreateReceiver(recvChannelId);
     helper::logDebug(logPrefix + "sendReceive: recv linkDirection for '" + recvChannelId +
@@ -305,6 +324,13 @@ SendReceiveStateEngine::SendReceiveStateEngine() {
                            STATE_SEND_RECEIVE_PACKAGE_SENT);
     declareStateTransition(STATE_SEND_RECEIVE_PACKAGE_SENT,                  EVENT_CONN_STATE_MACHINE_CONNECTED,              STATE_SEND_RECEIVE_PACKAGE_SENT);
     declareStateTransition(STATE_SEND_RECEIVE_PACKAGE_SENT,                  EVENT_RECEIVE_PACKAGE,              STATE_SEND_RECEIVE_FINISHED);
+
+    // A failing connection state machine, or a failed package, fails the sendReceive
+    declareStateTransition(STATE_SEND_RECEIVE_INITIAL,                       EVENT_STATE_MACHINE_FAILED,         STATE_SEND_RECEIVE_FAILED);
+    declareStateTransition(STATE_SEND_RECEIVE_WAITING_FOR_SEND_CONNECTION,   EVENT_STATE_MACHINE_FAILED,         STATE_SEND_RECEIVE_FAILED);
+    declareStateTransition(STATE_SEND_RECEIVE_SEND_OPEN,                     EVENT_STATE_MACHINE_FAILED,         STATE_SEND_RECEIVE_FAILED);
+    declareStateTransition(STATE_SEND_RECEIVE_PACKAGE_SENT,                  EVENT_STATE_MACHINE_FAILED,         STATE_SEND_RECEIVE_FAILED);
+    declareStateTransition(STATE_SEND_RECEIVE_SEND_OPEN,                     EVENT_PACKAGE_FAILED,               STATE_SEND_RECEIVE_FAILED);
   // clang-format on
 }
 

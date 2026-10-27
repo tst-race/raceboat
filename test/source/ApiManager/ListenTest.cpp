@@ -133,6 +133,8 @@ public:
                                      ConnectionID thisConnId);
   void onPackageStatusChangedCall(RaceHandle handle);
   void receiveEncPkgCall(std::vector<uint8_t> &bytes, ConnectionID thisConnId);
+  void receiveEncPkgCall(std::vector<uint8_t> &bytes,
+                         std::vector<ConnectionID> connIds);
   void onConnectionStatusChangedClosedCall(RaceHandle handle,
                                            ConnectionID thisConnId);
   void onLinkStatusChangedDestroyedCall(RaceHandle handle, LinkID thisLinkId);
@@ -333,6 +335,13 @@ void ApiManagerListenTestFixture::receiveEncPkgCall(std::vector<uint8_t> &bytes,
   manager.waitForCallbacks();
 }
 
+void ApiManagerListenTestFixture::receiveEncPkgCall(
+    std::vector<uint8_t> &bytes, std::vector<ConnectionID> connIds) {
+  EncPkg pkg(0, 0, bytes);
+  manager.receiveEncPkg(*core->container, pkg, connIds);
+  manager.waitForCallbacks();
+}
+
 void ApiManagerListenTestFixture::onConnectionStatusChangedClosedCall(
     RaceHandle handle, ConnectionID thisConnId) {
   manager.onConnectionStatusChanged(*core->container, handle, thisConnId,
@@ -410,6 +419,27 @@ TEST_F(ApiManagerListenTestFixture, no_errors) {
   EXPECT_EQ(manager.impl.activeContexts.size(), 0);
   EXPECT_EQ(manager.impl.idContextMap.size(), 0);
   EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+}
+
+// A producer that is not yet bound to a connection is delivered with every
+// connection on the shared link. The bootstrap must still reach the listener
+// instead of being dropped.
+TEST_F(ApiManagerListenTestFixture, bootstrap_with_multiple_connection_ids) {
+  expectActivateRecvChannel(recvChanHandle);
+  expectCreateLink(createLinkHandle);
+  expectOpenConnection(openRecvConnHandle, recvLinkId);
+
+  listenCall(listenCallback);
+  onChannelStatusChangedCall(recvChanHandle, recvOptions.recv_channel);
+  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
+  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  EXPECT_EQ(status1, ApiStatus::OK);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 2); // recv conn, listen
+
+  receiveEncPkgCall(recvBytes,
+                    std::vector<ConnectionID>{"otherConnId", recvConnId});
+  EXPECT_EQ(manager.impl.activeContexts.size(),
+            3); // recv conn, listen, pre conn obj
 }
 
 TEST_F(ApiManagerListenTestFixture, no_errors_accept_before_recv) {
@@ -822,6 +852,10 @@ TEST_F(ApiManagerListenTestFixture, open_send_link_fail) {
   EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
 }
 
+// listen() reports OK as soon as the recv link exists (that is when the link
+// address is known), so a recv connection that then fails to open is not
+// reported through the listen callback. Closing the listener must still
+// release everything.
 TEST_F(ApiManagerListenTestFixture, open_recv_conn_fail) {
   expectActivateRecvChannel(recvChanHandle);
   expectCreateLink(createLinkHandle);
@@ -832,11 +866,15 @@ TEST_F(ApiManagerListenTestFixture, open_recv_conn_fail) {
 
   onChannelStatusChangedCall(recvChanHandle, recvOptions.recv_channel);
   onLinkStatusChangedCall(createLinkHandle, recvLinkId);
+  EXPECT_EQ(status1, ApiStatus::OK);
 
   manager.onConnectionStatusChanged(*core->container, openRecvConnHandle,
                                     recvConnId, CONNECTION_CLOSED, linkProps);
   manager.waitForCallbacks();
-  EXPECT_EQ(status1, ApiStatus::INTERNAL_ERROR);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 1); // listen
+
+  closeCall(listenHandle, closeCallback);
+  EXPECT_EQ(status5, ApiStatus::OK);
 
   EXPECT_EQ(manager.impl.activeContexts.size(), 0);
   EXPECT_EQ(manager.impl.idContextMap.size(), 0);

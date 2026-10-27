@@ -63,7 +63,7 @@ public:
       recvBytes.push_back(0xFF - byte);
     }
 
-    linkProps.linkAddress = "linkAddr";
+    linkProps.linkAddress = "{\"hashtag\":\"linkAddr\"}";
     linkProps.linkType = LT_BIDI;
 
     status1 = ApiStatus::INVALID;
@@ -337,14 +337,18 @@ TEST_F(ApiManagerDialTestFixture, no_errors) {
   expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   dialCall(dialCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 2); // dial, recv conn
+
+  // The recv side is established first; the send connection is only started
+  // once the recv link exists.
+  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
+  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
+  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 3); // dial, recv conn, send conn
 
   onChannelStatusChangedCall(sendChanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
   onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
   onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
-  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
   onPackageStatusChangedCall(pkgHandle);
 
   readCall(dialHandle, readCallback);
@@ -387,14 +391,18 @@ TEST_F(ApiManagerDialTestFixture, write_fail) {
   expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   dialCall(dialCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 2); // dial, recv conn
+
+  // The recv side is established first; the send connection is only started
+  // once the recv link exists.
+  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
+  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
+  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 3); // dial, recv conn, send conn
 
   onChannelStatusChangedCall(sendChanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
   onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
   onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
-  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
   onPackageStatusChangedCall(pkgHandle);
 
   readCall(dialHandle, readCallback);
@@ -439,14 +447,18 @@ TEST_F(ApiManagerDialTestFixture, initial_package_fail) {
   expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   dialCall(dialCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 2); // dial, recv conn
+
+  // The recv side is established first; the send connection is only started
+  // once the recv link exists.
+  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
+  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
+  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 3); // dial, recv conn, send conn
 
   onChannelStatusChangedCall(sendChanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
   onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
   onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
-  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
   manager.onPackageStatusChanged(*core->container, pkgHandle,
                                  PACKAGE_FAILED_GENERIC);
   manager.waitForCallbacks();
@@ -475,13 +487,13 @@ TEST_F(ApiManagerDialTestFixture, send_conn_fail) {
   expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   dialCall(dialCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 2); // dial, recv conn
 
-  onChannelStatusChangedCall(sendChanHandle, sendOptions.send_channel);
   onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
-  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
   onLinkStatusChangedCall(createLinkHandle, recvLinkId);
   onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  onChannelStatusChangedCall(sendChanHandle, sendOptions.send_channel);
+  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
   manager.onConnectionStatusChanged(*core->container, openSendConnHandle,
                                     sendConnId, CONNECTION_CLOSED, linkProps);
   manager.waitForCallbacks();
@@ -496,33 +508,38 @@ TEST_F(ApiManagerDialTestFixture, send_conn_fail) {
 }
 
 TEST_F(ApiManagerDialTestFixture, recv_conn_fail) {
+  // The send connection is started as soon as the recv link exists, so it is
+  // already in flight when the recv connection fails. Once it finishes
+  // establishing with no dependents left it must close itself.
   EXPECT_CALL(*core, getEntropy(_))
       .WillRepeatedly(Return(std::vector<uint8_t>(16, 1)));
-  expectActivateSendChannel(sendChanHandle);
   expectActivateRecvChannel(recvChanHandle);
-  expectLoadLinkAddress(loadLinkHandle);
   expectCreateLink(createLinkHandle);
-  expectOpenConnection(openSendConnHandle, sendLinkId);
   expectOpenConnection(openRecvConnHandle, recvLinkId);
+  expectActivateSendChannel(sendChanHandle);
+  expectLoadLinkAddress(loadLinkHandle);
+  expectOpenConnection(openSendConnHandle, sendLinkId);
   expectCloseConnection(closeSendConnHandle, sendConnId);
   expectDestroyLink(destroySendLinkHandle, sendLinkId);
 
   dialCall(dialCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 2); // dial, recv conn
 
-  onChannelStatusChangedCall(sendChanHandle, sendOptions.send_channel);
   onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
-  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
   onLinkStatusChangedCall(createLinkHandle, recvLinkId);
-  onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 3); // dial, recv conn, send conn
   manager.onConnectionStatusChanged(*core->container, openRecvConnHandle,
                                     recvConnId, CONNECTION_CLOSED, linkProps);
   manager.waitForCallbacks();
+  EXPECT_EQ(status1, ApiStatus::INTERNAL_ERROR);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 1); // send conn
 
+  onChannelStatusChangedCall(sendChanHandle, sendOptions.send_channel);
+  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
+  onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
   onConnectionStatusChangedClosedCall(closeSendConnHandle, sendConnId);
   onLinkStatusChangedDestroyedCall(destroySendLinkHandle, sendLinkId);
 
-  EXPECT_EQ(status1, ApiStatus::INTERNAL_ERROR);
   EXPECT_EQ(manager.impl.activeContexts.size(), 0);
   EXPECT_EQ(manager.impl.idContextMap.size(), 0);
   EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
