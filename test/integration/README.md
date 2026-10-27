@@ -120,7 +120,7 @@ python3 run_all_scenarios.py --image-tag <tag> --fail-fast
 ```
 
 Currently available scenarios:
-- `racebird-client-connect`, `decomposed-client-connect`,
+- `racebird-client-connect`, `racebird-client-connect-multi-client`, `decomposed-client-connect`,
   `decomposed-client-connect-multi-client` - single-channel `client-connect`/`server-connect` mode
 - `decomposed-client-connect-dual-composition` - plain `client-connect` mode,
   but the "channel" slot uses TWO DIFFERENT compositions of the same plugin
