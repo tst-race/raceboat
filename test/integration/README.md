@@ -132,8 +132,11 @@ Currently available scenarios:
   `bootstrap-racebird-racebird-multi-client`, `bootstrap-racebird-decomposed-multi-client`,
   `bootstrap-decomposed-decomposed-multi-client` - `bootstrap-connect` mode (one listener plus one
   or more connector nodes, each with an "initial" and "final" channel/composition slot)
-- `decomposed-client-connect-multi-client-long` - same 2-connector/1-listener
-  topology as `decomposed-client-connect-multi-client` (both connectors
+- `decomposed-client-connect-multi-client` runs 3 connectors against 1 listener
+  to show that link counts do NOT grow with the number of clients in plain
+  `client-connect` mode (see its link-event spec).
+- `decomposed-client-connect-multi-client-long` - same listener/connector
+  topology as `decomposed-client-connect-multi-client`, but with 2 connectors (both connectors
   legitimately share the SAME listener-created link address), but exchanges
   10 sequential messages per direction using the `tcp-stub-*-multimsg.py`
   stubs (see optional scenario keys `messages`/`stub_client`/`stub_server`

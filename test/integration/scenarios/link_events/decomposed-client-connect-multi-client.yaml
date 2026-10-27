@@ -1,8 +1,17 @@
-# Client-connect mode (2 connectors) with a shared listen address. See
-# decomposed-client-connect.yaml for the per-channel reasoning. The listener
-# creates its 2 links once and reuses them for every subsequent accept(), so a
-# second client adds no CREATE. `connector` (role keyword) auto-expands to each
-# of dialer/dialer2, each expecting 2 loads.
+# Client-connect mode with 3 connectors sharing one listener-created address.
+#
+# Counts do NOT scale with the number of clients here: the listener creates its
+# single bidirectional link once (twoSixIndirectComposition is LD_BIDI, so
+# DialStateMachine uses a single bidi link and the separate recv/send hashtags
+# are not both used) and every connector loads that same link. Conduits are
+# told apart by package id, not by per-client links. Per-client private links
+# only appear in bootstrap-connect mode (see
+# bootstrap-decomposed-decomposed-multi-client.yaml: one final CREATE per client).
+#
+# Note on the numbers below: for decomposed channels in slot=channel mode the
+# checker sees each real link twice - once from Socket::establish and once from
+# the CompositeWrapper createLink*/loadLinkAddress line - so "count: 2" below is
+# ONE real link per node.
 steps:
   1:
     - {node: listener, action: CREATE, channel: twoSixIndirectComposition, count: 2}
