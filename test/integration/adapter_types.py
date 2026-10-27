@@ -75,6 +75,10 @@ class NodeRequest:
     # Used by adapters to determine if a bootstrap initial direction should
     # be dynamic (default) or use pre-specified addresses (when overridden).
     effective_link_direction: Optional[str] = None
+    # Scenario identifier, used by adapters for deterministic repo/address generation
+    scenario_id: Optional[str] = None
+    # Scenario mode (send, send-recv, client-connect, bootstrap-connect)
+    scenario_mode: Optional[str] = None
 
 
 @dataclass
@@ -99,3 +103,5 @@ class NodeContribution:
     sidecar_services: Dict[str, dict] = field(default_factory=dict)
     # Direct race-cli flags outside the --param namespace, e.g. {"send-address": "{...json...}"}.
     cli_flags: Dict[str, str] = field(default_factory=dict)
+    # Container environment variables (injected at runtime from host env)
+    environment: Dict[str, str] = field(default_factory=dict)

@@ -47,7 +47,8 @@ RUN apt-get update && yes | apt-get install -y \
     parallel \
     libjpeg62-dev \
     libavdevice-dev \
-    libcpprest2.10
+    libcpprest2.10 \
+    git
     # ffmpeg \
 
 # COPY libflickcurl.so /usr/local/lib/libflickcurl.so

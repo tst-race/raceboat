@@ -435,6 +435,8 @@ def _process_node(
                     composition_name=channel_name if info.is_composition else None,
                     direction=direction if split else None,
                     effective_link_direction=effective_link_direction,
+                    scenario_id=scenario.get("id"),
+                    scenario_mode=scenario.get("mode"),
                 )
                 contribution = adapter.generate_node_contribution(request)
                 contribution.channel_name = channel_name
@@ -549,6 +551,16 @@ def _render_compose(scenario: dict, nodes: List[Node], output_dir: Path, image_t
             lines.append(f"    image: ghcr.io/tst-race/raceboat/raceboat-runtime:{image_tag}")
         lines.append(f"    container_name: {node.id}")
         lines.append(f'    user: "{_host_user_directive()}"')
+
+        # Merge environment variables from all contributions
+        env_vars = {}
+        for contribution in node.contributions.values():
+            env_vars.update(contribution.environment)
+        if env_vars:
+            lines.append("    environment:")
+            for key, value in env_vars.items():
+                lines.append(f"      {key}: \"{value}\"")
+
         listener_ids = [n.id for n in nodes if n.role == "listener"]
         sidecars = _merge_sidecar_services(nodes)
         has_dependencies = (node.role == "connector" and listener_ids) or sidecars

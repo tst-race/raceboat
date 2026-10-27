@@ -1,0 +1,31 @@
+{
+  "id": "hf-client-connect",
+  "mode": "client-connect",
+  "wait_time": 60,
+  "timeout": 120,
+  "network": {
+    "name": "hf-client-connect-network",
+    "subnet": "10.20.4.0/24"
+  },
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "hf-client-connect-listener",
+      "ip": "10.20.4.3",
+      "slots": {
+        "channel": "hfTransportComposition"
+      }
+    },
+    {
+      "role": "connector",
+      "id": "hf-client-connect-connector",
+      "ip": "10.20.4.2",
+      "slots": {
+        "channel": "hfTransportComposition"
+      }
+    }
+  ],
+  "send_message": "HF transport client-connect test",
+  "reply_message": "HF transport reply",
+  "description": "Full client-connect test with persistent socket proxy. REQUIRES real HF credentials: set HF_USERNAME and HF_TOKEN env vars with a write-scope PAT."
+}

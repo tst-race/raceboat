@@ -116,6 +116,9 @@ CMTypes::CmInternalStatus ComponentActionManager::onLinkStatusChanged(
                                    }),
                     actions.end());
       link->actionQueue.clear();
+    } else if (status == LINK_LOADED || status == LINK_CREATED) {
+      // New link added - queue existing wildcard actions for this link
+      updateLinkTimelines();
     }
   } catch (std::out_of_range & /* e */) {
     // Nothing to do if the link doesn't exist
@@ -198,10 +201,12 @@ ComponentActionManager::createActionInfo(Action &&action) {
             "Actions associated with multiple link ids are not supported");
       }
 
-      // TODO: if this is for cover trafic, we will never select the actual
-      // link. Does that matter, or can we let the transport decide?
-      info->wildcardLink |= (param.linkId == "*");
     }
+
+    // TODO: if this is for cover trafic, we will never select the actual
+    // link. Does that matter, or can we let the transport decide?
+    // Check wildcard for both post (encodePackage=true) and fetch (encodePackage=false) actions
+    info->wildcardLink |= (param.linkId == "*");
 
     auto matchingEncodings = manager.encodingComponentFromEncodingParams(param);
     if (matchingEncodings.empty()) {
@@ -316,14 +321,22 @@ void ComponentActionManager::updateLinkTimelines() {
   std::unordered_map<LinkID, std::deque<ActionInfo *>> linkQueues;
   auto links = manager.getLinks();
 
+  int wildcardCount = 0;
   for (auto &info : actions) {
     if (info->wildcardLink) {
+      wildcardCount++;
       for (auto &link : links) {
         linkQueues[link->linkId].push_back(info.get());
       }
     } else if (!info->linkId.empty()) {
       linkQueues[info->linkId].push_back(info.get());
     }
+  }
+  helper::logDebug("updateLinkTimelines: actions=" + std::to_string(actions.size()) +
+                   " wildcard=" + std::to_string(wildcardCount) +
+                   " links=" + std::to_string(links.size()));
+  for (auto &link : links) {
+    helper::logDebug("  link=" + link->linkId + " queueSize=" + std::to_string(linkQueues[link->linkId].size()));
   }
 
   for (auto &link : links) {

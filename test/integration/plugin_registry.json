@@ -1,5 +1,6 @@
 {
   "racebird": "../../../plugins/racebird",
   "decomposed-exemplars": "../../../plugins/decomposed-exemplars",
-  "skyhook": "../../../plugins/skyhook"
+  "skyhook": "../../../plugins/skyhook",
+  "hf-stego-transport": "../../../hf-stego-transport"
 }
