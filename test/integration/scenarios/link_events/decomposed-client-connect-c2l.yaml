@@ -1,0 +1,17 @@
+# Link event spec for scenarios/decomposed-client-connect-c2l.json
+#
+# twoSixIndirectComposition is overridden to LD_CREATOR_TO_LOADER, so on each
+# leg the sender creates the link and the receiver loads it:
+# - Upstream (dialer -> listener):   dialer (sender) CREATEs, listener (receiver) LOADs
+# - Downstream (listener -> dialer): listener (sender) CREATEs, dialer (receiver) LOADs
+#
+# twoSixIndirectComposition never merges send/recv into one physical link, so
+# each node has exactly one CREATE and one LOAD. All links use pre-specified
+# static addresses and both nodes start immediately, so the order is not
+# deterministic; put all events in one step.
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, count: 1}
+    - {node: listener, action: LOAD,   channel: twoSixIndirectComposition, count: 1}
+    - {node: dialer,   action: CREATE, channel: twoSixIndirectComposition, count: 1}
+    - {node: dialer,   action: LOAD,   channel: twoSixIndirectComposition, count: 1}

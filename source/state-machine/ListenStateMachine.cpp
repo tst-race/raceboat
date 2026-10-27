@@ -167,13 +167,27 @@ struct StateListenInitial : public ListenState {
         ? LinkDirectionality::Bidi
         : LinkDirectionality::Recv;
 
-    // Create the FIRST connection state machine for the initial listener
-    // This creates LinkID_0 and waits for the first client to connect
-    // Determine role based on channel properties (linkDirection)
+    // Determine role based on channel properties (linkDirection): the receiver
+    // creates unless the channel is CREATOR_TO_LOADER. (A merged/Bidi link is
+    // on an LD_BIDI channel, for which the receiver, i.e. the listener, creates.)
     bool recvCreating = ctx.shouldCreateReceiver(channelId);
     LinkRole recvRole_ = recvCreating ? LinkRole::Creator : LinkRole::Loader;
     helper::logDebug(logPrefix + "listen: recv linkDirection for '" + channelId +
                      "' -> creating=" + (recvCreating ? "true" : "false"));
+
+    // For CREATOR_TO_LOADER the listener must load its recv link from the
+    // sender's address. Without one that can never work, so fail up front.
+    if (!recvCreating && linkAddress.empty()) {
+      helper::logError(logPrefix + "Channel '" + channelId +
+                       "' is CREATOR_TO_LOADER, so the listener must load its recv "
+                       "link, but no recv_address was provided");
+      ctx.listenCb(ApiStatus::INVALID_ARGUMENT, "", {});
+      ctx.listenCb = {};
+      return EventResult::NOT_SUPPORTED;
+    }
+
+    // Create the FIRST connection state machine for the initial listener
+    // This creates LinkID_0 and waits for the first client to connect
     ctx.recvConnSMHandle = Socket::establish(
         ctx.manager, ctx.handle,
         SocketRequest{channelId, role, linkAddress,

@@ -44,7 +44,7 @@ public:
     sendConnId = "mockConnId";
     recvConnId = "mockConnId2";
 
-    expectedSendAddress = "sendAddress";
+    expectedSendAddress = "{\"hashtag\":\"sendAddress\"}";
 
     channelProps.bootstrap = false;
     channelProps.channelStatus = CHANNEL_UNDEF;
@@ -440,6 +440,99 @@ TEST_F(ApiManagerListenTestFixture, bootstrap_with_multiple_connection_ids) {
                     std::vector<ConnectionID>{"otherConnId", recvConnId});
   EXPECT_EQ(manager.impl.activeContexts.size(),
             3); // recv conn, listen, pre conn obj
+}
+
+// The listener's preset send link follows the send channel's linkDirection:
+// the sender creates the link (at the preset address) for CREATOR_TO_LOADER,
+// and loads the address otherwise.
+TEST_F(ApiManagerListenTestFixture, preset_send_link_created_for_creator_to_loader) {
+  recvOptions.send_address = "{\"hashtag\":\"presetSend\"}";
+  EXPECT_CALL(core->mockChannelManager, getChannelProperties(_))
+      .WillRepeatedly([this](const ChannelId &channelId) {
+        ChannelProperties props = channelProps;
+        props.linkDirection = channelId == recvOptions.send_channel
+                                  ? LD_CREATOR_TO_LOADER
+                                  : LD_LOADER_TO_CREATOR;
+        return props;
+      });
+
+  expectActivateRecvChannel(recvChanHandle);
+  expectCreateLink(createLinkHandle);
+  expectOpenConnection(openRecvConnHandle, recvLinkId);
+  expectActivateSendChannel(sendChanHandle);
+  EXPECT_CALL(*core->plugin,
+              createLinkFromAddress(_, recvOptions.send_channel,
+                                    recvOptions.send_address, _))
+      .WillOnce(Return(SdkResponse(SDK_OK)));
+  EXPECT_CALL(*core->plugin, loadLinkAddress(_, _, _, _)).Times(0);
+
+  listenCall(listenCallback);
+  onChannelStatusChangedCall(recvChanHandle, recvOptions.recv_channel);
+  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
+  onChannelStatusChangedCall(sendChanHandle, recvOptions.send_channel);
+}
+
+TEST_F(ApiManagerListenTestFixture, preset_send_link_loaded_for_loader_to_creator) {
+  recvOptions.send_address = "{\"hashtag\":\"presetSend\"}";
+  EXPECT_CALL(core->mockChannelManager, getChannelProperties(_))
+      .WillRepeatedly([this](const ChannelId &) {
+        ChannelProperties props = channelProps;
+        props.linkDirection = LD_LOADER_TO_CREATOR;
+        return props;
+      });
+
+  expectActivateRecvChannel(recvChanHandle);
+  expectCreateLink(createLinkHandle);
+  expectOpenConnection(openRecvConnHandle, recvLinkId);
+  expectActivateSendChannel(sendChanHandle);
+  expectLoadLinkAddress(loadLinkHandle, recvOptions.send_address);
+  EXPECT_CALL(*core->plugin, createLinkFromAddress(_, _, _, _)).Times(0);
+
+  listenCall(listenCallback);
+  onChannelStatusChangedCall(recvChanHandle, recvOptions.recv_channel);
+  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
+  onChannelStatusChangedCall(sendChanHandle, recvOptions.send_channel);
+}
+
+// For CREATOR_TO_LOADER the listener loads its recv link, so a missing
+// recv_address can never work and must be rejected before anything starts.
+TEST_F(ApiManagerListenTestFixture, creator_to_loader_recv_requires_address) {
+  recvOptions.recv_address = "";
+  EXPECT_CALL(core->mockChannelManager, getChannelProperties(_))
+      .WillRepeatedly([this](const ChannelId &) {
+        ChannelProperties props = channelProps;
+        props.linkDirection = LD_CREATOR_TO_LOADER;
+        return props;
+      });
+  EXPECT_CALL(core->mockChannelManager, activateChannel(_, _, _)).Times(0);
+
+  listenCall(listenCallback);
+
+  EXPECT_EQ(status1, ApiStatus::INVALID_ARGUMENT);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
+  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
+  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+}
+
+// With an address a CREATOR_TO_LOADER listener loads its recv link.
+TEST_F(ApiManagerListenTestFixture, creator_to_loader_recv_is_loaded) {
+  recvOptions.recv_address = "{\"hashtag\":\"recvAddress\"}";
+  EXPECT_CALL(core->mockChannelManager, getChannelProperties(_))
+      .WillRepeatedly([this](const ChannelId &) {
+        ChannelProperties props = channelProps;
+        props.linkDirection = LD_CREATOR_TO_LOADER;
+        return props;
+      });
+  expectActivateRecvChannel(recvChanHandle);
+  EXPECT_CALL(*core->plugin,
+              loadLinkAddress(_, recvOptions.recv_channel,
+                              recvOptions.recv_address, _))
+      .WillOnce(Return(SdkResponse(SDK_OK)));
+  EXPECT_CALL(*core->plugin, createLink(_, _, _)).Times(0);
+  EXPECT_CALL(*core->plugin, createLinkFromAddress(_, _, _, _)).Times(0);
+
+  listenCall(listenCallback);
+  onChannelStatusChangedCall(recvChanHandle, recvOptions.recv_channel);
 }
 
 TEST_F(ApiManagerListenTestFixture, no_errors_accept_before_recv) {
