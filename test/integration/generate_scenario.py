@@ -114,6 +114,11 @@ def _get_all_kit_dirs(scenario: dict) -> List[Path]:
     return list(kit_dirs)
 
 
+def _pristine_manifest_path(kit_dir: Path) -> Path:
+    """Where the unpatched manifest is kept while overrides are applied."""
+    return kit_dir.parent / f".{kit_dir.name}.manifest.pristine"
+
+
 def apply_link_direction_overrides_to_kits(scenario: dict) -> Dict[Path, dict]:
     """
     Apply linkDirectionOverrides from scenario to the original kit manifest.json files.
@@ -148,6 +153,17 @@ def apply_link_direction_overrides_to_kits(scenario: dict) -> Dict[Path, dict]:
         manifest_path = kit_dir / "manifest.json"
         if not manifest_path.exists():
             continue
+
+        # A previous run that was killed mid-scenario leaves its patch behind, and
+        # a backup taken from that manifest would "restore" the patch forever.
+        # Keep a pristine copy on disk (outside the kit dir, so it is never copied
+        # into a container) and recover from it first.
+        pristine_path = _pristine_manifest_path(kit_dir)
+        if pristine_path.exists():
+            print(f"  [linkDirectionOverrides] Recovering {manifest_path} from an interrupted run")
+            shutil.copyfile(pristine_path, manifest_path)
+        else:
+            shutil.copyfile(manifest_path, pristine_path)
 
         # Read and backup original manifest (deep copy to avoid mutation issues)
         original_manifest = json.loads(manifest_path.read_text())
@@ -198,7 +214,12 @@ def restore_link_direction_overrides(backups: Dict[Path, dict]) -> None:
     """Restore original manifest.json files from backups."""
     for kit_dir, original_manifest in backups.items():
         manifest_path = kit_dir / "manifest.json"
-        manifest_path.write_text(json.dumps(original_manifest, indent=4))
+        pristine_path = _pristine_manifest_path(kit_dir)
+        if pristine_path.exists():
+            shutil.copyfile(pristine_path, manifest_path)
+            pristine_path.unlink()
+        else:
+            manifest_path.write_text(json.dumps(original_manifest, indent=4))
         print(f"  [linkDirectionOverrides] Restored {manifest_path}")
 
 
