@@ -135,6 +135,12 @@ def main() -> int:
 
         if stopped_after is None:
             print(f"FAILED: race-cli client container was still running {TEARDOWN_TIMEOUT_S}s after local disconnect")
+            logs = subprocess.run(
+                ["docker", "logs", "--tail", "80", CLIENT_CONTAINER],
+                capture_output=True, text=True,
+            )
+            print(f"--- last race-cli output from {CLIENT_CONTAINER} ---")
+            print(logs.stdout + logs.stderr)
             return 1
 
         print(f"PASSED: race-cli client process exited {stopped_after:.1f}s after local disconnect")
