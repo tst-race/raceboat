@@ -13,7 +13,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -80,14 +80,21 @@ def default_spec_path(scenario_id: str) -> Path:
     return LINK_EVENTS_DIR / f"{scenario_id}.yaml"
 
 
+# A CompositeWrapper/LoaderWrapper/PluginWrapper line logged this soon after a
+# matching Socket::establish line is the same link operation seen from the
+# plugin side, not a second link.
+WRAPPER_PAIRING_WINDOW = timedelta(seconds=2)
+
+
 def extract_log_events(log_path: Path) -> List[LogEvent]:
     if not log_path.exists():
         return []
-    events = []
+    established: List[LogEvent] = []
+    wrapped: List[LogEvent] = []
     for line in log_path.read_text(errors="replace").splitlines():
         m = LOG_LINE_RE.match(line)
         if m:
-            events.append(LogEvent(
+            established.append(LogEvent(
                 timestamp=datetime.strptime(m["ts"], TIMESTAMP_FORMAT),
                 action=ACTION_FOR_ROLE[m["role"]],
                 channel=m["channel"],
@@ -98,13 +105,31 @@ def extract_log_events(log_path: Path) -> List[LogEvent]:
         m = COMPOSITE_WRAPPER_RE.match(line)
         if m:
             # For send-recv mode, slot is always "channel"
-            events.append(LogEvent(
+            wrapped.append(LogEvent(
                 timestamp=datetime.strptime(m["ts"], TIMESTAMP_FORMAT),
                 action=METHOD_TO_ACTION[m["method"]],
                 channel=m["channel"],
                 slot="channel",
             ))
-            continue
+
+    # Pair each wrapper line with the nearest unpaired preceding
+    # Socket::establish for the same action/channel (slot "channel" only;
+    # bootstrap slots are tagged initial/final and never matched wrapper lines).
+    # Unpaired wrapper lines (send/send-recv modes that bypass Socket::establish)
+    # are kept as their own events.
+    unpaired = [e for e in established if e.slot == "channel"]
+    events = list(established)
+    for w in sorted(wrapped, key=lambda e: e.timestamp):
+        match = None
+        for e in unpaired:
+            if (e.action == w.action and e.channel == w.channel
+                    and timedelta(0) <= w.timestamp - e.timestamp <= WRAPPER_PAIRING_WINDOW):
+                match = e
+                break
+        if match is not None:
+            unpaired.remove(match)
+        else:
+            events.append(w)
     return events
 
 

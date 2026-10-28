@@ -7,13 +7,8 @@
 # told apart by package id, not by per-client links. Per-client private links
 # only appear in bootstrap-connect mode (see
 # bootstrap-decomposed-decomposed-multi-client.yaml: one final CREATE per client).
-#
-# Note on the numbers below: for decomposed channels in slot=channel mode the
-# checker sees each real link twice - once from Socket::establish and once from
-# the CompositeWrapper createLink*/loadLinkAddress line - so "count: 2" below is
-# ONE real link per node.
 steps:
   1:
-    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, count: 2}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, count: 1}
   2:
-    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, count: 2}
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, count: 1}

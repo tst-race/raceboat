@@ -1,10 +1,9 @@
 # Best-effort default convention for client-connect mode: the listener
 # (server) creates its listen link(s), the connector (client) loads them.
 # decomposed-exemplars (LD_BIDI) uses a single bidirectional link for the
-# "channel" slot (the second address is unused). The checker sees that one
-# link twice (Socket::establish + CompositeWrapper log line), hence count 2.
+# "channel" slot, so there is 1 link (the adapter passes only the one address).
 steps:
   1:
-    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, count: 2}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, count: 1}
   2:
-    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, count: 2}
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, count: 1}

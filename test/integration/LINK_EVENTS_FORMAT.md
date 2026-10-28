@@ -74,6 +74,13 @@ Socket::establish: slot=<slot> channel=<channelGid> role=<creator|loader> direct
 parses their leading timestamp (`2026-09-28 12:50:01.932223: ...`), and maps
 `role=creator` -> `CREATE`, `role=loader` -> `LOAD`.
 
+Decomposed plugins also log `CompositeWrapper::createLink`/`createLinkFromAddress`/
+`loadLinkAddress` lines (always tagged `slot=channel`). When one of these follows
+a `slot=channel` `Socket::establish` line for the same action and channel within
+2 s, it is the same link operation and is NOT counted again; wrapper lines with
+no such `Socket::establish` partner (send/send-recv modes) count on their own.
+Counts are minimums: extra matching events beyond `count` are ignored.
+
 ## Running standalone
 
 ```bash
