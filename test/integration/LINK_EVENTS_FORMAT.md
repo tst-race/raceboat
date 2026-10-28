@@ -42,19 +42,20 @@ The top-level `steps` key maps a **step number** to a **list of events**.
   interleaving.** Concretely: every event in step *N* must be observed
   (by log timestamp) before *any* event in step *N+1* - but two events in the
   same step have no ordering requirement relative to each other.
-* Events *not* mentioned in the spec are ignored. The spec is a set of
-  required checkpoints, not an exhaustive trace - so you only need to call
-  out the create/load operations that matter for what you're testing.
+* **The spec is exhaustive.** Every link a plugin creates or loads must be
+  claimed by some step; a link event the spec doesn't account for (an extra
+  occurrence, or a different node/channel/slot) fails the check as
+  `[UNEXPECTED]`. Counts are exact.
 
 ### Event fields
 
 | Field     | Required | Description |
 |-----------|----------|-------------|
 | `node`    | yes | A literal node `id` from the scenario's `nodes[]` list, **or** a role keyword: `listener`/`server`, `connector`/`client`. A role keyword expands to one independent requirement *per node currently in the scenario with that role* - e.g. in a multi-client scenario, `connector` means "each connector, independently," not "any one connector." |
-| `action`  | yes | `CREATE` or `LOAD` (case-insensitive). Corresponds to Raceboat's `Socket::establish` log tag `role=creator` (`CREATE`) vs. `role=loader` (`LOAD`). |
+| `action`  | yes | `CREATE` or `LOAD` (case-insensitive). `CREATE` matches a `LINK_CREATED` status, `LOAD` a `LINK_LOADED` status. |
 | `channel` | yes | The channel gid exactly as declared in the owning plugin's `source/manifest.json` under `channel_properties` (e.g. `obfs4`, `twoSixIndirectComposition`) - **not** the scenario's plugin/registry name (`racebird`, `decomposed-exemplars`), since one plugin can expose several channel gids. |
 | `slot`    | no (default `channel`) | Which race-cli phase this event belongs to: `channel` (single-phase `client-connect`/`server-connect` mode), `initial`, or `final` (the two phases of `bootstrap-connect` mode). Always set this explicitly for bootstrap-connect scenarios, since `initial` and `final` can otherwise share the same channel gid. |
-| `count`   | no (default `1`) | How many independent occurrences of this exact `(node, action, channel, slot)` tuple must be observed within this step (per matching node, if `node` is a role keyword). Use this for channels that open more than one physical link per peer, e.g. an `LD_BIDI`+`TT_MULTICAST` channel that needs a separate send link and recv link. |
+| `count`   | no (default `1`) | How many independent occurrences of this exact `(node, action, channel, slot)` tuple must be observed within this step (per matching node, if `node` is a role keyword). This is the number of *links*, e.g. 2 for a channel that opens separate send and recv links, or one per client for a listener that makes a private link per connection. |
 
 The same `(node, action, channel, slot)` tuple can legitimately appear in
 more than one step (e.g. a listener creating a fresh link per connecting
@@ -64,22 +65,23 @@ a log line already claimed by an earlier step.
 
 ## How it maps to raceboat log lines
 
-Every `Socket::establish()` call (see `source/state-machine/Socket.h`) logs:
+`ApiManagerInternal::onLinkStatusChanged` (see `source/api-managers/ApiManager.cpp`)
+is the one place every plugin's link status passes through, decomposed or
+monolithic. For each `LINK_CREATED`/`LINK_LOADED` it logs exactly one line:
 
 ```
-Socket::establish: slot=<slot> channel=<channelGid> role=<creator|loader> directionality=<...>
+LinkEvent: status=<LINK_CREATED|LINK_LOADED> slot=<slot> channel=<channelGid> linkId=<id>
 ```
 
-`link_events.py` greps each node's `raceboat_<role>.log` for these lines,
-parses their leading timestamp (`2026-09-28 12:50:01.932223: ...`), and maps
-`role=creator` -> `CREATE`, `role=loader` -> `LOAD`.
+`slot` comes from the `Socket::establish(..., slot)` call that requested the
+connection (untagged call sites report `channel`). `link_events.py` greps each
+node's `raceboat_<role>.log` for these lines, parses their leading timestamp
+(`2026-09-28 12:50:01.932223: ...`), and maps `LINK_CREATED` -> `CREATE`,
+`LINK_LOADED` -> `LOAD`.
 
-Decomposed plugins also log `CompositeWrapper::createLink`/`createLinkFromAddress`/
-`loadLinkAddress` lines (always tagged `slot=channel`). When one of these follows
-a `slot=channel` `Socket::establish` line for the same action and channel within
-2 s, it is the same link operation and is NOT counted again; wrapper lines with
-no such `Socket::establish` partner (send/send-recv modes) count on their own.
-Counts are minimums: extra matching events beyond `count` are ignored.
+Because the line is emitted per link status event, reusing an existing link
+(e.g. a listener `accept()`ing another client on its listen link) produces no
+event, and one link is never counted twice.
 
 ## Running standalone
 

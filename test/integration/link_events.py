@@ -13,7 +13,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -24,36 +24,23 @@ SCENARIOS_DIR = INTEGRATION_DIR / "scenarios"
 LINK_EVENTS_DIR = SCENARIOS_DIR / "link_events"
 GENERATED_DIR = INTEGRATION_DIR / "generated"
 
-# Matches the slot-tagged Socket::establish log line emitted by every link
-# create/load call site (see source/state-machine/Socket.h).
+# Matches the "LinkEvent:" line ApiManagerInternal::logLinkEvent emits once per
+# link a plugin actually reports as LINK_CREATED or LINK_LOADED. This is the
+# single funnel for every plugin (decomposed and monolithic), so one match is
+# exactly one link - unlike Socket::establish, which also fires for reused links.
 LOG_LINE_RE = re.compile(
     r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+): .*"
-    r"Socket::establish: slot=(?P<slot>\w+) channel=(?P<channel>\S+) "
-    r"role=(?P<role>creator|loader)"
-)
-
-# Matches CompositeWrapper/LoaderWrapper/PluginWrapper createLink/loadLinkAddress
-# log lines (used by decomposed plugins in send/send-recv modes).
-COMPOSITE_WRAPPER_RE = re.compile(
-    r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+): .*"
-    r"Raceboat::(?:CompositeWrapper|LoaderWrapper|PluginWrapper)::"
-    r"(?P<method>createLink|createLinkFromAddress|loadLinkAddress)"
-    r": called with getId\(\)=(?P<channel>[^,\s]+)"
+    r"LinkEvent: status=(?P<status>LINK_CREATED|LINK_LOADED) "
+    r"slot=(?P<slot>\w+) channel=(?P<channel>\S+) linkId=(?P<link_id>\S+)"
 )
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
 
-# Map method names to actions
-METHOD_TO_ACTION = {
-    "createLink": "CREATE",
-    "createLinkFromAddress": "CREATE",
-    "loadLinkAddress": "LOAD",
-}
+ACTION_FOR_STATUS = {"LINK_CREATED": "CREATE", "LINK_LOADED": "LOAD"}
 
 ROLE_ALIASES = {
     "listener": "listener", "server": "listener",
     "connector": "connector", "client": "connector",
 }
-ACTION_FOR_ROLE = {"creator": "CREATE", "loader": "LOAD"}
 
 
 @dataclass(frozen=True)
@@ -80,56 +67,19 @@ def default_spec_path(scenario_id: str) -> Path:
     return LINK_EVENTS_DIR / f"{scenario_id}.yaml"
 
 
-# A CompositeWrapper/LoaderWrapper/PluginWrapper line logged this soon after a
-# matching Socket::establish line is the same link operation seen from the
-# plugin side, not a second link.
-WRAPPER_PAIRING_WINDOW = timedelta(seconds=2)
-
-
 def extract_log_events(log_path: Path) -> List[LogEvent]:
     if not log_path.exists():
         return []
-    established: List[LogEvent] = []
-    wrapped: List[LogEvent] = []
+    events = []
     for line in log_path.read_text(errors="replace").splitlines():
         m = LOG_LINE_RE.match(line)
         if m:
-            established.append(LogEvent(
+            events.append(LogEvent(
                 timestamp=datetime.strptime(m["ts"], TIMESTAMP_FORMAT),
-                action=ACTION_FOR_ROLE[m["role"]],
+                action=ACTION_FOR_STATUS[m["status"]],
                 channel=m["channel"],
                 slot=m["slot"],
             ))
-            continue
-        # Try CompositeWrapper format
-        m = COMPOSITE_WRAPPER_RE.match(line)
-        if m:
-            # For send-recv mode, slot is always "channel"
-            wrapped.append(LogEvent(
-                timestamp=datetime.strptime(m["ts"], TIMESTAMP_FORMAT),
-                action=METHOD_TO_ACTION[m["method"]],
-                channel=m["channel"],
-                slot="channel",
-            ))
-
-    # Pair each wrapper line with the nearest unpaired preceding
-    # Socket::establish for the same action/channel (slot "channel" only;
-    # bootstrap slots are tagged initial/final and never matched wrapper lines).
-    # Unpaired wrapper lines (send/send-recv modes that bypass Socket::establish)
-    # are kept as their own events.
-    unpaired = [e for e in established if e.slot == "channel"]
-    events = list(established)
-    for w in sorted(wrapped, key=lambda e: e.timestamp):
-        match = None
-        for e in unpaired:
-            if (e.action == w.action and e.channel == w.channel
-                    and timedelta(0) <= w.timestamp - e.timestamp <= WRAPPER_PAIRING_WINDOW):
-                match = e
-                break
-        if match is not None:
-            unpaired.remove(match)
-        else:
-            events.append(w)
     return events
 
 
@@ -236,6 +186,19 @@ def check_link_events(scenario: dict, steps: Dict[int, list], logs_dir: Path) ->
                 step_latest = max(step_latest, matched[-1].timestamp) if step_latest else matched[-1].timestamp
         if step_latest is not None:
             cursor = step_latest
+
+    # Exact counts: every link event must be claimed by some step, so an extra
+    # link (or one on a node/channel/slot the spec never mentions) fails.
+    leftovers: Dict[Tuple[str, str, str, str], int] = {}
+    for node_id, pool in pools.items():
+        for e in pool:
+            key = (node_id, e.action, e.channel, e.slot)
+            leftovers[key] = leftovers.get(key, 0) + 1
+    if leftovers:
+        ok = False
+        lines.append("Unexpected extra link events (spec counts are exact):")
+        for (node_id, action, channel, slot), n in sorted(leftovers.items()):
+            lines.append(f"  [UNEXPECTED] {node_id}: {action} {channel} (slot={slot}) x{n}")
     return ok, lines
 
 

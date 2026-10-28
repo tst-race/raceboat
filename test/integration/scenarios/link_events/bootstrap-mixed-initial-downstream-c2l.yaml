@@ -17,9 +17,13 @@
 #
 # Steps follow the observed temporal order (a step's events must come after
 # the latest event of the previous step).
+# Exact counts. The listener also creates a shared final-recv link at startup
+# (BootstrapListenStateMachine; the client->server link every pre-conduit
+# reads from) in addition to the final link(s) created after each hello.
 steps:
   1:
     - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}
+    - {node: listener, action: CREATE, channel: obfs4, slot: final, count: 1}
     - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
   2:
     - {node: dialer, action: LOAD, channel: obfs4, slot: initial, count: 1}

@@ -200,6 +200,9 @@ public:
                                                 std::string linkAddress,
                                                 bool creating,
                                                 LinkID existingLinkId = "");
+  // Records which API slot first requested a connection state machine. A
+  // reused connection keeps its original tag.
+  void tagConnSlot(RaceHandle connHandle, const std::string &slot);
   virtual RaceHandle startConduitectStateMachine(
       RaceHandle contextHandle, RaceHandle recvHandle,
       const ConnectionID &recvConnId, RaceHandle sendHandle,
@@ -265,6 +268,8 @@ protected:
   virtual ApiContext *newBootstrapPreConduitContext();
   virtual ApiContext *newResumeContext();
 
+  void logLinkEvent(RaceHandle linkHandle, const LinkID &linkId,
+                    LinkStatus status);
   virtual Contexts getContexts(RaceHandle handle);
   virtual Contexts getContexts(const std::string &id);
   virtual Contexts getContextsByPackageId(const std::string &packageId);

@@ -3,9 +3,13 @@
 # initial=racebird's obfs4 (LD_BIDI+TT_UNICAST, single bidi link);
 # final=decomposed-exemplars' twoSixIndirectComposition (LD_BIDI+TT_MULTICAST, single bidi link).
 # Listener creates both initial and final bidi links; dialer loads both.
+# Exact counts. The listener also creates a shared final-recv link at startup
+# (BootstrapListenStateMachine; the client->server link every pre-conduit
+# reads from) in addition to the final link(s) created after each hello.
 steps:
   1:
     - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
   2:
     - {node: connector, action: LOAD, channel: obfs4, slot: initial, count: 1}
   3:

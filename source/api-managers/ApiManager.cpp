@@ -908,6 +908,42 @@ void ApiManagerInternal::onChannelStatusChanged(
   }
 }
 
+// One line per link actually created or loaded by a plugin, emitted from the
+// single point every plugin's link status passes through. Integration tooling
+// (test/integration/link_events.py) counts these lines, so keep the format
+// stable: "LinkEvent: status=<LINK_CREATED|LINK_LOADED> slot=<slot>
+// channel=<gid> linkId=<id>".
+void ApiManagerInternal::logLinkEvent(RaceHandle linkHandle,
+                                      const LinkID &linkId,
+                                      LinkStatus status) {
+  std::string slot = "channel";
+  std::string channel = "unknown";
+  for (auto context : getContexts(linkHandle)) {
+    if (auto *conn = getDerivedContext<ApiConnContext>(context)) {
+      channel = conn->channelId;
+      if (!conn->slotTag.empty()) {
+        slot = conn->slotTag;
+      }
+      break;
+    }
+  }
+  helper::logInfo("LinkEvent: status=" + linkStatusToString(status) +
+                  " slot=" + slot + " channel=" + channel +
+                  " linkId=" + linkId);
+}
+
+void ApiManagerInternal::tagConnSlot(RaceHandle connHandle,
+                                     const std::string &slot) {
+  auto it = activeContexts.find(connHandle);
+  if (it == activeContexts.end()) {
+    return;
+  }
+  auto *conn = getDerivedContext<ApiConnContext>(it->second.get());
+  if (conn != nullptr && conn->slotTag.empty()) {
+    conn->slotTag = slot;
+  }
+}
+
 void ApiManagerInternal::onLinkStatusChanged(uint64_t postId,
                                              RaceHandle linkHandle,
                                              const LinkID &linkId,
@@ -917,6 +953,7 @@ void ApiManagerInternal::onLinkStatusChanged(uint64_t postId,
 
   EventType event = EVENT_INVALID;
   if (status == LINK_CREATED || status == LINK_LOADED) {
+    logLinkEvent(linkHandle, linkId, status);
     event = EVENT_LINK_ESTABLISHED;
   } else if (status == LINK_DESTROYED) {
     event = EVENT_LINK_DESTROYED;

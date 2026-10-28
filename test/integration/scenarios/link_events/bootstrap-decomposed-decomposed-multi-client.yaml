@@ -2,9 +2,13 @@
 # With single bidirectional links on LD_BIDI channels:
 # - Initial slot: listener creates 1 bidi link, each connector loads 1
 # - Final slot: listener creates 1 bidi link PER CLIENT, each connector loads 1
+# Exact counts. The listener also creates a shared final-recv link at startup
+# (BootstrapListenStateMachine; the client->server link every pre-conduit
+# reads from) in addition to the final link(s) created after each hello.
 steps:
   1:
     - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
   2:
     - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
   3:
