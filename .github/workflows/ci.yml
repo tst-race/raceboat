@@ -364,12 +364,11 @@ jobs:
             --image-tag "${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}" \
             --fail-fast \
             --skip \
-              bootstrap-mixed-updown-l2c-c2l \
-              bootstrap-decomposed-decomposed \
-              bootstrap-decomposed-decomposed-multi-client \
-              bootstrap-decomposed-racebird \
-              bootstrap-racebird-decomposed-multi-client \
-              client-connect-mixed-l2c-c2l
+              hf-client-connect \
+              hf-mixed-client-connect \
+              hf-send-only \
+              hf-send-recv \
+              skyhook-client-connect
 
       - name: Upload logs on failure
         if: failure()

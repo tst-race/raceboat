@@ -40,10 +40,10 @@ public:
   // Starts the connection state machine appropriate for `req.establishment`
   // (genuinely bidirectional via startConnStateMachineBidi when merged,
   // directional via startConnStateMachine otherwise) and returns its handle.
-  // `slot` ("channel"/"initial"/"final") is logged only - it lets test
-  // tooling (link_topology.py) attribute create/load events to a slot even
-  // when "initial" and "final" share the same channel gid, instead of
-  // guessing from log position.
+  // `slot` ("channel"/"initial"/"final") is logged and attached to the
+  // connection so the resulting "LinkEvent:" line (see
+  // ApiManagerInternal::logLinkEvent) can be attributed to a slot even when
+  // "initial" and "final" share the same channel gid.
   static RaceHandle establish(ApiManagerInternal &manager,
                              RaceHandle contextHandle,
                              const SocketRequest &req,
@@ -53,15 +53,21 @@ public:
                     " role=" + (req.establishment.isCreator() ? "creator" : "loader") +
                     " directionality=" + (req.establishment.isBidi() ? "bidi" :
                                           req.establishment.isSend() ? "send" : "recv"));
+    RaceHandle connHandle = NULL_RACE_HANDLE;
     if (req.establishment.isBidi()) {
-      return manager.startConnStateMachineBidi(
+      connHandle = manager.startConnStateMachineBidi(
           contextHandle, req.channelId, req.role, req.linkAddress,
           req.establishment.isCreator(), req.existingLinkId);
+    } else {
+      connHandle = manager.startConnStateMachine(
+          contextHandle, req.channelId, req.role, req.linkAddress,
+          req.establishment.isCreator(), req.establishment.isSend(),
+          req.existingLinkId);
     }
-    return manager.startConnStateMachine(
-        contextHandle, req.channelId, req.role, req.linkAddress,
-        req.establishment.isCreator(), req.establishment.isSend(),
-        req.existingLinkId);
+    if (connHandle != NULL_RACE_HANDLE) {
+      manager.tagConnSlot(connHandle, slot);
+    }
+    return connHandle;
   }
 };
 

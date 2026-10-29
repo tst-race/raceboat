@@ -35,7 +35,7 @@ public:
   ApiManagerSendReceiveTestFixture()
       : params(), core(std::make_shared<MockCore>()), manager(*core) {
     sendOptions.send_channel = "sendChannel";
-    sendOptions.send_address = "sendAddress";
+    sendOptions.send_address = "{\"hashtag\":\"sendAddress\"}";
     sendOptions.send_role = "sendRole";
     sendOptions.recv_channel = "recvChannel";
     sendOptions.recv_role = "recvRole";
@@ -65,7 +65,7 @@ public:
       recvBytes.push_back(0xFF - byte);
     }
 
-    linkProps.linkAddress = "linkAddr";
+    linkProps.linkAddress = "{\"hashtag\":\"linkAddr\"}";
     linkProps.linkType = LT_BIDI;
 
     status = ApiStatus::INVALID;
@@ -103,6 +103,16 @@ public:
   void onConnectionStatusChangedClosedCall(RaceHandle handle,
                                            ConnectionID thisConnId);
   void onLinkStatusChangedDestroyedCall(RaceHandle handle, LinkID thisLinkId);
+
+  // The recv side is established first; each side tears down independently once
+  // the sendReceive that depended on it has failed or finished.
+  void bringUpRecv();
+  void bringUpSend();
+  void tearDownRecv();
+  void tearDownSend();
+  void expectNoLeaks();
+
+  RaceHandle recvChanHandle = 0;
 
   ChannelParamStore params;
   std::shared_ptr<MockCore> core;
@@ -260,7 +270,10 @@ void ApiManagerSendReceiveTestFixture::onPackageStatusChangedCall(
 
 void ApiManagerSendReceiveTestFixture::receiveEncPkgCall(
     std::vector<uint8_t> &bytes, ConnectionID thisConnId) {
-  EncPkg pkg(0, 0, bytes);
+  // Replies are addressed with an all-zero package id prefix.
+  std::vector<uint8_t> prefixed(packageIdLen, 0);
+  prefixed.insert(prefixed.end(), bytes.begin(), bytes.end());
+  EncPkg pkg(0, 0, prefixed);
   SdkResponse response =
       manager.receiveEncPkg(*core->container, pkg, {thisConnId});
   EXPECT_EQ(response.status, SDK_OK);
@@ -283,12 +296,39 @@ void ApiManagerSendReceiveTestFixture::onLinkStatusChangedDestroyedCall(
   manager.waitForCallbacks();
 }
 
+void ApiManagerSendReceiveTestFixture::bringUpRecv() {
+  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
+  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
+  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+}
+
+void ApiManagerSendReceiveTestFixture::bringUpSend() {
+  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
+  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
+  onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
+}
+
+void ApiManagerSendReceiveTestFixture::tearDownRecv() {
+  onConnectionStatusChangedClosedCall(closeRecvConnHandle, recvConnId);
+  onLinkStatusChangedDestroyedCall(destroyRecvLinkHandle, recvLinkId);
+}
+
+void ApiManagerSendReceiveTestFixture::tearDownSend() {
+  onConnectionStatusChangedClosedCall(closeSendConnHandle, sendConnId);
+  onLinkStatusChangedDestroyedCall(destroySendLinkHandle, sendLinkId);
+}
+
+void ApiManagerSendReceiveTestFixture::expectNoLeaks() {
+  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
+  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
+  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+}
+
 TEST_F(ApiManagerSendReceiveTestFixture, no_errors) {
   expectActivateSendChannel(chanHandle);
 
   RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
+  expectActivateRecvChannel(chanHandle2);
   expectLoadLinkAddress(loadLinkHandle);
   expectCreateLink(createLinkHandle);
   expectOpenConnection(openSendConnHandle, sendLinkId);
@@ -300,14 +340,18 @@ TEST_F(ApiManagerSendReceiveTestFixture, no_errors) {
   expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 2); // sendReceive, recv conn
+
+  // The recv side is established first; the send connection is only started
+  // once the recv link exists.
+  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
+  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
+  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 3); // + send conn
 
   onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
   onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
   onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
-  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
   onPackageStatusChangedCall(pkgHandle);
   receiveEncPkgCall(recvBytes, recvConnId);
   onConnectionStatusChangedClosedCall(closeSendConnHandle, sendConnId);
@@ -388,500 +432,333 @@ TEST_F(ApiManagerSendReceiveTestFixture, sendReceive_empty_send_address_error) {
   EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
 }
 
-TEST_F(ApiManagerSendReceiveTestFixture, activateChannel_1_error) {
+// The recv connection is established first. If its channel cannot be activated
+// the sendReceive fails immediately.
+TEST_F(ApiManagerSendReceiveTestFixture, activateChannel_recv_error) {
+  expectActivateRecvChannel(recvChanHandle,
+                            ActivateChannelStatusCode::CHANNEL_DOES_NOT_EXIST);
+
+  sendReceiveCall(sendReceiveCallback);
+
+  manager.waitForCallbacks();
+  EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
+  expectNoLeaks();
+}
+
+// The send connection starts once the recv link exists, so the recv side is
+// already in flight when the send channel fails to activate.
+TEST_F(ApiManagerSendReceiveTestFixture, activateChannel_send_error) {
+  expectActivateRecvChannel(recvChanHandle);
+  expectCreateLink(createLinkHandle);
+  expectOpenConnection(openRecvConnHandle, recvLinkId);
   expectActivateSendChannel(chanHandle,
                             ActivateChannelStatusCode::CHANNEL_DOES_NOT_EXIST);
+  expectCloseConnection(closeRecvConnHandle, recvConnId);
+  expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   sendReceiveCall(sendReceiveCallback);
-
-  manager.waitForCallbacks();
+  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
+  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
   EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
-}
 
-TEST_F(ApiManagerSendReceiveTestFixture, activateChannel_2_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::CHANNEL_DOES_NOT_EXIST);
-
-  sendReceiveCall(sendReceiveCallback);
-
-  manager.waitForCallbacks();
-  EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
-}
-
-TEST_F(ApiManagerSendReceiveTestFixture, onChannelStatusChanged_send_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-
-  sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
-  manager.onChannelStatusChanged(*core->container, NULL_RACE_HANDLE,
-                                 sendOptions.send_channel, CHANNEL_FAILED, {});
-
-  manager.waitForCallbacks();
-  EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+  // the recv connection finishes opening with nothing depending on it, and
+  // closes itself
+  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  tearDownRecv();
+  expectNoLeaks();
 }
 
 TEST_F(ApiManagerSendReceiveTestFixture, onChannelStatusChanged_recv_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
+  expectActivateRecvChannel(recvChanHandle);
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 2);
 
-  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  manager.onChannelStatusChanged(*core->container, NULL_RACE_HANDLE,
+  manager.onChannelStatusChanged(*core->container, recvChanHandle,
                                  sendOptions.recv_channel, CHANNEL_FAILED, {});
 
   manager.waitForCallbacks();
   EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+  expectNoLeaks();
+}
+
+TEST_F(ApiManagerSendReceiveTestFixture, onChannelStatusChanged_send_error) {
+  expectActivateRecvChannel(recvChanHandle);
+  expectCreateLink(createLinkHandle);
+  expectOpenConnection(openRecvConnHandle, recvLinkId);
+  expectActivateSendChannel(chanHandle);
+  expectCloseConnection(closeRecvConnHandle, recvConnId);
+  expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
+
+  sendReceiveCall(sendReceiveCallback);
+  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
+  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
+  manager.onChannelStatusChanged(*core->container, chanHandle,
+                                 sendOptions.send_channel, CHANNEL_FAILED, {});
+
+  manager.waitForCallbacks();
+  EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
+
+  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  tearDownRecv();
+  expectNoLeaks();
 }
 
 TEST_F(ApiManagerSendReceiveTestFixture, createLink_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-  expectLoadLinkAddress(loadLinkHandle);
+  expectActivateRecvChannel(recvChanHandle);
   EXPECT_CALL(*core->plugin, createLink(_, sendOptions.recv_channel, _))
       .WillOnce(Return(SdkResponse(SDK_INVALID_ARGUMENT)));
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 2);
 
-  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
+  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
 
   manager.waitForCallbacks();
   EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+  expectNoLeaks();
 }
 
 TEST_F(ApiManagerSendReceiveTestFixture, loadLinkAddress_error) {
+  expectActivateRecvChannel(recvChanHandle);
+  expectCreateLink(createLinkHandle);
+  expectOpenConnection(openRecvConnHandle, recvLinkId);
   expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
   EXPECT_CALL(*core->plugin, loadLinkAddress(_, sendOptions.send_channel,
                                              sendOptions.send_address, _))
       .WillOnce(Return(SdkResponse(SDK_INVALID_ARGUMENT)));
+  expectCloseConnection(closeRecvConnHandle, recvConnId);
+  expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
+  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
+  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
   onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
 
   manager.waitForCallbacks();
   EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+
+  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  tearDownRecv();
+  expectNoLeaks();
 }
 
+// A recv link reported destroyed before it was ever established
 TEST_F(ApiManagerSendReceiveTestFixture, onLinkStatusChanged_recv_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-  expectLoadLinkAddress(loadLinkHandle);
+  expectActivateRecvChannel(recvChanHandle);
   expectCreateLink(createLinkHandle);
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
-  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
+  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
   manager.onLinkStatusChanged(*core->container, createLinkHandle, recvLinkId,
                               LINK_DESTROYED, linkProps);
-  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
 
   manager.waitForCallbacks();
   EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+  expectNoLeaks();
 }
 
 TEST_F(ApiManagerSendReceiveTestFixture, onLinkStatusChanged_send_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-  expectLoadLinkAddress(loadLinkHandle);
+  expectActivateRecvChannel(recvChanHandle);
   expectCreateLink(createLinkHandle);
+  expectOpenConnection(openRecvConnHandle, recvLinkId);
+  expectActivateSendChannel(chanHandle);
+  expectLoadLinkAddress(loadLinkHandle);
+  expectCloseConnection(closeRecvConnHandle, recvConnId);
+  expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
+  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
+  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
   onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
   manager.onLinkStatusChanged(*core->container, loadLinkHandle, sendLinkId,
                               LINK_DESTROYED, linkProps);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
 
   manager.waitForCallbacks();
   EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+
+  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  tearDownRecv();
+  expectNoLeaks();
 }
 
 TEST_F(ApiManagerSendReceiveTestFixture, openConnection_recv_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-  expectLoadLinkAddress(loadLinkHandle);
+  expectActivateRecvChannel(recvChanHandle);
   expectCreateLink(createLinkHandle);
-  expectOpenConnection(openSendConnHandle, sendLinkId);
   EXPECT_CALL(*core->plugin, openConnection(_, _, recvLinkId, "{}", 0, 0, _))
       .WillOnce(Return(SdkResponse(SDK_INVALID)));
+  // the send side may already have been started by the recv link
+  EXPECT_CALL(core->mockChannelManager,
+              activateChannel(_, sendOptions.send_channel,
+                              sendOptions.send_role))
+      .Times(::testing::AtMost(1))
+      .WillRepeatedly(Return(ActivateChannelStatusCode::OK));
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
-  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
-  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
+  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
   onLinkStatusChangedCall(createLinkHandle, recvLinkId);
 
   manager.waitForCallbacks();
   EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
 }
 
-TEST_F(ApiManagerSendReceiveTestFixture, openConnection_send_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-  expectLoadLinkAddress(loadLinkHandle);
-  expectCreateLink(createLinkHandle);
-  EXPECT_CALL(*core->plugin, openConnection(_, _, sendLinkId, "{}", 0, 0, _))
-      .WillOnce(Return(SdkResponse(SDK_INVALID)));
-
-  sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
-  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
-  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
-
-  manager.waitForCallbacks();
-  EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
-}
-
+// The recv connection fails to open (reported closed before it was open)
 TEST_F(ApiManagerSendReceiveTestFixture,
        onConnectionStatusChanged_open_recv_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-  expectLoadLinkAddress(loadLinkHandle);
+  expectActivateRecvChannel(recvChanHandle);
   expectCreateLink(createLinkHandle);
-  expectOpenConnection(openSendConnHandle, sendLinkId);
   expectOpenConnection(openRecvConnHandle, recvLinkId);
+  expectActivateSendChannel(chanHandle);
+  expectLoadLinkAddress(loadLinkHandle);
+  expectOpenConnection(openSendConnHandle, sendLinkId);
+  expectCloseConnection(closeSendConnHandle, sendConnId);
+  expectDestroyLink(destroySendLinkHandle, sendLinkId);
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
-  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
-  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
+  onChannelStatusChangedCall(recvChanHandle, sendOptions.recv_channel);
   onLinkStatusChangedCall(createLinkHandle, recvLinkId);
-  onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
   manager.onConnectionStatusChanged(*core->container, openRecvConnHandle,
                                     recvConnId, CONNECTION_CLOSED, linkProps);
-
   manager.waitForCallbacks();
   EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+
+  // the in-flight send side finishes establishing and closes itself
+  bringUpSend();
+  tearDownSend();
+  expectNoLeaks();
 }
 
 TEST_F(ApiManagerSendReceiveTestFixture,
        onConnectionStatusChanged_open_send_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-  expectLoadLinkAddress(loadLinkHandle);
+  expectActivateRecvChannel(recvChanHandle);
   expectCreateLink(createLinkHandle);
-  expectOpenConnection(openSendConnHandle, sendLinkId);
   expectOpenConnection(openRecvConnHandle, recvLinkId);
+  expectActivateSendChannel(chanHandle);
+  expectLoadLinkAddress(loadLinkHandle);
+  expectOpenConnection(openSendConnHandle, sendLinkId);
+  expectCloseConnection(closeRecvConnHandle, recvConnId);
+  expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
+  bringUpRecv();
   onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
   onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
-  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
   manager.onConnectionStatusChanged(*core->container, openSendConnHandle,
                                     sendConnId, CONNECTION_CLOSED, linkProps);
-
   manager.waitForCallbacks();
   EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+
+  tearDownRecv();
+  expectNoLeaks();
 }
 
 TEST_F(ApiManagerSendReceiveTestFixture, sendPackage_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-  expectLoadLinkAddress(loadLinkHandle);
+  expectActivateRecvChannel(recvChanHandle);
   expectCreateLink(createLinkHandle);
-  expectOpenConnection(openSendConnHandle, sendLinkId);
   expectOpenConnection(openRecvConnHandle, recvLinkId);
+  expectActivateSendChannel(chanHandle);
+  expectLoadLinkAddress(loadLinkHandle);
+  expectOpenConnection(openSendConnHandle, sendLinkId);
   EXPECT_CALL(*core->plugin, sendPackage(_, sendConnId, _, _, _))
       .WillOnce(Return(SdkResponse(SDK_INVALID_ARGUMENT)));
+  expectCloseConnection(closeSendConnHandle, sendConnId);
+  expectCloseConnection(closeRecvConnHandle, recvConnId);
+  expectDestroyLink(destroySendLinkHandle, sendLinkId);
+  expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
-  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
-  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
-  onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
-  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  bringUpRecv();
+  bringUpSend();
 
   manager.waitForCallbacks();
   EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+
+  tearDownSend();
+  tearDownRecv();
+  expectNoLeaks();
 }
 
 TEST_F(ApiManagerSendReceiveTestFixture, onPackageStatusChanged_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-  expectLoadLinkAddress(loadLinkHandle);
+  expectActivateRecvChannel(recvChanHandle);
   expectCreateLink(createLinkHandle);
-  expectOpenConnection(openSendConnHandle, sendLinkId);
   expectOpenConnection(openRecvConnHandle, recvLinkId);
+  expectActivateSendChannel(chanHandle);
+  expectLoadLinkAddress(loadLinkHandle);
+  expectOpenConnection(openSendConnHandle, sendLinkId);
   expectSendPackage(pkgHandle, sendConnId);
+  expectCloseConnection(closeSendConnHandle, sendConnId);
+  expectCloseConnection(closeRecvConnHandle, recvConnId);
+  expectDestroyLink(destroySendLinkHandle, sendLinkId);
+  expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
-  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
-  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
-  onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
-  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  bringUpRecv();
+  bringUpSend();
   manager.onPackageStatusChanged(*core->container, pkgHandle,
                                  PACKAGE_FAILED_GENERIC);
 
   manager.waitForCallbacks();
   EXPECT_EQ(status, ApiStatus::INTERNAL_ERROR);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+
+  tearDownSend();
+  tearDownRecv();
+  expectNoLeaks();
 }
 
-TEST_F(ApiManagerSendReceiveTestFixture, closeConnection_recv_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-  expectLoadLinkAddress(loadLinkHandle);
+// A plugin error while tearing down is not reported through the (already
+// delivered) sendReceive result, and must not leave contexts behind.
+TEST_F(ApiManagerSendReceiveTestFixture, closeConnection_error_after_success) {
+  expectActivateRecvChannel(recvChanHandle);
   expectCreateLink(createLinkHandle);
-  expectOpenConnection(openSendConnHandle, sendLinkId);
   expectOpenConnection(openRecvConnHandle, recvLinkId);
-  expectSendPackage(pkgHandle, sendConnId);
-  expectCloseConnection(closeSendConnHandle, sendConnId);
-  EXPECT_CALL(*core->plugin, closeConnection(_, recvConnId, _))
-      .WillOnce(Return(SdkResponse(SDK_INVALID_ARGUMENT)));
-  expectDestroyLink(destroySendLinkHandle, sendLinkId);
-
-  sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
-  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
-  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
-  onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
-  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
-  onPackageStatusChangedCall(pkgHandle);
-  receiveEncPkgCall(recvBytes, recvConnId);
-  onConnectionStatusChangedClosedCall(closeSendConnHandle, sendConnId);
-  onLinkStatusChangedDestroyedCall(destroySendLinkHandle, sendLinkId);
-
-  manager.waitForCallbacks();
-  EXPECT_EQ(status, ApiStatus::OK);
-  EXPECT_EQ(bytes2, recvBytes);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
-}
-
-TEST_F(ApiManagerSendReceiveTestFixture, closeConnection_send_error) {
   expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
   expectLoadLinkAddress(loadLinkHandle);
-  expectCreateLink(createLinkHandle);
   expectOpenConnection(openSendConnHandle, sendLinkId);
-  expectOpenConnection(openRecvConnHandle, recvLinkId);
   expectSendPackage(pkgHandle, sendConnId);
-  expectCloseConnection(closeRecvConnHandle, recvConnId);
   EXPECT_CALL(*core->plugin, closeConnection(_, sendConnId, _))
       .WillOnce(Return(SdkResponse(SDK_INVALID_ARGUMENT)));
+  expectCloseConnection(closeRecvConnHandle, recvConnId);
   expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
-  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
-  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
-  onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
-  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  bringUpRecv();
+  bringUpSend();
   onPackageStatusChangedCall(pkgHandle);
   receiveEncPkgCall(recvBytes, recvConnId);
-  onConnectionStatusChangedClosedCall(closeRecvConnHandle, recvConnId);
-  onLinkStatusChangedDestroyedCall(destroyRecvLinkHandle, recvLinkId);
+  tearDownRecv();
 
   manager.waitForCallbacks();
   EXPECT_EQ(status, ApiStatus::OK);
   EXPECT_EQ(bytes2, recvBytes);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+  expectNoLeaks();
 }
 
-TEST_F(ApiManagerSendReceiveTestFixture, destroyLink_recv_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-  expectLoadLinkAddress(loadLinkHandle);
+TEST_F(ApiManagerSendReceiveTestFixture, destroyLink_error_after_success) {
+  expectActivateRecvChannel(recvChanHandle);
   expectCreateLink(createLinkHandle);
-  expectOpenConnection(openSendConnHandle, sendLinkId);
   expectOpenConnection(openRecvConnHandle, recvLinkId);
+  expectActivateSendChannel(chanHandle);
+  expectLoadLinkAddress(loadLinkHandle);
+  expectOpenConnection(openSendConnHandle, sendLinkId);
   expectSendPackage(pkgHandle, sendConnId);
   expectCloseConnection(closeSendConnHandle, sendConnId);
-  expectCloseConnection(closeRecvConnHandle, recvConnId);
-  expectDestroyLink(destroySendLinkHandle, sendLinkId);
-  EXPECT_CALL(*core->plugin, destroyLink(_, recvLinkId, _))
-      .WillOnce(Return(SdkResponse(SDK_INVALID_ARGUMENT)));
-
-  sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
-  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
-  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
-  onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
-  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
-  onPackageStatusChangedCall(pkgHandle);
-  receiveEncPkgCall(recvBytes, recvConnId);
-  onConnectionStatusChangedClosedCall(closeSendConnHandle, sendConnId);
-  onConnectionStatusChangedClosedCall(closeRecvConnHandle, recvConnId);
-  onLinkStatusChangedDestroyedCall(destroySendLinkHandle, sendLinkId);
-
-  manager.waitForCallbacks();
-  EXPECT_EQ(status, ApiStatus::OK);
-  EXPECT_EQ(bytes2, recvBytes);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
-}
-
-TEST_F(ApiManagerSendReceiveTestFixture, destroyLink_send_error) {
-  expectActivateSendChannel(chanHandle);
-
-  RaceHandle chanHandle2;
-  expectActivateRecvChannel(chanHandle2,
-                            ActivateChannelStatusCode::ALREADY_ACTIVATED);
-  expectLoadLinkAddress(loadLinkHandle);
-  expectCreateLink(createLinkHandle);
-  expectOpenConnection(openSendConnHandle, sendLinkId);
-  expectOpenConnection(openRecvConnHandle, recvLinkId);
-  expectSendPackage(pkgHandle, sendConnId);
-  expectCloseConnection(closeSendConnHandle, sendConnId);
-  expectCloseConnection(closeRecvConnHandle, recvConnId);
-  expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
   EXPECT_CALL(*core->plugin, destroyLink(_, sendLinkId, _))
       .WillOnce(Return(SdkResponse(SDK_INVALID_ARGUMENT)));
+  expectCloseConnection(closeRecvConnHandle, recvConnId);
+  expectDestroyLink(destroyRecvLinkHandle, recvLinkId);
 
   sendReceiveCall(sendReceiveCallback);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 3);
-
-  onChannelStatusChangedCall(chanHandle, sendOptions.send_channel);
-  onChannelStatusChangedCall(chanHandle2, sendOptions.recv_channel);
-  onLinkStatusChangedCall(loadLinkHandle, sendLinkId);
-  onLinkStatusChangedCall(createLinkHandle, recvLinkId);
-  onConnectionStatusChangedCall(openSendConnHandle, sendConnId);
-  onConnectionStatusChangedCall(openRecvConnHandle, recvConnId);
+  bringUpRecv();
+  bringUpSend();
   onPackageStatusChangedCall(pkgHandle);
   receiveEncPkgCall(recvBytes, recvConnId);
-  onConnectionStatusChangedClosedCall(closeRecvConnHandle, recvConnId);
   onConnectionStatusChangedClosedCall(closeSendConnHandle, sendConnId);
-  onLinkStatusChangedDestroyedCall(destroyRecvLinkHandle, recvLinkId);
+  tearDownRecv();
 
   manager.waitForCallbacks();
   EXPECT_EQ(status, ApiStatus::OK);
   EXPECT_EQ(bytes2, recvBytes);
-  EXPECT_EQ(manager.impl.activeContexts.size(), 0);
-  EXPECT_EQ(manager.impl.idContextMap.size(), 0);
-  EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
+  expectNoLeaks();
 }
 
 TEST_F(ApiManagerSendReceiveTestFixture, empty_callback_error) {

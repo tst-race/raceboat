@@ -1,0 +1,37 @@
+{
+  "id": "hf-mixed-client-connect",
+  "mode": "client-connect",
+  "wait_time": 60,
+  "timeout": 120,
+  "network": {
+    "name": "hf-mixed-client-connect-network",
+    "subnet": "10.20.3.0/24"
+  },
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "hf-mixed-client-connect-listener",
+      "ip": "10.20.3.3",
+      "slots": {
+        "channel": {
+          "recv": "twoSixIndirectComposition",
+          "send": "hfTransportComposition"
+        }
+      }
+    },
+    {
+      "role": "connector",
+      "id": "hf-mixed-client-connect-connector",
+      "ip": "10.20.3.2",
+      "slots": {
+        "channel": {
+          "recv": "hfTransportComposition",
+          "send": "twoSixIndirectComposition"
+        }
+      }
+    }
+  ],
+  "send_message": "HF mixed client-connect test",
+  "reply_message": "HF mixed reply",
+  "description": "Mixed client-connect test: upstream (dialer->listener) uses twoSixIndirectComposition, downstream (listener->dialer) uses hfTransportComposition. Both directions use static addresses (no dynamic link creation). REQUIRES real HF credentials: set HF_USERNAME and HF_TOKEN env vars with a write-scope PAT."
+}

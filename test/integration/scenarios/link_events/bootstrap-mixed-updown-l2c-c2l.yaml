@@ -1,19 +1,29 @@
 # Link event spec for bootstrap-mixed-updown-l2c-c2l
-# Mixed channels per direction (no linkDirectionOverrides):
-# Initial: listener recv=obfs4 (CREATE), listener send=twoSixIndirectComposition (CREATE)
-#          dialer recv=twoSixIndirectComposition (LOAD), dialer send=obfs4 (LOAD)
-# Final:   listener recv=twoSixIndirectComposition (CREATE), listener send=obfs4 (CREATE)
-#          dialer recv=obfs4 (LOAD), dialer send=twoSixIndirectComposition (LOAD)
+#
+# Channel directions: obfs4 is LD_LOADER_TO_CREATOR (the receiver creates, the
+# sender loads); twoSixIndirectComposition is LD_CREATOR_TO_LOADER (the sender
+# creates, the receiver loads). The overrides apply to a channel in every slot.
+#
+# Initial: listener recv=obfs4, send=twoSix; connector recv=twoSix, send=obfs4
+#   listener recv obfs4 (L2C receiver)  -> CREATE
+#   listener send twoSix (C2L sender)   -> CREATE
+#   connector recv twoSix (C2L receiver)-> LOAD
+#   connector send obfs4 (L2C sender)   -> LOAD
+# Final: the roles swap - listener recv=twoSix, send=obfs4; connector recv=obfs4, send=twoSix
+#   listener recv twoSix (C2L receiver) -> LOAD
+#   listener send obfs4 (L2C sender)    -> LOAD
+#   connector recv obfs4 (L2C receiver) -> CREATE
+#   connector send twoSix (C2L sender)  -> CREATE
 steps:
   1:
     - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}
     - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
+  # The connector reports its final creates between its two initial loads.
   2:
     - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
     - {node: connector, action: LOAD, channel: obfs4, slot: initial, count: 1}
+    - {node: connector, action: CREATE, channel: obfs4, slot: final, count: 1}
+    - {node: connector, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
   3:
-    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
-    - {node: listener, action: CREATE, channel: obfs4, slot: final, count: 1}
-  4:
-    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}
-    - {node: connector, action: LOAD, channel: obfs4, slot: final, count: 1}
+    - {node: listener, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}
+    - {node: listener, action: LOAD, channel: obfs4, slot: final, count: 1}

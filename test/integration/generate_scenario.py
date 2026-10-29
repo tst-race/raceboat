@@ -114,6 +114,11 @@ def _get_all_kit_dirs(scenario: dict) -> List[Path]:
     return list(kit_dirs)
 
 
+def _pristine_manifest_path(kit_dir: Path) -> Path:
+    """Where the unpatched manifest is kept while overrides are applied."""
+    return kit_dir.parent / f".{kit_dir.name}.manifest.pristine"
+
+
 def apply_link_direction_overrides_to_kits(scenario: dict) -> Dict[Path, dict]:
     """
     Apply linkDirectionOverrides from scenario to the original kit manifest.json files.
@@ -148,6 +153,17 @@ def apply_link_direction_overrides_to_kits(scenario: dict) -> Dict[Path, dict]:
         manifest_path = kit_dir / "manifest.json"
         if not manifest_path.exists():
             continue
+
+        # A previous run that was killed mid-scenario leaves its patch behind, and
+        # a backup taken from that manifest would "restore" the patch forever.
+        # Keep a pristine copy on disk (outside the kit dir, so it is never copied
+        # into a container) and recover from it first.
+        pristine_path = _pristine_manifest_path(kit_dir)
+        if pristine_path.exists():
+            print(f"  [linkDirectionOverrides] Recovering {manifest_path} from an interrupted run")
+            shutil.copyfile(pristine_path, manifest_path)
+        else:
+            shutil.copyfile(manifest_path, pristine_path)
 
         # Read and backup original manifest (deep copy to avoid mutation issues)
         original_manifest = json.loads(manifest_path.read_text())
@@ -198,7 +214,12 @@ def restore_link_direction_overrides(backups: Dict[Path, dict]) -> None:
     """Restore original manifest.json files from backups."""
     for kit_dir, original_manifest in backups.items():
         manifest_path = kit_dir / "manifest.json"
-        manifest_path.write_text(json.dumps(original_manifest, indent=4))
+        pristine_path = _pristine_manifest_path(kit_dir)
+        if pristine_path.exists():
+            shutil.copyfile(pristine_path, manifest_path)
+            pristine_path.unlink()
+        else:
+            manifest_path.write_text(json.dumps(original_manifest, indent=4))
         print(f"  [linkDirectionOverrides] Restored {manifest_path}")
 
 
@@ -435,6 +456,8 @@ def _process_node(
                     composition_name=channel_name if info.is_composition else None,
                     direction=direction if split else None,
                     effective_link_direction=effective_link_direction,
+                    scenario_id=scenario.get("id"),
+                    scenario_mode=scenario.get("mode"),
                 )
                 contribution = adapter.generate_node_contribution(request)
                 contribution.channel_name = channel_name
@@ -549,6 +572,16 @@ def _render_compose(scenario: dict, nodes: List[Node], output_dir: Path, image_t
             lines.append(f"    image: ghcr.io/tst-race/raceboat/raceboat-runtime:{image_tag}")
         lines.append(f"    container_name: {node.id}")
         lines.append(f'    user: "{_host_user_directive()}"')
+
+        # Merge environment variables from all contributions
+        env_vars = {}
+        for contribution in node.contributions.values():
+            env_vars.update(contribution.environment)
+        if env_vars:
+            lines.append("    environment:")
+            for key, value in env_vars.items():
+                lines.append(f"      {key}: \"{value}\"")
+
         listener_ids = [n.id for n in nodes if n.role == "listener"]
         sidecars = _merge_sidecar_services(nodes)
         has_dependencies = (node.role == "connector" and listener_ids) or sidecars

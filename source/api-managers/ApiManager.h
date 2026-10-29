@@ -133,6 +133,9 @@ public:
                                                     std::string role);
   virtual void stateMachineFailed(ApiContext &context);
   virtual void stateMachineFinished(ApiContext &context);
+  // Finish another context by handle (e.g. a listener releasing pre-conduits
+  // that were never accepted).
+  virtual void stateMachineFinished(RaceHandle contextHandle);
   virtual void connStateMachineLinkEstablished(RaceHandle contextHandle,
                                          LinkID linkId,
                                          std::string linkAddress,
@@ -197,6 +200,9 @@ public:
                                                 std::string linkAddress,
                                                 bool creating,
                                                 LinkID existingLinkId = "");
+  // Records which API slot first requested a connection state machine. A
+  // reused connection keeps its original tag.
+  void tagConnSlot(RaceHandle connHandle, const std::string &slot);
   virtual RaceHandle startConduitectStateMachine(
       RaceHandle contextHandle, RaceHandle recvHandle,
       const ConnectionID &recvConnId, RaceHandle sendHandle,
@@ -262,6 +268,8 @@ protected:
   virtual ApiContext *newBootstrapPreConduitContext();
   virtual ApiContext *newResumeContext();
 
+  void logLinkEvent(RaceHandle linkHandle, const LinkID &linkId,
+                    LinkStatus status);
   virtual Contexts getContexts(RaceHandle handle);
   virtual Contexts getContexts(const std::string &id);
   virtual Contexts getContextsByPackageId(const std::string &packageId);

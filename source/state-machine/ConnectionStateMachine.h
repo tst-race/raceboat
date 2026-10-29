@@ -70,6 +70,10 @@ public:
   ConnEstablishment establishment;
   ChannelId channelId;
   std::string channelRole;
+  // Which API slot ("channel"/"initial"/"final") first requested this
+  // connection; set by Socket::establish, reported in the "LinkEvent:" log
+  // line. Empty means untagged (reported as "channel").
+  std::string slotTag;
   std::string linkAddress;
   std::string updatedLinkAddress;
   LinkID linkId;

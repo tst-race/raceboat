@@ -245,15 +245,11 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
 
     // If we are NOT creating then we have to wait for the client to create and send us the address as a hello-response
     if (create) {
-      bool sending = true;
-      ctx.finalSendConnSMHandle = ctx.manager.
-        startConnStateMachine(ctx.handle,
-                              ctx.opts.final_send_channel,
-                              ctx.opts.final_send_role,
-                              "",
-                              create, // is true
-                              sending // is true
-                              );
+      ctx.finalSendConnSMHandle = Socket::establish(
+          ctx.manager, ctx.handle,
+          SocketRequest{ctx.opts.final_send_channel, ctx.opts.final_send_role, "",
+                       ConnEstablishment{LinkRole::Creator, LinkDirectionality::Send}},
+          "final");
       if (ctx.finalSendConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting connection state machine failed");
         return EventResult::NOT_SUPPORTED;
@@ -272,15 +268,11 @@ struct StateBootstrapListenInitial : public BootstrapListenState {
 
       // If we are NOT creating then we are waiting for the client to create and send the address as a hello-response
       if (create) {
-        bool sending = false;
-        ctx.finalRecvConnSMHandle = ctx.manager.
-          startConnStateMachine(ctx.handle,
-                                ctx.opts.final_recv_channel,
-                                ctx.opts.final_recv_role,
-                                "",
-                                create, // is true
-                                sending // is false
-                                );
+        ctx.finalRecvConnSMHandle = Socket::establish(
+            ctx.manager, ctx.handle,
+            SocketRequest{ctx.opts.final_recv_channel, ctx.opts.final_recv_role, "",
+                         ConnEstablishment{LinkRole::Creator, LinkDirectionality::Recv}},
+            "final");
       
         if (ctx.finalRecvConnSMHandle == NULL_RACE_HANDLE) {
           helper::logError(logPrefix + " starting connection state machine failed");

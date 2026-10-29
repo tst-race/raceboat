@@ -1,0 +1,9 @@
+# Client-connect mode with 2 connectors. obfs4 (racebird, LD_BIDI+TT_UNICAST)
+# merges send/recv into a single physical link. The listener creates that link
+# once and reuses it for every accept(), so it creates exactly 1 link in total;
+# each connector (dialer, dialer2) loads exactly 1.
+steps:
+  1:
+    - {node: listener, action: CREATE, channel: obfs4, count: 1}
+  2:
+    - {node: connector, action: LOAD, channel: obfs4, count: 1}

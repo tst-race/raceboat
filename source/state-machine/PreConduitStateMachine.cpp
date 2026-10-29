@@ -244,6 +244,8 @@ PreConduitStateEngine::PreConduitStateEngine() {
     declareStateTransition(STATE_PRE_CONN_OBJ_ACCEPTED,  EVENT_ALWAYS,                       STATE_PRE_CONN_OBJ_OPENING);
     declareStateTransition(STATE_PRE_CONN_OBJ_OPENING,   EVENT_RECEIVE_PACKAGE,              STATE_PRE_CONN_OBJ_OPENING);
     declareStateTransition(STATE_PRE_CONN_OBJ_OPENING,   EVENT_CONN_STATE_MACHINE_CONNECTED, STATE_PRE_CONN_OBJ_FINISHED);
+    // The send connection failing fails the accept
+    declareStateTransition(STATE_PRE_CONN_OBJ_OPENING,   EVENT_STATE_MACHINE_FAILED,         STATE_PRE_CONN_OBJ_FAILED);
   // clang-format on
 }
 

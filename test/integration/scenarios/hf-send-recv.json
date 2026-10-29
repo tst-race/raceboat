@@ -1,0 +1,31 @@
+{
+  "id": "hf-send-recv",
+  "mode": "send-recv",
+  "wait_time": 60,
+  "timeout": 180,
+  "send_message": "Hello from hf-send-recv integration test",
+  "reply_message": "Reply from hf-send-recv integration test",
+  "network": {
+    "name": "hf-send-recv-network",
+    "subnet": "10.20.2.0/24"
+  },
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "hf-send-recv-listener",
+      "ip": "10.20.2.3",
+      "slots": {
+        "channel": "hfTransportComposition"
+      }
+    },
+    {
+      "role": "connector",
+      "id": "hf-send-recv-connector",
+      "ip": "10.20.2.2",
+      "slots": {
+        "channel": "hfTransportComposition"
+      }
+    }
+  ],
+  "description": "Bidirectional test: connector sends to listener's repo, listener replies to connector's repo. REQUIRES real HF credentials: set HF_USERNAME and HF_TOKEN env vars with a write-scope PAT."
+}

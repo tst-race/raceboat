@@ -1,9 +1,14 @@
-# Best-effort default convention for client-connect mode (2 connectors). See
-# decomposed-client-connect.yaml for the per-channel reasoning; `listener`
-# aggregates 2 links/connector * 2 connectors = 4, `connector` (role keyword)
-# auto-expands to each of dialer/dialer2 independently expecting 2 loads.
+# Client-connect mode with 3 connectors sharing one listener-created address.
+#
+# Counts do NOT scale with the number of clients here: the listener creates its
+# single bidirectional link once (twoSixIndirectComposition is LD_BIDI, so
+# DialStateMachine uses a single bidi link and the separate recv/send hashtags
+# are not both used) and every connector loads that same link. Conduits are
+# told apart by package id, not by per-client links. Per-client private links
+# only appear in bootstrap-connect mode (see
+# bootstrap-decomposed-decomposed-multi-client.yaml: one final CREATE per client).
 steps:
   1:
-    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, count: 4}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, count: 1}
   2:
-    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, count: 2}
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, count: 1}

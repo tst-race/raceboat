@@ -137,15 +137,17 @@ struct StateDialInitial : public DialState {
       ctx.sendConnSMHandle = ctx.recvConnSMHandle;
       ctx.manager.registerHandle(ctx, ctx.recvConnSMHandle);
     } else {
-      // Original behavior: separate receive connection. If the caller
-      // pre-specified a recv_address (e.g. so multiple dialers can share one
-      // known reply address), load it instead of creating a fresh one.
-      bool loadingRecvAddress = not ctx.opts.recv_address.empty();
+      // Original behavior: separate receive connection. Determine role based on
+      // channel properties (linkDirection). For CT_INDIRECT + LD_CREATOR_TO_LOADER,
+      // the dialer should be Loader for recv (loads peer's send repo).
+      bool recvCreating = ctx.shouldCreateReceiver(recvChannelId);
+      LinkRole recvRole_ = recvCreating ? LinkRole::Creator : LinkRole::Loader;
+      helper::logDebug(logPrefix + "dial: recv linkDirection for '" + recvChannelId +
+                       "' -> creating=" + (recvCreating ? "true" : "false"));
       ctx.recvConnSMHandle = Socket::establish(
           ctx.manager, ctx.handle,
           SocketRequest{recvChannelId, recvRole, ctx.opts.recv_address,
-                       ConnEstablishment{loadingRecvAddress ? LinkRole::Loader : LinkRole::Creator,
-                                         LinkDirectionality::Recv}});
+                       ConnEstablishment{recvRole_, LinkDirectionality::Recv}});
 
       if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
         helper::logError(logPrefix + " starting connection state machine failed");
@@ -226,10 +228,17 @@ struct StateDialWaitingForSendConnection : public DialState {
       return EventResult::NOT_SUPPORTED;
     }
 
+    // Determine correct LinkRole for send connection based on channel properties
+    // For CT_INDIRECT + LD_CREATOR_TO_LOADER, the dialer should be Creator (creates its own send repo)
+    bool sendCreating = ctx.shouldCreateSender(sendChannelId);
+    LinkRole sendRole_ = sendCreating ? LinkRole::Creator : LinkRole::Loader;
+    helper::logDebug(logPrefix + "sendReceive: send linkDirection for '" + sendChannelId +
+                     "' -> creating=" + (sendCreating ? "true" : "false"));
+
     ctx.sendConnSMHandle = Socket::establish(
         ctx.manager, ctx.handle,
         SocketRequest{sendChannelId, sendRole, sendLinkAddress,
-                     ConnEstablishment{LinkRole::Loader, LinkDirectionality::Send}});
+                     ConnEstablishment{sendRole_, LinkDirectionality::Send}});
     if (ctx.sendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
       return EventResult::NOT_SUPPORTED;
@@ -377,6 +386,13 @@ DialStateEngine::DialStateEngine() {
     declareStateTransition(STATE_DIAL_SEND_OPEN, EVENT_PACKAGE_SENT, STATE_DIAL_PACKAGE_SENT);
     declareStateTransition(STATE_DIAL_PACKAGE_SENT,                  EVENT_CONN_STATE_MACHINE_CONNECTED,              STATE_DIAL_PACKAGE_SENT);
     declareStateTransition(STATE_DIAL_PACKAGE_SENT,              EVENT_SATISFIED,                 STATE_DIAL_FINISHED);
+
+    // A failing connection state machine, or a failed initial package, fails the dial
+    declareStateTransition(STATE_DIAL_INITIAL,                   EVENT_STATE_MACHINE_FAILED,      STATE_DIAL_FAILED);
+    declareStateTransition(STATE_DIAL_WAITING_FOR_SEND_CONNECTION, EVENT_STATE_MACHINE_FAILED,    STATE_DIAL_FAILED);
+    declareStateTransition(STATE_DIAL_SEND_OPEN,                 EVENT_STATE_MACHINE_FAILED,      STATE_DIAL_FAILED);
+    declareStateTransition(STATE_DIAL_PACKAGE_SENT,              EVENT_STATE_MACHINE_FAILED,      STATE_DIAL_FAILED);
+    declareStateTransition(STATE_DIAL_SEND_OPEN,                 EVENT_PACKAGE_FAILED,            STATE_DIAL_FAILED);
   // clang-format on
 }
 

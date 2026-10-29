@@ -701,6 +701,11 @@ void ApiManagerInternal::stateMachineFinished(ApiContext &context) {
   manager.onStateMachineFinished(contextHandle);
 }
 
+void ApiManagerInternal::stateMachineFinished(RaceHandle contextHandle) {
+  TRACE_METHOD(contextHandle);
+  manager.onStateMachineFinished(contextHandle);
+}
+
 void ApiManagerInternal::connStateMachineLinkEstablished(RaceHandle contextHandle,
                                                    LinkID linkId,
                                                    std::string linkAddress,
@@ -814,6 +819,22 @@ void ApiManagerInternal::onConnStateMachineConnected(uint64_t postId,
   }
 }
 
+// Only a channel becoming available or genuinely failing drives a state
+// machine. Informational statuses (e.g. CHANNEL_ENABLED, CHANNEL_STARTING)
+// are also reported to the API manager and must not be treated as failures.
+static EventType channelStatusToEvent(ChannelStatus status) {
+  switch (status) {
+  case CHANNEL_AVAILABLE:
+    return EVENT_CHANNEL_ACTIVATED;
+  case CHANNEL_FAILED:
+  case CHANNEL_UNAVAILABLE:
+  case CHANNEL_UNSUPPORTED:
+    return EVENT_FAILED;
+  default:
+    return EVENT_INVALID;
+  }
+}
+
 // This is triggered by activateChannel if onChannelStatusChanged was already
 // called
 void ApiManagerInternal::onChannelStatusChangedForContext(
@@ -822,12 +843,7 @@ void ApiManagerInternal::onChannelStatusChangedForContext(
     const ChannelProperties &properties) {
   TRACE_METHOD(postId, callHandle, channelGid, status);
 
-  EventType event = EVENT_INVALID;
-  if (status == CHANNEL_AVAILABLE) {
-    event = EVENT_CHANNEL_ACTIVATED;
-  } else {
-    event = EVENT_FAILED;
-  }
+  EventType event = channelStatusToEvent(status);
 
   auto contextIt = activeContexts.find(contextHandle);
   if (contextIt == activeContexts.end()) {
@@ -837,7 +853,9 @@ void ApiManagerInternal::onChannelStatusChangedForContext(
   ApiContext &context = *contextIt->second;
   context.updateChannelStatusChanged(callHandle, channelGid, status,
                                      properties);
-  triggerEvent(context, event);
+  if (event != EVENT_INVALID) {
+    triggerEvent(context, event);
+  }
 }
 
   // This is triggered by startConnStateMachine if a connection for
@@ -878,18 +896,51 @@ void ApiManagerInternal::onChannelStatusChanged(
 
   activatedChannels[channelGid] = {status, properties};
 
-  EventType event = EVENT_INVALID;
-  if (status == CHANNEL_AVAILABLE) {
-    event = EVENT_CHANNEL_ACTIVATED;
-  } else {
-    event = EVENT_FAILED;
-  }
+  EventType event = channelStatusToEvent(status);
 
   auto contexts = getContexts(chanHandle, channelGid);
   for (auto context : contexts) {
     context->updateChannelStatusChanged(chanHandle, channelGid, status,
                                         properties);
-    triggerEvent(*context, event);
+    if (event != EVENT_INVALID) {
+      triggerEvent(*context, event);
+    }
+  }
+}
+
+// One line per link actually created or loaded by a plugin, emitted from the
+// single point every plugin's link status passes through. Integration tooling
+// (test/integration/link_events.py) counts these lines, so keep the format
+// stable: "LinkEvent: status=<LINK_CREATED|LINK_LOADED> slot=<slot>
+// channel=<gid> linkId=<id>".
+void ApiManagerInternal::logLinkEvent(RaceHandle linkHandle,
+                                      const LinkID &linkId,
+                                      LinkStatus status) {
+  std::string slot = "channel";
+  std::string channel = "unknown";
+  for (auto context : getContexts(linkHandle)) {
+    if (auto *conn = getDerivedContext<ApiConnContext>(context)) {
+      channel = conn->channelId;
+      if (!conn->slotTag.empty()) {
+        slot = conn->slotTag;
+      }
+      break;
+    }
+  }
+  helper::logInfo("LinkEvent: status=" + linkStatusToString(status) +
+                  " slot=" + slot + " channel=" + channel +
+                  " linkId=" + linkId);
+}
+
+void ApiManagerInternal::tagConnSlot(RaceHandle connHandle,
+                                     const std::string &slot) {
+  auto it = activeContexts.find(connHandle);
+  if (it == activeContexts.end()) {
+    return;
+  }
+  auto *conn = getDerivedContext<ApiConnContext>(it->second.get());
+  if (conn != nullptr && conn->slotTag.empty()) {
+    conn->slotTag = slot;
   }
 }
 
@@ -902,6 +953,7 @@ void ApiManagerInternal::onLinkStatusChanged(uint64_t postId,
 
   EventType event = EVENT_INVALID;
   if (status == LINK_CREATED || status == LINK_LOADED) {
+    logLinkEvent(linkHandle, linkId, status);
     event = EVENT_LINK_ESTABLISHED;
   } else if (status == LINK_DESTROYED) {
     event = EVENT_LINK_DESTROYED;

@@ -668,13 +668,15 @@ TEST_F(ApiManagerSendTestFixture, closeConnection_error) {
   EXPECT_EQ(manager.impl.handleContextMap.size(), 0);
 }
 
-TEST_F(ApiManagerSendTestFixture,
-       DISABLED_onConnectionStatusChanged_closed_error) {
+// The send callback reports OK as soon as the package is sent; it does not wait
+// for the connection and link to finish closing.
+TEST_F(ApiManagerSendTestFixture, callback_ok_before_connection_closed) {
   expectActivateChannel(chanHandle);
   expectLoadLinkAddress(loadLinkHandle);
   expectOpenConnection(openConnHandle, linkId);
   expectSendPackage(pkgHandle, connId);
   expectCloseConnection(closeConnHandle, connId);
+  expectDestroyLink(destroyLinkHandle, linkId);
 
   ApiStatus status = ApiStatus::INVALID;
   auto sendCallback = [&status](ApiStatus _status) { status = _status; };
@@ -687,13 +689,12 @@ TEST_F(ApiManagerSendTestFixture,
   onConnectionStatusChangedCall(openConnHandle, connId);
   onPackageStatusChangedCall(pkgHandle);
 
-  // How can this call fail?
-  // manager.onConnectionStatusChanged(*core->container, closeConnHandle,
-  // connId, CONNECTION_CLOSED,
-  //                                   linkProps);
+  EXPECT_EQ(status, ApiStatus::OK);
+  EXPECT_EQ(manager.impl.activeContexts.size(), 1); // conn, still closing
 
-  manager.waitForCallbacks();
-  // We sent the package, so expect ok
+  onConnectionStatusChangedClosedCall(closeConnHandle, connId);
+  onLinkStatusChangedDestroyedCall(destroyLinkHandle, linkId);
+
   EXPECT_EQ(status, ApiStatus::OK);
   EXPECT_EQ(manager.impl.activeContexts.size(), 0);
   EXPECT_EQ(manager.impl.idContextMap.size(), 0);
@@ -730,7 +731,7 @@ TEST_F(ApiManagerSendTestFixture, destroyLink_error) {
 }
 
 TEST_F(ApiManagerSendTestFixture,
-       DISABLED_onLinkStatusChanged_destroyed_error) {
+       onLinkStatusChanged_destroyed_error) {
   expectActivateChannel(chanHandle);
   expectLoadLinkAddress(loadLinkHandle);
   expectOpenConnection(openConnHandle, linkId);

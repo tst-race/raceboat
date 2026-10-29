@@ -3,16 +3,16 @@
 # final=twoSixIndirectComposition (single bidi link per client):
 #   listener creates 1 for dialer, dialer loads it,
 #   then listener creates 1 for dialer2, dialer2 loads it
+# Exact counts. Besides the per-client final links above, the listener creates
+# one shared final-recv link at startup (BootstrapListenStateMachine). The
+# clients bootstrap independently, so one client's final link can be created
+# and loaded before the other client has loaded the initial link; everything
+# after the initial link exists is therefore a single unordered step.
 steps:
   1:
     - {node: listener, action: CREATE, channel: obfs4, slot: initial, count: 1}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
   2:
     - {node: connector, action: LOAD, channel: obfs4, slot: initial, count: 1}
-  3:
-    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
-  4:
-    - {node: dialer, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}
-  5:
-    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 1}
-  6:
-    - {node: dialer2, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final, count: 2}
+    - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: final, count: 1}

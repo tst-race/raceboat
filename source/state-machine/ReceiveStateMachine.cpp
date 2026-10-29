@@ -40,6 +40,13 @@ void ApiRecvContext::updateGetReceiver(
 void ApiRecvContext::updateReceive(
     RaceHandle /* _handle */,
     std::function<void(ApiStatus, std::vector<uint8_t>)> _cb) {
+  // Only one receive can be outstanding. Reject the new call rather than
+  // silently replacing (and so never completing) the pending callback.
+  if (this->receiveCb) {
+    helper::logError("ApiRecvContext::updateReceive: receive() already pending");
+    _cb(ApiStatus::INVALID_ARGUMENT, {});
+    return;
+  }
   this->receiveCb = _cb;
 };
 void ApiRecvContext::updateClose(RaceHandle /* handle */,
@@ -302,6 +309,8 @@ RecvStateEngine::RecvStateEngine() {
     declareStateTransition(STATE_RECV_WAITING_FOR_APP_AND_PLUGIN,    EVENT_CLOSE,                        STATE_RECV_FINISHED);
     declareStateTransition(STATE_RECV_WAITING_FOR_PLUGIN,            EVENT_CLOSE,                        STATE_RECV_FINISHED);
     declareStateTransition(STATE_RECV_WAITING_FOR_APP,               EVENT_CLOSE,                        STATE_RECV_FINISHED);
+    // The connection state machine failing while still setting up fails the receive
+    declareStateTransition(STATE_RECV_INITIAL,                       EVENT_STATE_MACHINE_FAILED,         STATE_RECV_FAILED);
   // clang-format on
 }
 

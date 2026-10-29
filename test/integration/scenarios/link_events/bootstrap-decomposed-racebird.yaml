@@ -2,9 +2,13 @@
 # initial=decomposed-exemplars (LD_BIDI+TT_MULTICAST): bootstrap handshake merges
 # bidi into a single shared link (1 link). final=racebird's obfs4
 # (LD_BIDI+TT_UNICAST, merges into a single link -> 1).
+# Exact counts. The listener also creates a shared final-recv link at startup
+# (BootstrapListenStateMachine; the client->server link every pre-conduit
+# reads from) in addition to the final link(s) created after each hello.
 steps:
   1:
     - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial, count: 1}
+    - {node: listener, action: CREATE, channel: obfs4, slot: final, count: 1}
   2:
     - {node: connector, action: LOAD, channel: twoSixIndirectComposition, slot: initial, count: 1}
   3:

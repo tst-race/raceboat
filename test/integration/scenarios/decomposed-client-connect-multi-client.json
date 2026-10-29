@@ -30,6 +30,14 @@
       "slots": {
         "channel": "twoSixIndirectComposition"
       }
+    },
+    {
+      "role": "connector",
+      "id": "dialer3",
+      "ip": "10.20.1.5",
+      "slots": {
+        "channel": "twoSixIndirectComposition"
+      }
     }
   ]
 }

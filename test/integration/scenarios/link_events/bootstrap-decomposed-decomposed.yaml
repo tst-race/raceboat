@@ -6,10 +6,14 @@
 # a single merged connection per slot:
 # - Initial: Listener creates initial-recv, Dialer loads initial-send
 # - Final: Listener creates final bidi link, Dialer loads final bidi link
+# Exact counts. The listener also creates a shared final-recv link at startup
+# (BootstrapListenStateMachine; the client->server link every pre-conduit
+# reads from) in addition to the final link(s) created after each hello.
 steps:
   # The listener (listener) creates the "initial" phase's recv link first
   1:
     - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: initial}
+    - {node: listener, action: CREATE, channel: twoSixIndirectComposition, slot: final}
 
   # The connector (dialer) dials in: loads the initial send link
   2:

@@ -404,6 +404,15 @@ ConnStateEngine::ConnStateEngine() {
     declareStateTransition(STATE_CONN_CONNECTED,         EVENT_STATE_MACHINE_FINISHED, STATE_CONN_CONNECTED);
     declareStateTransition(STATE_CONN_CONNECTED,         EVENT_STATE_MACHINE_FAILED,   STATE_CONN_CONNECTED);
 
+    // A failed channel, link or connection while still establishing fails this state machine,
+    // which notifies its dependents via stateMachineFailed.
+    declareStateTransition(STATE_CONN_INITIAL,           EVENT_FAILED,                 STATE_CONN_FAILED);
+    declareStateTransition(STATE_CONN_ACTIVATED,         EVENT_FAILED,                 STATE_CONN_FAILED);
+    declareStateTransition(STATE_CONN_LINK_ESTABLISHED,  EVENT_FAILED,                 STATE_CONN_FAILED);
+    declareStateTransition(STATE_CONN_LINK_ESTABLISHED,  EVENT_CONNECTION_DESTROYED,   STATE_CONN_FAILED);
+    declareStateTransition(STATE_CONN_ACTIVATED,         EVENT_LINK_DESTROYED,         STATE_CONN_FAILED);
+    declareStateTransition(STATE_CONN_LINK_ESTABLISHED,  EVENT_LINK_DESTROYED,         STATE_CONN_FAILED);
+
     declareStateTransition(STATE_CONN_CONNECTED,         EVENT_CONN_CLOSE,             STATE_CONN_CLOSING);
     declareStateTransition(STATE_CONN_CLOSING,           EVENT_CONNECTION_DESTROYED,   STATE_CONN_CONNECTION_CLOSED);
     declareStateTransition(STATE_CONN_CONNECTION_CLOSED, EVENT_LINK_DESTROYED,         STATE_CONN_LINK_CLOSED);

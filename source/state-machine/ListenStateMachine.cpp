@@ -167,12 +167,31 @@ struct StateListenInitial : public ListenState {
         ? LinkDirectionality::Bidi
         : LinkDirectionality::Recv;
 
+    // Determine role based on channel properties (linkDirection): the receiver
+    // creates unless the channel is CREATOR_TO_LOADER. (A merged/Bidi link is
+    // on an LD_BIDI channel, for which the receiver, i.e. the listener, creates.)
+    bool recvCreating = ctx.shouldCreateReceiver(channelId);
+    LinkRole recvRole_ = recvCreating ? LinkRole::Creator : LinkRole::Loader;
+    helper::logDebug(logPrefix + "listen: recv linkDirection for '" + channelId +
+                     "' -> creating=" + (recvCreating ? "true" : "false"));
+
+    // For CREATOR_TO_LOADER the listener must load its recv link from the
+    // sender's address. Without one that can never work, so fail up front.
+    if (!recvCreating && linkAddress.empty()) {
+      helper::logError(logPrefix + "Channel '" + channelId +
+                       "' is CREATOR_TO_LOADER, so the listener must load its recv "
+                       "link, but no recv_address was provided");
+      ctx.listenCb(ApiStatus::INVALID_ARGUMENT, "", {});
+      ctx.listenCb = {};
+      return EventResult::NOT_SUPPORTED;
+    }
+
     // Create the FIRST connection state machine for the initial listener
     // This creates LinkID_0 and waits for the first client to connect
     ctx.recvConnSMHandle = Socket::establish(
         ctx.manager, ctx.handle,
         SocketRequest{channelId, role, linkAddress,
-                     ConnEstablishment{resolveBidiRole(ModeRole::Listener), recvDirectionality}});
+                     ConnEstablishment{recvRole_, recvDirectionality}});
 
     if (ctx.recvConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting connection state machine failed");
@@ -229,10 +248,17 @@ struct StateListenWaitingForSendConnection : public ListenState {
       return EventResult::SUCCESS;
     }
 
+    // Determine correct LinkRole for preset send connection based on channel properties
+    // For CT_INDIRECT + LD_CREATOR_TO_LOADER, the listener should be Creator (creates its own send repo)
+    bool sendCreating = ctx.shouldCreateSender(ctx.opts.send_channel);
+    LinkRole sendRole_ = sendCreating ? LinkRole::Creator : LinkRole::Loader;
+    helper::logDebug(logPrefix + "listen: preset send linkDirection for '" + ctx.opts.send_channel +
+                     "' -> creating=" + (sendCreating ? "true" : "false"));
+
     ctx.presetSendConnSMHandle = Socket::establish(
         ctx.manager, ctx.handle,
         SocketRequest{ctx.opts.send_channel, ctx.opts.send_role, ctx.opts.send_address,
-                     ConnEstablishment{LinkRole::Loader, LinkDirectionality::Send}});
+                     ConnEstablishment{sendRole_, LinkDirectionality::Send}});
 
     if (ctx.presetSendConnSMHandle == NULL_RACE_HANDLE) {
       helper::logError(logPrefix + " starting preset send connection state machine failed");
@@ -473,6 +499,12 @@ struct StateListenFinished : public ListenState {
     }
     ctx.acceptCb = {};
 
+    // Release dials that were received but never accepted
+    while (!ctx.preConduitSM.empty()) {
+      ctx.manager.stateMachineFinished(ctx.preConduitSM.front());
+      ctx.preConduitSM.pop();
+    }
+
     ctx.manager.stateMachineFinished(ctx);
 
     ctx.closeCb(ApiStatus::OK);
@@ -541,6 +573,11 @@ ListenStateEngine::ListenStateEngine() {
     declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_RECEIVE_PACKAGE,              STATE_LISTEN_WAITING);
     declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_ACCEPT,                       STATE_LISTEN_WAITING);
     declareStateTransition(STATE_LISTEN_WAITING,                       EVENT_CLOSE,                        STATE_LISTEN_FINISHED);
+
+    // The recv/preset-send connections failing while still setting up fails the listen. Once
+    // listening, a failed accept-time connection does not take down the listener.
+    declareStateTransition(STATE_LISTEN_INITIAL,                       EVENT_STATE_MACHINE_FAILED,         STATE_LISTEN_FAILED);
+    declareStateTransition(STATE_LISTEN_WAITING_FOR_SEND_CONNECTION,   EVENT_STATE_MACHINE_FAILED,         STATE_LISTEN_FAILED);
   // clang-format on
 }
 

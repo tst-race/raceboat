@@ -18,6 +18,7 @@
 
 #include <atomic>
 #include <future>
+#include <memory>
 #include <sstream>
 
 #include "Core.h"
@@ -132,16 +133,20 @@ ConduitProperties Conduit::getConduitProperties() {
   
 std::pair<ApiStatus, std::vector<uint8_t>> Conduit::read(int timeoutSeconds) {
   TRACE_METHOD(timeoutSeconds);
-  std::promise<std::pair<ApiStatus, std::vector<uint8_t>>> promise;
-  auto future = promise.get_future();
+  // The promise is shared with the callback because a timed-out read leaves
+  // its callback registered; it may be invoked after this function returns
+  // (e.g. when the conduit is closed).
+  auto promise = std::make_shared<
+      std::promise<std::pair<ApiStatus, std::vector<uint8_t>>>>();
+  auto future = promise->get_future();
 
   if (core == nullptr) {
     return {ApiStatus::INVALID, {}};
   }
 
   auto response = core->getApiManager().read(
-      handle, [&promise](ApiStatus status, std::vector<uint8_t> bytes) {
-        promise.set_value({status, std::move(bytes)});
+      handle, [promise](ApiStatus status, std::vector<uint8_t> bytes) {
+        promise->set_value({status, std::move(bytes)});
       });
   if (response.status != SDK_OK) {
     return {ApiStatus::INVALID_ARGUMENT, {}};
