@@ -7,6 +7,7 @@ Automatically handles both IPv4 and IPv6.
 Supports multiple simultaneous client connections.
 """
 
+import os
 import socket
 import sys
 import threading
@@ -15,7 +16,8 @@ import time
 PORT = 7777
 EXPECTED = b"hello from"  # Accept any client ID
 REPLY = b"hello from server\n"
-TIMEOUT = 180
+# Overridable via STUB_TIMEOUT (set by the scenario's "stub_timeout").
+TIMEOUT = float(os.environ.get("STUB_TIMEOUT", 180))
 NUM_CLIENTS = int(sys.argv[1]) if len(sys.argv) > 1 else 1
 
 # Shared state for tracking connections

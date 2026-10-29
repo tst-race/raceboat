@@ -12,6 +12,7 @@ link address getting their streams mixed up) instead of just checking for
 Usage: tcp-stub-client-multimsg.py <client_id> [num_messages]
 """
 
+import os
 import socket
 import sys
 import time
@@ -23,8 +24,10 @@ NUM_MESSAGES = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 # exemplars' whiteboard) can need up to ~2 poll cycles per round trip, and
 # occasional multi-cycle delays under multi-client contention over many
 # sequential messages have been observed to exceed 60-120s.
-TIMEOUT = 300
-MAX_RETRIES = 60
+# Overridable via STUB_TIMEOUT / STUB_CONNECT_RETRIES (set by the scenario's
+# "stub_timeout" / "stub_connect_retries") for slower plugins.
+TIMEOUT = float(os.environ.get("STUB_TIMEOUT", 300))
+MAX_RETRIES = int(os.environ.get("STUB_CONNECT_RETRIES", 60))
 RETRY_DELAY = 1
 
 

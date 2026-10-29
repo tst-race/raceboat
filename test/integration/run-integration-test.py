@@ -132,6 +132,18 @@ def main():
         default=None,
         help='Number of sequential round-trip messages per client (passed through to stub scripts that support it)'
     )
+    parser.add_argument(
+        '--stub-timeout',
+        type=float,
+        default=None,
+        help='Per-operation socket timeout (seconds) for the stub scripts (default: each stub\'s built-in value)'
+    )
+    parser.add_argument(
+        '--stub-connect-retries',
+        type=int,
+        default=None,
+        help='Number of 1s-spaced attempts the client stub makes to connect to race-cli (default: stub built-in)'
+    )
 
     args = parser.parse_args()
 
@@ -262,8 +274,14 @@ def main():
         # Start server stub in background (with number of expected clients)
         print(f"Starting server stub (expecting {num_clients} clients)...")
         server_stub_args = f'{num_clients}' if args.messages is None else f'{num_clients} {args.messages}'
+        stub_env = {}
+        if args.stub_timeout is not None:
+            stub_env['STUB_TIMEOUT'] = str(args.stub_timeout)
+        if args.stub_connect_retries is not None:
+            stub_env['STUB_CONNECT_RETRIES'] = str(args.stub_connect_retries)
+        env_flags = [x for k, v in stub_env.items() for x in ('-e', f'{k}={v}')]
         subprocess.run(
-            ['docker', 'exec', '-d', server_container, 'bash', '-c',
+            ['docker', 'exec', '-d', *env_flags, server_container, 'bash', '-c',
              f'python3 /tmp/stub-server.py {server_stub_args} >/tmp/stub-server.out 2>&1'],
             check=True
         )
@@ -277,7 +295,7 @@ def main():
         client_results = [None] * num_clients
 
         def run_client_stub(idx, client):
-            client_stub_cmd = ['docker', 'exec', client, 'python3', '/tmp/stub-client.py', client]
+            client_stub_cmd = ['docker', 'exec', *env_flags, client, 'python3', '/tmp/stub-client.py', client]
             if args.messages is not None:
                 client_stub_cmd.append(str(args.messages))
             client_results[idx] = (client, subprocess.run(

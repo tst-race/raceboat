@@ -85,6 +85,11 @@ def main() -> int:
                 cmd += ["--client-stub-path", str(INTEGRATION_DIR / scenario["stub_client"])]
             if "messages" in scenario:
                 cmd += ["--messages", str(scenario["messages"])]
+            # Slower plugins: raise the stubs' socket timeout / client connect retries.
+            if "stub_timeout" in scenario:
+                cmd += ["--stub-timeout", str(scenario["stub_timeout"])]
+            if "stub_connect_retries" in scenario:
+                cmd += ["--stub-connect-retries", str(scenario["stub_connect_retries"])]
             returncode = subprocess.run(cmd).returncode
 
         logs_dir = compose_path.parent / "logs"

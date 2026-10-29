@@ -13,6 +13,7 @@ shows up as out-of-order indices or a different client's data appearing).
 Usage: tcp-stub-server-multimsg.py [num_clients] [num_messages]
 """
 
+import os
 import socket
 import sys
 import threading
@@ -22,7 +23,7 @@ PORT = 7777
 # exemplars' whiteboard) can need up to ~2 poll cycles per round trip, and
 # occasional multi-cycle delays under multi-client contention over many
 # sequential messages have been observed to exceed 60-120s.
-TIMEOUT = 300
+TIMEOUT = float(os.environ.get("STUB_TIMEOUT", 300))  # scenario "stub_timeout"
 NUM_CLIENTS = int(sys.argv[1]) if len(sys.argv) > 1 else 1
 NUM_MESSAGES = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 

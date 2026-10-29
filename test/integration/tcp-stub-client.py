@@ -8,6 +8,7 @@ Automatically handles both IPv4 and IPv6.
 Supports optional client identification for multi-client testing.
 """
 
+import os
 import socket
 import sys
 import time
@@ -16,8 +17,10 @@ PORT = 9999
 CLIENT_ID = sys.argv[1] if len(sys.argv) > 1 else "client"
 MESSAGE = f"hello from {CLIENT_ID}\n".encode()
 EXPECTED = b"hello from server"
-TIMEOUT = 30
-MAX_RETRIES = 60
+# Overridable via STUB_TIMEOUT / STUB_CONNECT_RETRIES (set by the scenario's
+# "stub_timeout" / "stub_connect_retries") for slower plugins.
+TIMEOUT = float(os.environ.get("STUB_TIMEOUT", 30))
+MAX_RETRIES = int(os.environ.get("STUB_CONNECT_RETRIES", 60))
 RETRY_DELAY = 1
 
 def try_connect(family, host):
