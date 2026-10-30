@@ -1,0 +1,31 @@
+{
+  "id": "audius-send-recv",
+  "mode": "send-recv",
+  "wait_time": 60,
+  "timeout": 120,
+  "network": {
+    "name": "audius-send-recv-network",
+    "subnet": "10.50.2.0/24"
+  },
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "audius-send-recv-listener",
+      "ip": "10.50.2.3",
+      "slots": {
+        "channel": "audiusComposition"
+      }
+    },
+    {
+      "role": "connector",
+      "id": "audius-send-recv-connector",
+      "ip": "10.50.2.2",
+      "slots": {
+        "channel": "audiusComposition"
+      }
+    }
+  ],
+  "send_message": "Hello from audius-send-recv",
+  "reply_message": "Reply from audius-send-recv",
+  "description": "Request/reply: the connector sends a request, the listener replies; each direction uses its own container."
+}

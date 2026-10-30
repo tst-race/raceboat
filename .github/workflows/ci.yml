@@ -368,6 +368,10 @@ jobs:
               hf-mixed-client-connect \
               hf-send-only \
               hf-send-recv \
+              audius-send-only \
+              audius-send-recv \
+              audius-client-connect \
+              audius-mixed-client-connect \
               skyhook-client-connect
 
       - name: Upload logs on failure

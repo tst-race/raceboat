@@ -1,0 +1,38 @@
+{
+  "id": "audius-mixed-client-connect",
+  "mode": "client-connect",
+  "wait_time": 60,
+  "timeout": 240,
+  "network": {
+    "name": "audius-mixed-client-connect-network",
+    "subnet": "10.50.4.0/24"
+  },
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "audius-mixed-client-connect-listener",
+      "ip": "10.50.4.3",
+      "slots": {
+        "channel": {
+          "recv": "twoSixIndirectComposition",
+          "send": "audiusComposition"
+        }
+      }
+    },
+    {
+      "role": "connector",
+      "id": "audius-mixed-client-connect-connector",
+      "ip": "10.50.4.2",
+      "slots": {
+        "channel": {
+          "recv": "audiusComposition",
+          "send": "twoSixIndirectComposition"
+        }
+      }
+    }
+  ],
+  "send_message": "stub client-connect test",
+  "reply_message": "stub reply",
+  "description": "Mixed directions: upstream (connector->listener) uses the reference twoSixIndirectComposition, downstream (listener->connector) uses audiusComposition. Verifies the adapter fills only the direction it is asked for.",
+  "stub_timeout": 180
+}

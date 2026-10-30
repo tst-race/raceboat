@@ -1,0 +1,30 @@
+{
+  "id": "audius-send-only",
+  "mode": "send",
+  "wait_time": 60,
+  "timeout": 120,
+  "network": {
+    "name": "audius-send-only-network",
+    "subnet": "10.50.1.0/24"
+  },
+  "nodes": [
+    {
+      "role": "listener",
+      "id": "audius-send-only-listener",
+      "ip": "10.50.1.3",
+      "slots": {
+        "channel": "audiusComposition"
+      }
+    },
+    {
+      "role": "connector",
+      "id": "audius-send-only-connector",
+      "ip": "10.50.1.2",
+      "slots": {
+        "channel": "audiusComposition"
+      }
+    }
+  ],
+  "send_message": "stub send-only test",
+  "description": "One-way push: the connector posts one message, the listener fetches and prints it."
+}
