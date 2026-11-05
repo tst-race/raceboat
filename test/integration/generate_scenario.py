@@ -557,7 +557,10 @@ def _merge_kits(node: Node, output_dir: Path) -> None:
         dest = kits_dir / kit_dir.name
         if dest.exists():
             shutil.rmtree(dest)
-        shutil.copytree(kit_dir, dest)
+        shutil.copytree(
+            kit_dir, dest,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
 
 
 def _render_compose(scenario: dict, nodes: List[Node], output_dir: Path, image_tag: str) -> str:
