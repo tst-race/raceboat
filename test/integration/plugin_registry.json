@@ -2,5 +2,6 @@
   "racebird": "../../../plugins/racebird",
   "decomposed-exemplars": "../../../plugins/decomposed-exemplars",
   "skyhook": "../../../plugins/skyhook",
-  "hf-stego-transport": "../../../hf-stego-transport"
+  "hf-stego-transport": "../../../hf-stego-transport",
+  "pythonBase64-encoding": "../../../pythonBase64-encoding"
 }
